@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import 'tailwindcss';
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #F1F0EA;
+  color: #24302E;
+  margin: 0;
+  padding: 0;
+}
+
+.font-mono {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #D6D3C6;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8C897C;
+}
+
+/* ── Design tokens ── */
+:root {
+  --accent:       #B08D46;
+  --accent-light: #F1E7D2;
+  --accent-ring:  #B08D4640;
+  --font-body:    'Inter', system-ui, sans-serif;
+  --font-mono:    'IBM Plex Mono', monospace;
+}
+
+/* Display / title typeface */
+.display { font-family: var(--font-body); font-weight: 600; }
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #4C7A6E !important;
+  box-shadow: 0 0 0 2px #B08D46;
+}
+
+/* OTP inputs */
+.otp-input {
+  width: 48px;
+  height: 56px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 600;
+  border: 1px solid #D6D3C6;
+  border-radius: 6px;
+  background: #FFFFFF;
+  color: #24302E;
+}
+.otp-input:focus {
+  border-color: #4C7A6E;
+  box-shadow: 0 0 0 2px #B08D46;
+}
+
+button {
+  transition: all 0.15s ease;
+}
+
+/* Primary Button Hover */
+button[style*="background: rgb(76, 122, 110)"]:hover:not(:disabled),
+button[style*="background-color: rgb(76, 122, 110)"]:hover:not(:disabled),
+button[style*="background: #4C7A6E"]:hover:not(:disabled),
+button[style*="background: #4c7a6e"]:hover:not(:disabled) {
+  background: #3F6459 !important;
+}
+
+/* Secondary Button Hover */
+button[style*="background: rgb(255, 255, 255)"]:hover:not(:disabled),
+button[style*="background-color: rgb(255, 255, 255)"]:hover:not(:disabled),
+button[style*="background: white"]:hover:not(:disabled),
+button[style*="background: #fff"]:hover:not(:disabled),
+button[style*="background: #ffffff"]:hover:not(:disabled) {
+  background: #E4E2D9 !important;
+}
+
