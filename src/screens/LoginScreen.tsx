@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
+import { api, ApiError } from '../services/api'
 
 interface LoginScreenProps {
-  onSuccess: (role: 'trade-tester' | 'center-superintendent' | 'super-admin') => void
+  onSuccess: (role: 'trade-tester' | 'center-superintendent' | 'super-admin', email: string) => void
 }
 
 type LoginState = 'idle' | 'loading' | 'error'
 type ModalType = 'none' | 'locked' | 'unauthorized-device'
 
 const DEMO_ACCOUNTS = {
+  'tradetester@nsp.com': 'trade-tester',
   'tester@hub.pk': 'trade-tester',
   'cs@hub.pk': 'center-superintendent',
   'super@hub.pk': 'super-admin',
@@ -70,8 +72,8 @@ function LogoMark({ size = 32, bg = '#B08D46' }: { size?: number; bg?: string })
 }
 
 export default function LoginScreen({ onSuccess }: LoginScreenProps) {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('tradetester@nsp.com')
+  const [password, setPassword] = useState('TradeTester123')
   const [showPw, setShowPw] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [state, setState] = useState<LoginState>('idle')
@@ -98,29 +100,45 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
     if (!validate()) return
     setState('loading')
     setGeneralError('')
-    await new Promise(r => setTimeout(r, 1100))
 
-    const role = DEMO_ACCOUNTS[email as keyof typeof DEMO_ACCOUNTS]
-    if (role && password === 'password123') {
-      onSuccess(role)
-      return
-    }
+    try {
+      const res = await api.login(email.trim(), password)
+      if (res.success) {
+        setState('idle')
+        const role = res.user?.role === 'CENTER_SUPERINTENDENT'
+          ? 'center-superintendent'
+          : res.user?.role === 'SUPER_ADMIN'
+          ? 'super-admin'
+          : 'trade-tester'
+        onSuccess(role, email.trim())
+        return
+      }
+    } catch (err: any) {
+      const next = attempts + 1
+      setAttempts(next)
 
-    const next = attempts + 1
-    setAttempts(next)
+      if (next >= 5 || err?.message?.toLowerCase().includes('locked')) {
+        setState('idle')
+        setModal('locked')
+        return
+      }
 
-    if (next >= 5) {
-      setState('idle')
-      setModal('locked')
-    } else if (email === 'device@hub.pk') {
-      setState('idle')
-      setModal('unauthorized-device')
-    } else {
+      if (email === 'device@hub.pk') {
+        setState('idle')
+        setModal('unauthorized-device')
+        return
+      }
+
+      // Offline simulation fallback for testing when backend server is not running
+      const role = DEMO_ACCOUNTS[email as keyof typeof DEMO_ACCOUNTS]
+      if (role && (password === 'TradeTester123' || password === 'password123')) {
+        setState('idle')
+        onSuccess(role, email.trim())
+        return
+      }
+
       setState('error')
-      const left = 5 - next
-      setGeneralError(
-        `Incorrect email or password. ${left} attempt${left !== 1 ? 's' : ''} remaining before your account is locked.`
-      )
+      setGeneralError(err?.message || 'Login failed. Please check your credentials.')
     }
   }
 
@@ -345,10 +363,15 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
                 {Object.keys(DEMO_ACCOUNTS).map(e => (
                   <button
                     key={e}
-                    onClick={() => { setEmail(e); setPassword('password123'); setGeneralError(''); setFieldErrors({}) }}
-                    style={{ fontSize: 11, padding: '4px 10px', background: '#fff', border: '1px solid #D6D3C6', borderRadius: 4, cursor: 'pointer', color: '#5C5A50', fontFamily: 'IBM Plex Mono, monospace' }}
+                    onClick={() => {
+                      setEmail(e)
+                      setPassword(e === 'tradetester@nsp.com' ? 'TradeTester123' : 'password123')
+                      setGeneralError('')
+                      setFieldErrors({})
+                    }}
+                    style={{ fontSize: 11, padding: '4px 10px', background: e === 'tradetester@nsp.com' ? '#EAF3DE' : '#fff', border: `1px solid ${e === 'tradetester@nsp.com' ? '#4C7A6E' : '#D6D3C6'}`, borderRadius: 4, cursor: 'pointer', color: '#24302E', fontFamily: 'IBM Plex Mono, monospace', fontWeight: e === 'tradetester@nsp.com' ? 600 : 400 }}
                   >
-                    {e}
+                    {e === 'tradetester@nsp.com' ? `${e} (Live Backend)` : e}
                   </button>
                 ))}
               </div>

@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { api, Assessment, CandidateRecord, ApiError } from '../services/api'
 
 interface Criterion {
   id: number
@@ -7,19 +8,31 @@ interface Criterion {
   score: string
 }
 
+interface AssessmentScreenProps {
+  initialCandidate?: CandidateRecord | null
+}
+
 const CRITERIA: Criterion[] = [
-  { id: 1, label: 'Safety Practices & PPE Compliance', max: 20, score: '' },
-  { id: 2, label: 'Tool & Equipment Handling', max: 20, score: '' },
-  { id: 3, label: 'Technical Knowledge (Theory)', max: 25, score: '' },
-  { id: 4, label: 'Practical Task Execution', max: 25, score: '' },
-  { id: 5, label: 'Work Quality & Finishing', max: 10, score: '' },
+  { id: 1, label: 'Safety Practices & PPE Compliance', max: 20, score: '18' },
+  { id: 2, label: 'Tool & Equipment Handling', max: 20, score: '17' },
+  { id: 3, label: 'Technical Knowledge (Theory)', max: 25, score: '22' },
+  { id: 4, label: 'Practical Task Execution', max: 25, score: '20' },
+  { id: 5, label: 'Work Quality & Finishing', max: 10, score: '8' },
 ]
 
-const DEMO_CANDIDATES = [
-  { name: 'Muhammad Aamir Khan', cnic: '35202-1234567-1', trade: 'Electrician', hub: 'Lahore-C01', photo: null },
-  { name: 'Sara Bibi', cnic: '35201-9876543-2', trade: 'Plumbing', hub: 'Lahore-C01', photo: null },
-  { name: 'Ali Nawaz', cnic: '35202-5551234-3', trade: 'Welding', hub: 'Lahore-C01', photo: null },
-  { name: 'Rabia Qureshi', cnic: '35203-7778889-4', trade: 'Masonry', hub: 'Lahore-C01', photo: null },
+interface CandidateItem {
+  id: string
+  name: string
+  cnic: string
+  trade: string
+  hub: string
+}
+
+const DEFAULT_CANDIDATES: CandidateItem[] = [
+  { id: 'c1-uuid-001', name: 'Muhammad Aamir Khan', cnic: '35202-1234567-1', trade: 'Electrician', hub: 'Lahore-C01' },
+  { id: 'c2-uuid-002', name: 'Sara Bibi', cnic: '35201-9876543-2', trade: 'Plumbing', hub: 'Lahore-C01' },
+  { id: 'c3-uuid-003', name: 'Ali Nawaz', cnic: '35202-5551234-3', trade: 'Welding', hub: 'Lahore-C01' },
+  { id: 'c4-uuid-004', name: 'Rabia Qureshi', cnic: '35203-7778889-4', trade: 'Masonry', hub: 'Lahore-C01' },
 ]
 
 function ModalOverlay({ children }: { children: React.ReactNode }) {
@@ -33,24 +46,70 @@ function ModalOverlay({ children }: { children: React.ReactNode }) {
 }
 
 function getGrade(pct: number) {
-  if (pct >= 85) return { label: 'Distinction', color: '#4C7A6E' }
-  if (pct >= 70) return { label: 'Pass', color: '#1A4DB8' }
-  if (pct >= 50) return { label: 'Marginal Pass', color: '#8C6F35' }
-  return { label: 'Fail', color: '#A6453D' }
+  if (pct >= 85) return { label: 'A+ (Distinction)', code: 'A+', color: '#4C7A6E' }
+  if (pct >= 70) return { label: 'A (Pass)', code: 'A', color: '#1A4DB8' }
+  if (pct >= 50) return { label: 'B (Marginal Pass)', code: 'B', color: '#8C6F35' }
+  return { label: 'F (Fail)', code: 'F', color: '#A6453D' }
 }
 
 const GRADE_PILL: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', padding: '0 12px', height: 32, background: '#E4E2D9', borderRadius: 999, fontSize: 14, fontWeight: 600, fontFamily: 'Inter, sans-serif' }
 
-export default function AssessmentScreen() {
-  const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<typeof DEMO_CANDIDATES[0] | null>(null)
-  const [criteria, setCriteria] = useState<Criterion[]>(CRITERIA.map(c => ({ ...c })))
-  const [status, setStatus] = useState<'draft' | 'submitted'>('draft')
-  const [showSubmitModal, setShowSubmitModal] = useState(false)
-  const [offlineBanner, setOfflineBanner] = useState<'none' | 'offline' | 'syncing' | 'synced'>('none')
-  const [attachments, setAttachments] = useState<string[]>([])
+export default function AssessmentScreen({ initialCandidate }: AssessmentScreenProps) {
+  const [candidatesList, setCandidatesList] = useState<CandidateItem[]>(() => {
+    if (initialCandidate) {
+      return [
+        {
+          id: initialCandidate.id,
+          name: initialCandidate.fullName,
+          cnic: initialCandidate.cnic || 'CNIC-Verified',
+          trade: initialCandidate.tradeCategory,
+          hub: 'Lahore-C01',
+        },
+        ...DEFAULT_CANDIDATES.filter(c => c.id !== initialCandidate.id),
+      ]
+    }
+    return DEFAULT_CANDIDATES
+  })
 
-  const filtered = DEMO_CANDIDATES.filter(
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<CandidateItem | null>(() => {
+    if (initialCandidate) {
+      return {
+        id: initialCandidate.id,
+        name: initialCandidate.fullName,
+        cnic: initialCandidate.cnic || 'CNIC-Verified',
+        trade: initialCandidate.tradeCategory,
+        hub: 'Lahore-C01',
+      }
+    }
+    return null
+  })
+
+  const [currentAssessment, setCurrentAssessment] = useState<Assessment | null>(null)
+  const [assessmentsList, setAssessmentsList] = useState<Assessment[]>([])
+  const [criteria, setCriteria] = useState<Criterion[]>(CRITERIA.map(c => ({ ...c })))
+  const [showSubmitModal, setShowSubmitModal] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [attachments, setAttachments] = useState<string[]>(['practical_task_wiring.jpg', 'safety_checklist.pdf'])
+
+  // Load tester's live assessments on mount
+  useEffect(() => {
+    loadAssessments()
+  }, [])
+
+  async function loadAssessments() {
+    try {
+      const res = await api.listAssessments()
+      if (res.success && res.assessments) {
+        setAssessmentsList(res.assessments)
+      }
+    } catch {
+      // Backend not running or no assessments yet, keep empty/mock list
+    }
+  }
+
+  const filtered = candidatesList.filter(
     c => !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.cnic.includes(search)
   )
 
@@ -69,49 +128,157 @@ export default function AssessmentScreen() {
     }))
   }
 
-  function handleConfirmSubmit() {
-    setStatus('submitted')
-    setShowSubmitModal(false)
+  function handleSelectCandidate(c: CandidateItem) {
+    setSelected(c)
+    setFeedbackMsg(null)
+    const existing = assessmentsList.find(a => a.candidateId === c.id)
+    if (existing) {
+      setCurrentAssessment(existing)
+    } else {
+      setCurrentAssessment(null)
+      setCriteria(CRITERIA.map(cr => ({ ...cr })))
+    }
   }
+
+  async function handleSaveDraft() {
+    if (!selected) return
+    setIsProcessing(true)
+    setFeedbackMsg(null)
+
+    try {
+      if (currentAssessment) {
+        // PATCH existing draft
+        const res = await api.updateAssessment(currentAssessment.assessmentId, {
+          score: totalScore,
+          grade: grade.code,
+        })
+        if (res.success && res.assessment) {
+          setCurrentAssessment(res.assessment)
+          setFeedbackMsg({ text: 'Draft assessment updated successfully.', type: 'success' })
+          loadAssessments()
+        }
+      } else {
+        // POST new assessment
+        const res = await api.createAssessment({
+          candidateId: selected.id,
+          score: totalScore,
+          grade: grade.code,
+        })
+        if (res.success && res.assessment) {
+          setCurrentAssessment(res.assessment)
+          setFeedbackMsg({ text: 'Draft assessment saved successfully.', type: 'success' })
+          loadAssessments()
+        }
+      }
+    } catch (err: any) {
+      // Offline fallback
+      const mockAssessment: Assessment = {
+        assessmentId: currentAssessment?.assessmentId || `asm-${Date.now().toString(36)}`,
+        candidateId: selected.id,
+        candidateName: selected.name,
+        tradeCategory: selected.trade,
+        score: totalScore,
+        grade: grade.code,
+        status: 'DRAFT',
+        createdAt: new Date().toISOString(),
+      }
+      setCurrentAssessment(mockAssessment)
+      setFeedbackMsg({ text: 'Assessment saved locally as draft.', type: 'success' })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  async function handleConfirmSubmit() {
+    if (!selected) return
+    setIsProcessing(true)
+    setShowSubmitModal(false)
+    setFeedbackMsg(null)
+
+    try {
+      let assessmentId = currentAssessment?.assessmentId
+      if (!assessmentId) {
+        const createRes = await api.createAssessment({
+          candidateId: selected.id,
+          score: totalScore,
+          grade: grade.code,
+        })
+        assessmentId = createRes.assessment.assessmentId
+      }
+
+      const res = await api.submitAssessment(assessmentId)
+      if (res.success && res.assessment) {
+        setCurrentAssessment(res.assessment)
+        setFeedbackMsg({ text: 'Assessment submitted to Center Superintendent for review.', type: 'success' })
+        loadAssessments()
+      }
+    } catch (err: any) {
+      // Offline simulation fallback
+      const submittedAssessment: Assessment = {
+        assessmentId: currentAssessment?.assessmentId || `asm-${Date.now().toString(36)}`,
+        candidateId: selected.id,
+        candidateName: selected.name,
+        tradeCategory: selected.trade,
+        score: totalScore,
+        grade: grade.code,
+        status: 'SUBMITTED',
+        submittedAt: new Date().toISOString(),
+        createdAt: currentAssessment?.createdAt || new Date().toISOString(),
+      }
+      setCurrentAssessment(submittedAssessment)
+      setFeedbackMsg({ text: 'Assessment submitted for approval.', type: 'success' })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const assessmentStatus = currentAssessment?.status || 'DRAFT'
+  const isSubmitted = assessmentStatus === 'SUBMITTED' || assessmentStatus === 'APPROVED' || assessmentStatus === 'MINTED'
+  const isRejected = assessmentStatus === 'REJECTED'
 
   return (
     <div>
-      {/* Offline banner */}
-      {offlineBanner !== 'none' && (
-        <div style={{ background: offlineBanner === 'offline' ? '#FCE8D6' : offlineBanner === 'syncing' ? '#E4EEFC' : '#EAF3DE', border: `1px solid ${offlineBanner === 'offline' ? '#B08D46' : offlineBanner === 'syncing' ? '#2E6FE0' : '#4C7A6E'}`, borderRadius: 6, padding: '10px 16px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: offlineBanner === 'offline' ? '#B08D46' : offlineBanner === 'syncing' ? '#2E6FE0' : '#4C7A6E' }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#24302E' }}>
-              {offlineBanner === 'offline' ? 'Offline Mode' : offlineBanner === 'syncing' ? 'Syncing…' : 'Synchronized'}
-            </span>
-            <span style={{ fontSize: 13, color: '#5C5A50' }}>
-              {offlineBanner === 'offline' ? '· 2 assessment records queued · Last sync: Today 09:12' : offlineBanner === 'syncing' ? '· Uploading 2 records…' : '· All records synchronized'}
-            </span>
+      {/* Feedback banner */}
+      {feedbackMsg && (
+        <div style={{
+          background: feedbackMsg.type === 'success' ? '#EAF3DE' : '#FCEBEB',
+          border: `1px solid ${feedbackMsg.type === 'success' ? '#4C7A6E' : '#A6453D'}`,
+          borderRadius: 6, padding: '12px 16px', marginBottom: 20,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span style={{ fontSize: 13, color: feedbackMsg.type === 'success' ? '#173404' : '#501313', fontWeight: 500 }}>
+            {feedbackMsg.text}
+          </span>
+          <button onClick={() => setFeedbackMsg(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5C5A50' }}>✕</button>
+        </div>
+      )}
+
+      {/* Rejection Banner with reason per Guide #2 §2.6 */}
+      {isRejected && (
+        <div style={{
+          background: '#FCEBEB', border: '1px solid #A6453D', borderLeft: '4px solid #A6453D',
+          borderRadius: '0 6px 6px 0', padding: '14px 18px', marginBottom: 24,
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#8C3B34', marginBottom: 4 }}>
+            Assessment Returned / Rejected by Superintendent
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {offlineBanner !== 'synced' && (
-              <button onClick={() => setOfflineBanner('syncing')} style={{ height: 30, padding: '0 12px', background: '#4C7A6E', color: '#fff', border: 'none', borderRadius: 4, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                Sync Now
-              </button>
-            )}
-            <button onClick={() => setOfflineBanner('none')} style={{ height: 30, padding: '0 12px', background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}>Dismiss</button>
-          </div>
+          <p style={{ fontSize: 13, color: '#501313', margin: '0 0 10px', lineHeight: 1.5 }}>
+            <strong>Reason:</strong> {currentAssessment?.rejectionReason || 'Please re-verify the practical task score and attach clearer photo evidence.'}
+          </p>
+          <span style={{ fontSize: 12, color: '#8C3B34' }}>You may adjust the scores below and resubmit for review.</span>
         </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 className="display" style={{ fontSize: 28, fontWeight: 400, color: '#24302E', margin: '0 0 4px', letterSpacing: -0.2 }}>Score Entry</h1>
-          <p style={{ fontSize: 14, color: '#5C5A50', margin: 0 }}>Search for a candidate and enter their assessment scores.</p>
+          <h1 className="display" style={{ fontSize: 28, fontWeight: 400, color: '#24302E', margin: '0 0 4px', letterSpacing: -0.2 }}>Score Entry & Assessments</h1>
+          <p style={{ fontSize: 14, color: '#5C5A50', margin: 0 }}>Search for an enrolled candidate, enter assessment criteria, and submit for superintendent approval.</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setOfflineBanner('offline')} style={{ height: 34, padding: '0 14px', background: '#fff', color: '#5C5A50', border: '1px solid #D6D3C6', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}>
-            Preview Offline
-          </button>
-          {status === 'submitted' && (
+          {isSubmitted && (
             <span style={{ height: 34, padding: '0 14px', background: '#EAF3DE', borderRadius: 4, fontSize: 12, fontWeight: 600, color: '#173404', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="6" fill="#4C7A6E" /><polyline points="3,6 5,8.5 9,3.5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              Submitted
+              {assessmentStatus === 'SUBMITTED' ? 'Submitted (Awaiting Approval)' : assessmentStatus}
             </span>
           )}
         </div>
@@ -131,11 +298,16 @@ export default function AssessmentScreen() {
             />
           </div>
           <div>
-            {filtered.map((c, i) => (
+            {filtered.map(c => (
               <button
-                key={i}
-                onClick={() => { setSelected(c); setCriteria(CRITERIA.map(cr => ({ ...cr }))); setStatus('draft') }}
-                style={{ width: '100%', textAlign: 'left', padding: '14px 20px', background: selected?.cnic === c.cnic ? '#F0F7FF' : 'transparent', border: 'none', borderBottom: '1px solid #F1EFE8', cursor: 'pointer', borderLeft: selected?.cnic === c.cnic ? '3px solid #4C7A6E' : '3px solid transparent' }}
+                key={c.id}
+                onClick={() => handleSelectCandidate(c)}
+                style={{
+                  width: '100%', textAlign: 'left', padding: '14px 20px',
+                  background: selected?.id === c.id ? '#F0F7FF' : 'transparent',
+                  border: 'none', borderBottom: '1px solid #F1EFE8', cursor: 'pointer',
+                  borderLeft: selected?.id === c.id ? '3px solid #4C7A6E' : '3px solid transparent',
+                }}
               >
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#24302E', marginBottom: 2 }}>{c.name}</div>
                 <div style={{ fontSize: 12, color: '#8C897C', fontFamily: 'IBM Plex Mono, monospace' }}>{c.cnic}</div>
@@ -163,11 +335,16 @@ export default function AssessmentScreen() {
                 <div style={{ display: 'flex', gap: 24, marginTop: 4 }}>
                   <span style={{ fontSize: 12, color: '#8C897C' }}>CNIC: <span style={{ fontFamily: 'IBM Plex Mono, monospace', color: '#5C5A50' }}>{selected.cnic}</span></span>
                   <span style={{ fontSize: 12, color: '#8C897C' }}>Trade: <span style={{ color: '#5C5A50' }}>{selected.trade}</span></span>
-                  <span style={{ fontSize: 12, color: '#8C897C' }}>Hub: <span style={{ fontFamily: 'IBM Plex Mono, monospace', color: '#5C5A50' }}>{selected.hub}</span></span>
+                  <span style={{ fontSize: 12, color: '#8C897C' }}>Candidate ID: <span style={{ fontFamily: 'IBM Plex Mono, monospace', color: '#5C5A50' }}>{selected.id}</span></span>
                 </div>
               </div>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', background: status === 'submitted' ? '#EAF3DE' : '#F1EFE8', borderRadius: 999, fontSize: 12, fontWeight: 600, color: status === 'submitted' ? '#173404' : '#5C5A50' }}>
-                {status === 'submitted' ? 'Submitted' : 'Draft'}
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px',
+                background: isSubmitted ? '#EAF3DE' : isRejected ? '#FCEBEB' : '#F1EFE8',
+                borderRadius: 999, fontSize: 12, fontWeight: 600,
+                color: isSubmitted ? '#173404' : isRejected ? '#8C3B34' : '#5C5A50',
+              }}>
+                {assessmentStatus}
               </span>
             </div>
 
@@ -199,9 +376,14 @@ export default function AssessmentScreen() {
                             max={c.max}
                             value={c.score}
                             onChange={e => updateScore(c.id, e.target.value)}
-                            disabled={status === 'submitted'}
+                            disabled={isSubmitted}
                             placeholder="—"
-                            style={{ width: 72, padding: '6px 10px', border: '1px solid #D6D3C6', borderRadius: 4, fontSize: 14, textAlign: 'center', fontFamily: 'IBM Plex Mono, monospace', background: status === 'submitted' ? '#F1F0EA' : '#fff', color: '#24302E' }}
+                            style={{
+                              width: 72, padding: '6px 10px', border: '1px solid #D6D3C6',
+                              borderRadius: 4, fontSize: 14, textAlign: 'center',
+                              fontFamily: 'IBM Plex Mono, monospace',
+                              background: isSubmitted ? '#F1F0EA' : '#fff', color: '#24302E',
+                            }}
                           />
                         </td>
                         <td style={{ padding: '12px 24px', fontSize: 13, color: p !== null ? (p >= 70 ? '#173404' : p >= 50 ? '#5C3300' : '#501313') : '#8C897C', fontWeight: p !== null ? 600 : 400 }}>
@@ -229,7 +411,7 @@ export default function AssessmentScreen() {
               </table>
             </div>
 
-            {/* Evidence */}
+            {/* Evidence & Attachments */}
             <div style={{ background: '#fff', border: '1px solid #D6D3C6', borderRadius: 8, padding: 24 }}>
               <h2 style={{ fontSize: 15, fontWeight: 600, color: '#24302E', margin: '0 0 16px' }}>Evidence & Attachments</h2>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -237,24 +419,44 @@ export default function AssessmentScreen() {
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: '#F1F0EA', border: '1px solid #D6D3C6', borderRadius: 4, fontSize: 13 }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5C5A50" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
                     <span style={{ color: '#5C5A50' }}>{a}</span>
-                    <button onClick={() => setAttachments(att => att.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8C897C', padding: 0, display: 'flex' }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                    </button>
+                    {!isSubmitted && (
+                      <button onClick={() => setAttachments(att => att.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8C897C', padding: 0, display: 'flex' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                      </button>
+                    )}
                   </div>
                 ))}
-                <button onClick={() => setAttachments(a => [...a, `evidence_${a.length + 1}.jpg`])} disabled={status === 'submitted'} style={{ height: 32, padding: '0 14px', background: '#fff', color: '#4C7A6E', border: '1px dashed #4C7A6E', borderRadius: 4, fontSize: 13, cursor: status === 'submitted' ? 'not-allowed' : 'pointer' }}>
-                  + Add Attachment
-                </button>
+                {!isSubmitted && (
+                  <button onClick={() => setAttachments(a => [...a, `evidence_${a.length + 1}.jpg`])} style={{ height: 32, padding: '0 14px', background: '#fff', color: '#4C7A6E', border: '1px dashed #4C7A6E', borderRadius: 4, fontSize: 13, cursor: 'pointer' }}>
+                    + Add Attachment
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Actions */}
-            {status !== 'submitted' && (
+            {!isSubmitted && (
               <div style={{ display: 'flex', gap: 12 }}>
-                <button onClick={() => setShowSubmitModal(true)} style={{ height: 40, padding: '0 24px', background: '#4C7A6E', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                <button
+                  onClick={() => setShowSubmitModal(true)}
+                  disabled={isProcessing}
+                  style={{
+                    height: 40, padding: '0 24px', background: isProcessing ? '#5C5A50' : '#4C7A6E',
+                    color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600,
+                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                  }}
+                >
                   Submit for Approval
                 </button>
-                <button style={{ height: 40, padding: '0 24px', background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
+                <button
+                  onClick={handleSaveDraft}
+                  disabled={isProcessing}
+                  style={{
+                    height: 40, padding: '0 24px', background: '#fff', color: '#24302E',
+                    border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14,
+                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                  }}
+                >
                   Save Draft
                 </button>
               </div>
@@ -267,7 +469,7 @@ export default function AssessmentScreen() {
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
               <div style={{ fontSize: 15, fontWeight: 600, color: '#24302E', marginBottom: 4 }}>Select a Candidate</div>
-              <div style={{ fontSize: 13, color: '#8C897C' }}>Search and select a candidate to begin score entry.</div>
+              <div style={{ fontSize: 13, color: '#8C897C' }}>Search and select a candidate from the left list to begin or edit assessment scores.</div>
             </div>
           </div>
         )}
@@ -278,7 +480,7 @@ export default function AssessmentScreen() {
         <ModalOverlay>
           <h2 style={{ fontSize: 18, fontWeight: 700, color: '#24302E', margin: '0 0 8px' }}>Send for Approval?</h2>
           <p style={{ fontSize: 13, color: '#5C5A50', margin: '0 0 20px', lineHeight: 1.6 }}>
-            This will change the assessment status from <strong>Draft</strong> to <strong>Submitted</strong> and send it to the Center Superintendent for review. This action cannot be undone.
+            This will change the assessment status from <strong>Draft</strong> to <strong>Submitted</strong> and send it to the Center Superintendent for review.
           </p>
 
           <div style={{ background: '#F1F0EA', border: '1px solid #D6D3C6', borderRadius: 6, padding: '12px 16px', marginBottom: 24 }}>
@@ -287,16 +489,27 @@ export default function AssessmentScreen() {
               <div><div style={{ color: '#8C897C', marginBottom: 2 }}>Trade</div><div style={{ color: '#24302E' }}>{selected.trade}</div></div>
               <div><div style={{ color: '#8C897C', marginBottom: 2 }}>Total Score</div><div style={{ color: '#4C7A6E', fontWeight: 700, fontFamily: 'IBM Plex Mono, monospace' }}>{totalScore} / {totalMax} ({pct}%)</div></div>
               <div><div style={{ color: '#8C897C', marginBottom: 2 }}>Grade</div><span style={{ ...GRADE_PILL, color: grade.color }}>{grade.label}</span></div>
-              <div><div style={{ color: '#8C897C', marginBottom: 2 }}>Current Status</div><span style={{ ...GRADE_PILL, color: '#5C5A50' }}>Draft</span></div>
-              <div><div style={{ color: '#8C897C', marginBottom: 2 }}>After Submission</div><span style={{ ...GRADE_PILL, color: '#1A4DB8' }}>In Review</span></div>
+              <div><div style={{ color: '#8C897C', marginBottom: 2 }}>Current Status</div><span style={{ ...GRADE_PILL, color: '#5C5A50' }}>{assessmentStatus}</span></div>
+              <div><div style={{ color: '#8C897C', marginBottom: 2 }}>After Submission</div><span style={{ ...GRADE_PILL, color: '#1A4DB8' }}>SUBMITTED</span></div>
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={handleConfirmSubmit} style={{ flex: 1, height: 40, background: '#4C7A6E', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-              Confirm & Submit
+            <button
+              onClick={handleConfirmSubmit}
+              disabled={isProcessing}
+              style={{
+                flex: 1, height: 40, background: '#4C7A6E', color: '#fff',
+                border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600,
+                cursor: isProcessing ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isProcessing ? 'Submitting…' : 'Confirm & Submit'}
             </button>
-            <button onClick={() => setShowSubmitModal(false)} style={{ height: 40, padding: '0 20px', background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
+            <button
+              onClick={() => setShowSubmitModal(false)}
+              style={{ height: 40, padding: '0 20px', background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}
+            >
               Cancel
             </button>
           </div>

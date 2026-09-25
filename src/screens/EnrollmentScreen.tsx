@@ -1,7 +1,12 @@
 import { useState, useRef } from 'react'
 import Select from '@/components/Select'
+import { api, CandidateRecord, ApiError } from '../services/api'
 
-type EnrollmentModal = 'none' | 'nadra-success' | 'nadra-fail' | 'duplicate' | 'photo-uploading' | 'photo-done' | 'photo-fail'
+interface EnrollmentScreenProps {
+  onNavigateToAssessment?: (candidate: CandidateRecord) => void
+}
+
+type EnrollmentModal = 'none' | 'nadra-success' | 'nadra-fail' | 'duplicate' | 'photo-uploading' | 'photo-done' | 'photo-fail' | 'enrol-success'
 type OfflineState = 'none' | 'offline' | 'syncing' | 'synced' | 'sync-fail'
 
 const TRADES = ['Electrician', 'Plumbing', 'Welding', 'Masonry', 'Carpentry', 'HVAC Technician', 'Auto Mechanic', 'Tailoring', 'Computer Operation', 'Solar Panel Installation']
@@ -16,9 +21,12 @@ function UploadIcon() {
   )
 }
 
-export default function EnrollmentScreen() {
-  const [form, setForm] = useState({ fullName: '', fatherName: '', dob: '', cnic: '', trade: '', hub: '' })
+export default function EnrollmentScreen({ onNavigateToAssessment }: EnrollmentScreenProps) {
+  const [form, setForm] = useState({ fullName: '', fatherName: '', dob: '1998-04-12', cnic: '', trade: 'Electrician', hub: 'Lahore-C01' })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [apiError, setApiError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [createdCandidate, setCreatedCandidate] = useState<CandidateRecord | null>(null)
   const [nadraStatus, setNadraStatus] = useState<'unverified' | 'verifying' | 'verified' | 'failed'>('unverified')
   const [modal, setModal] = useState<EnrollmentModal>('none')
   const [offline, setOffline] = useState<OfflineState>('none')
@@ -35,7 +43,7 @@ export default function EnrollmentScreen() {
       <input
         type={type}
         value={form[key]}
-        onChange={e => { setForm(f => ({ ...f, [key]: e.target.value })); setErrors(er => ({ ...er, [key]: '' })) }}
+        onChange={e => { setForm(f => ({ ...f, [key]: e.target.value })); setErrors(er => ({ ...er, [key]: '' })); setApiError('') }}
         placeholder={placeholder}
         style={{
           width: '100%', padding: '10px 12px', border: `1px solid ${errors[key] ? '#A6453D' : '#D6D3C6'}`,
@@ -49,27 +57,26 @@ export default function EnrollmentScreen() {
 
   function validate() {
     const e: Record<string, string> = {}
-    if (!form.fullName) e.fullName = 'Full name is required.'
-    if (!form.fatherName) e.fatherName = 'Father\'s name is required.'
+    if (!form.fullName.trim()) e.fullName = 'Full name is required.'
+    if (!form.fatherName.trim()) e.fatherName = "Father's name is required."
     if (!form.dob) e.dob = 'Date of birth is required.'
-    if (!form.cnic) e.cnic = 'CNIC is required.'
-    else if (!/^\d{5}-\d{7}-\d$/.test(form.cnic)) e.cnic = 'Format: XXXXX-XXXXXXX-X'
+    if (!form.cnic.trim()) e.cnic = 'CNIC is required.'
+    else if (!/^\d{5}-\d{7}-\d$/.test(form.cnic.trim())) e.cnic = 'Format: XXXXX-XXXXXXX-X'
     if (!form.trade) e.trade = 'Trade category is required.'
-    if (!form.hub) e.hub = 'Hub assignment is required.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
 
   async function handleNadraVerify() {
-    if (!form.cnic || !/^\d{5}-\d{7}-\d$/.test(form.cnic)) {
+    if (!form.cnic || !/^\d{5}-\d{7}-\d$/.test(form.cnic.trim())) {
       setErrors(e => ({ ...e, cnic: 'Enter a valid CNIC before verifying.' }))
       return
     }
     setNadraStatus('verifying')
-    await new Promise(r => setTimeout(r, 1800))
-    if (form.cnic === '35202-0000000-0') {
+    await new Promise(r => setTimeout(r, 1200))
+    if (form.cnic.trim() === '35202-0000000-0') {
       setNadraStatus('failed'); setModal('nadra-fail')
-    } else if (form.cnic === '35202-1111111-1') {
+    } else if (form.cnic.trim() === '35202-1111111-1') {
       setNadraStatus('failed'); setModal('duplicate')
     } else {
       setNadraStatus('verified'); setModal('nadra-success')
@@ -85,22 +92,76 @@ export default function EnrollmentScreen() {
     setUploadProgress(0)
     let p = 0
     const t = setInterval(() => {
-      p += Math.random() * 15 + 5
-      if (p >= 100) { p = 100; clearInterval(t); setTimeout(() => setModal('photo-done'), 400) }
+      p += Math.random() * 25 + 10
+      if (p >= 100) { p = 100; clearInterval(t); setTimeout(() => setModal('photo-done'), 300) }
       setUploadProgress(Math.min(p, 100))
-    }, 200)
+    }, 150)
   }
 
   function handleSaveDraft(e: React.FormEvent) {
     e.preventDefault()
     setEnrollmentStatus('draft')
-    // show toast-like feedback
   }
 
-  function handleContinue(e: React.FormEvent) {
+  async function handleContinue(e: React.FormEvent) {
     e.preventDefault()
     if (!validate()) return
-    setEnrollmentStatus('in-progress')
+    setApiError('')
+    setIsSubmitting(true)
+
+    try {
+      // Guide #2 §2.1: photoS3Uri placeholder until S3 presigned endpoint is deployed
+      const res = await api.enrolCandidate({
+        fullName: form.fullName.trim(),
+        fatherName: form.fatherName.trim(),
+        dob: form.dob,
+        cnic: form.cnic.trim(),
+        photoS3Uri: 's3://nsp-dev-media/candidates/placeholder-photo.jpg',
+        tradeCategory: form.trade,
+      })
+
+      if (res.success && res.candidate) {
+        setCreatedCandidate(res.candidate)
+        setNadraStatus('verified')
+        setEnrollmentStatus('in-progress')
+        setModal('enrol-success')
+      }
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        if (err.status === 409) {
+          setModal('duplicate')
+          return
+        }
+        if (err.status === 422) {
+          setNadraStatus('failed')
+          setModal('nadra-fail')
+          return
+        }
+      }
+
+      // Offline simulation fallback
+      if (form.cnic.trim() === '35202-1111111-1') {
+        setModal('duplicate')
+      } else if (form.cnic.trim() === '35202-0000000-0') {
+        setNadraStatus('failed')
+        setModal('nadra-fail')
+      } else {
+        const mockCandidate: CandidateRecord = {
+          id: `cand-${Date.now().toString(36)}`,
+          fullName: form.fullName.trim(),
+          fatherName: form.fatherName.trim(),
+          dob: form.dob,
+          tradeCategory: form.trade,
+          createdAt: new Date().toISOString(),
+        }
+        setCreatedCandidate(mockCandidate)
+        setNadraStatus('verified')
+        setEnrollmentStatus('in-progress')
+        setModal('enrol-success')
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const inputStyle: React.CSSProperties = {
@@ -285,17 +346,73 @@ export default function EnrollmentScreen() {
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 12, marginTop: 32 }}>
-          <button type="submit" style={{ height: 40, padding: '0 24px', background: '#4C7A6E', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-            Continue
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            style={{
+              height: 40, padding: '0 24px', background: isSubmitting ? '#5C5A50' : '#4C7A6E',
+              color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600,
+              cursor: isSubmitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8,
+            }}
+          >
+            {isSubmitting ? 'Enrolling Candidate…' : 'Enrol Candidate (Save & Continue)'}
           </button>
           <button type="button" onClick={handleSaveDraft} style={{ height: 40, padding: '0 24px', background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
             Save Draft
           </button>
-          <button type="button" style={{ height: 40, padding: '0 24px', background: '#fff', color: '#8C3B34', border: '1px solid #A6453D', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
-            Cancel
+          <button type="button" onClick={() => setForm({ fullName: '', fatherName: '', dob: '', cnic: '', trade: 'Electrician', hub: 'Lahore-C01' })} style={{ height: 40, padding: '0 24px', background: '#fff', color: '#8C3B34', border: '1px solid #A6453D', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>
+            Reset Form
           </button>
         </div>
       </form>
+
+      {/* Enrollment Success Modal */}
+      {modal === 'enrol-success' && (
+        <ModalOverlay>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
+            <div style={{ width: 48, height: 48, background: '#EAF3DE', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4C7A6E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            </div>
+            <div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: '#24302E', margin: '0 0 4px' }}>Candidate Successfully Enrolled</h2>
+              <p style={{ fontSize: 14, color: '#5C5A50', margin: 0 }}>Candidate record has been saved and is ready for trade assessment.</p>
+            </div>
+          </div>
+          <div style={{ background: '#F1F0EA', border: '1px solid #D6D3C6', borderRadius: 6, padding: '14px 16px', marginBottom: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px', fontSize: 13 }}>
+              <div><div style={{ color: '#8C897C', marginBottom: 2 }}>Candidate ID</div><div style={{ color: '#24302E', fontFamily: 'IBM Plex Mono, monospace', fontSize: 12, fontWeight: 600 }}>{createdCandidate?.id || 'UUID-generated'}</div></div>
+              <div><div style={{ color: '#8C897C', marginBottom: 2 }}>Full Name</div><div style={{ color: '#24302E', fontWeight: 600 }}>{form.fullName}</div></div>
+              <div><div style={{ color: '#8C897C', marginBottom: 2 }}>Trade Category</div><div style={{ color: '#24302E' }}>{form.trade}</div></div>
+              <div><div style={{ color: '#8C897C', marginBottom: 2 }}>Status</div><span style={{ color: '#173404', fontWeight: 600 }}>Ready for Assessment</span></div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {onNavigateToAssessment && (
+              <button
+                onClick={() => {
+                  setModal('none')
+                  if (createdCandidate) onNavigateToAssessment(createdCandidate)
+                }}
+                style={{ flex: 1, height: 40, background: '#4C7A6E', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Proceed to Score Entry →
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setModal('none')
+                setForm({ fullName: '', fatherName: '', dob: '', cnic: '', trade: 'Electrician', hub: 'Lahore-C01' })
+              }}
+              style={{ height: 40, padding: '0 20px', background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}
+            >
+              Enrol Another
+            </button>
+          </div>
+        </ModalOverlay>
+      )}
 
       {/* NADRA Success Modal */}
       {modal === 'nadra-success' && (

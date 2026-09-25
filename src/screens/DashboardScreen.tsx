@@ -1,4 +1,5 @@
 import SuperAdminDashboard from './SuperAdminDashboard'
+import { authStore } from '../services/authStore'
 
 type Role = 'trade-tester' | 'center-superintendent' | 'super-admin'
 
@@ -43,11 +44,15 @@ const recentCandidates = [
 ]
 
 function TradeTesterDashboard({ onNavigate }: { onNavigate: DashboardProps['onNavigate'] }) {
+  const user = authStore.getState().user
+  const displayName = user?.name || (user?.email ? user.email.split('@')[0] : 'Ahmad')
+  const hubId = user?.hubLocationId ?? 1
+
   return (
     <div>
       <div style={{ marginBottom: 32 }}>
-        <h1 className="display" style={{ fontSize: 28, fontWeight: 400, color: '#24302E', margin: '0 0 4px', letterSpacing: -0.2 }}>Good morning, Ahmad</h1>
-        <p style={{ fontSize: 14, color: '#5C5A50', margin: 0 }}>Hub: Lahore-C01 · Today is {new Date().toLocaleDateString('en-PK', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        <h1 className="display" style={{ fontSize: 28, fontWeight: 400, color: '#24302E', margin: '0 0 4px', letterSpacing: -0.2 }}>Good morning, {displayName}</h1>
+        <p style={{ fontSize: 14, color: '#5C5A50', margin: 0 }}>Hub Location #{hubId} (Lahore-C01) · Authenticated as {user?.email || 'tradetester@nsp.com'}</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 32 }}>

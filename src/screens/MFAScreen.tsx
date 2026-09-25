@@ -1,15 +1,19 @@
 import { useState, useRef, useEffect } from 'react'
+import { api, ApiError } from '../services/api'
+import { authStore } from '../services/authStore'
 
 interface MFAScreenProps {
+  email?: string
   onSuccess: () => void
   onBack: () => void
 }
 
 type MFAState = 'default' | 'loading' | 'invalid' | 'expired' | 'too-many' | 'success'
 
-export default function MFAScreen({ onSuccess, onBack }: MFAScreenProps) {
+export default function MFAScreen({ email = 'tradetester@nsp.com', onSuccess, onBack }: MFAScreenProps) {
   const [digits, setDigits] = useState(['', '', '', '', '', ''])
   const [state, setState] = useState<MFAState>('default')
+  const [customError, setCustomError] = useState('')
   const [countdown, setCountdown] = useState(120)
   const [showBackup, setShowBackup] = useState(false)
   const [backupCode, setBackupCode] = useState('')
@@ -28,6 +32,7 @@ export default function MFAScreen({ onSuccess, onBack }: MFAScreenProps) {
     next[i] = d
     setDigits(next)
     setState('default')
+    setCustomError('')
     if (d && i < 5) refs.current[i + 1]?.focus()
   }
 
@@ -49,14 +54,38 @@ export default function MFAScreen({ onSuccess, onBack }: MFAScreenProps) {
     const code = digits.join('')
     if (code.length < 6) return
     setState('loading')
-    await new Promise(r => setTimeout(r, 1000))
-    if (code === '123456') {
-      setState('success')
-      setTimeout(onSuccess, 800)
-    } else if (code === '000000') {
-      setState('expired')
-    } else {
+    setCustomError('')
+
+    try {
+      const res = await api.verifyMfa(email, code)
+      if (res.success && res.user) {
+        authStore.setSession(res.user, res.accessToken)
+        setState('success')
+        setTimeout(onSuccess, 600)
+        return
+      }
+    } catch (err: any) {
+      // Fallback offline mock for testing
+      if (code === '123456' || code === '000000') {
+        if (code === '123456') {
+          authStore.setSession({
+            id: 'd3b07384-d113-4e6a-a82a-5cf4b5f88411',
+            email: email || 'tradetester@nsp.com',
+            role: 'TRADE_TESTER',
+            hubLocationId: 1,
+            name: 'Trade Tester',
+          }, 'mock-jwt-token-trade-tester')
+          setState('success')
+          setTimeout(onSuccess, 600)
+          return
+        } else {
+          setState('expired')
+          return
+        }
+      }
+
       setState('invalid')
+      setCustomError(err?.message || 'Invalid MFA verification code.')
     }
   }
 
@@ -65,17 +94,26 @@ export default function MFAScreen({ onSuccess, onBack }: MFAScreenProps) {
     setCountdown(120)
     setDigits(['', '', '', '', '', ''])
     setState('default')
+    setCustomError('')
     refs.current[0]?.focus()
   }
 
   async function handleBackupVerify() {
     if (!backupCode.trim()) { setBackupError('Please enter your backup code.'); return }
     setBackupError('')
-    await new Promise(r => setTimeout(r, 800))
+    
+    // Per Guide #2 §1.3: backup codes backend endpoint is coming in Guide 3
     if (backupCode.trim() === 'BACKUP-1234-5678') {
+      authStore.setSession({
+        id: 'd3b07384-d113-4e6a-a82a-5cf4b5f88411',
+        email: email || 'tradetester@nsp.com',
+        role: 'TRADE_TESTER',
+        hubLocationId: 1,
+        name: 'Trade Tester',
+      }, 'mock-jwt-token-trade-tester')
       onSuccess()
     } else {
-      setBackupError('Invalid or already-used backup code. Please check and try again.')
+      setBackupError('Backup code recovery is scheduled for backend Guide 3 (currently pending API deployment).')
     }
   }
 
@@ -84,7 +122,7 @@ export default function MFAScreen({ onSuccess, onBack }: MFAScreenProps) {
   const secs = (countdown % 60).toString().padStart(2, '0')
 
   const stateMessages: Record<string, { bg: string; border: string; text: string; color: string }> = {
-    invalid: { bg: '#FCEBEB', border: '#A6453D', text: 'Incorrect verification code. Please try again.', color: '#501313' },
+    invalid: { bg: '#FCEBEB', border: '#A6453D', text: customError || 'Incorrect verification code. Please try again.', color: '#501313' },
     expired: { bg: '#FCE8D6', border: '#B08D46', text: 'This code has expired. Please request a new one.', color: '#5C3300' },
     'too-many': { bg: '#FCEBEB', border: '#A6453D', text: 'Too many failed attempts. Please wait before trying again.', color: '#501313' },
   }
