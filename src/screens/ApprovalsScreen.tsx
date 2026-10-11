@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Select from '@/components/Select'
+import { api, ApiError, Assessment } from '../services/api'
+import { authStore } from '../services/authStore'
 
 const Icons = {
   Check: ({ size = 24, strokeWidth = 2, color = 'currentColor' }) => (
@@ -47,18 +49,22 @@ interface Submission {
   rejectionReason?: string
 }
 
-const SUPERINTENDENT_HUB = 'Lahore-C01' // Simulating assigned hub
-
-const INITIAL_SUBMISSIONS: Submission[] = [
-  { id: 'ASS-2026-00482', candidate: 'Muhammad Aamir Khan', cnic: '35202-1234567-1', trade: 'Electrician', hub: 'Lahore-C01', submittedBy: 'Ahmad Raza', submittedAt: '2026-08-26 09:14', score: 87, maxScore: 100, grade: 'Distinction', status: 'submitted' },
-  { id: 'ASS-2026-00481', candidate: 'Sara Bibi', cnic: '35201-9876543-2', trade: 'Plumbing', hub: 'Lahore-C01', submittedBy: 'Ahmad Raza', submittedAt: '2026-08-25 15:32', score: 72, maxScore: 100, grade: 'Pass', status: 'submitted' },
-  { id: 'ASS-2026-00480', candidate: 'Rabia Qureshi', cnic: '35203-7778889-4', trade: 'Masonry', hub: 'Lahore-C01', submittedBy: 'Ahmad Raza', submittedAt: '2026-08-25 11:08', score: 61, maxScore: 100, grade: 'Marginal Pass', status: 'submitted' },
-  { id: 'ASS-2026-00479', candidate: 'Tariq Mehmood', cnic: '35204-3334455-5', trade: 'Plumbing', hub: 'Lahore-C01', submittedBy: 'Ahmad Raza', submittedAt: '2026-08-25 09:47', score: 91, maxScore: 100, grade: 'Distinction', status: 'approved', mintingStatus: 'confirmed', credentialId: 'CRED-8A2F99', txHash: '0x9f8c...3a12', blockNumber: 15923041 },
-  { id: 'ASS-2026-00478', candidate: 'Zainab Noor', cnic: '35205-8889990-6', trade: 'Welding', hub: 'Lahore-C01', submittedBy: 'Ahmad Raza', submittedAt: '2026-08-24 16:21', score: 43, maxScore: 100, grade: 'Fail', status: 'rejected', rejectionReason: 'Score below passing threshold. Reassessment required.' },
-  { id: 'ASS-2026-00477', candidate: 'Ali Nawaz', cnic: '35202-5551234-3', trade: 'Welding', hub: 'Lahore-C01', submittedBy: 'Ahmad Raza', submittedAt: '2026-08-24 13:05', score: 78, maxScore: 100, grade: 'Pass', status: 'approved', mintingStatus: 'failed', failReason: 'Gas exhausted on subnet', retryStatus: 'Pending Super Admin Retry' },
-  // Excluded (different hub) to demonstrate filtering
-  { id: 'ASS-2026-00476', candidate: 'Amna Siddiqui', cnic: '35206-2223334-7', trade: 'HVAC Technician', hub: 'Karachi-C02', submittedBy: 'Bilal Ahmed', submittedAt: '2026-08-24 10:30', score: 65, maxScore: 100, grade: 'Pass', status: 'submitted' },
-]
+// Guide 3 §1.1: the queue only carries ids, score, grade and trade/hub id. Names/CNIC are not in the payload yet.
+function toSubmission(a: Assessment): Submission {
+  return {
+    id: a.assessmentId,
+    candidate: a.candidateName || `Candidate ${a.candidateId.slice(0, 8)}`,
+    cnic: '—',
+    trade: a.tradeCategory || '—',
+    hub: a.testingHubId != null ? `Hub ${a.testingHubId}` : '—',
+    submittedBy: a.testerUserId ? a.testerUserId.slice(0, 8) : '—',
+    submittedAt: a.submittedAt ? a.submittedAt.slice(0, 16).replace('T', ' ') : '—',
+    score: a.score,
+    maxScore: 100, // criteria in AssessmentScreen sum to 100
+    grade: a.grade,
+    status: 'submitted',
+  }
+}
 
 function StatusPill({ status }: { status: ApprovalStatus }) {
   const map = {
@@ -116,7 +122,16 @@ function ModalOverlay({ children }: { children: React.ReactNode }) {
 }
 
 export default function ApprovalsScreen() {
-  const [submissions, setSubmissions] = useState<Submission[]>(INITIAL_SUBMISSIONS)
+  // Hub scoping is enforced by the server; the UI only labels it.
+  const hubId = authStore.getState().user?.hubLocationId
+  const SUPERINTENDENT_HUB = hubId != null ? `Hub ${hubId}` : 'your hub'
+
+  const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState('')
+  const [toast, setToast] = useState('')
   const [filter, setFilter] = useState<'all' | ApprovalStatus>('submitted')
   const [search, setSearch] = useState('')
   const [tradeFilter, setTradeFilter] = useState('all')
@@ -130,7 +145,7 @@ export default function ApprovalsScreen() {
   const [rejectionReason, setRejectionReason] = useState('')
 
   // Superintendent only sees their own hub
-  const hubSubmissions = submissions.filter(s => s.hub === SUPERINTENDENT_HUB)
+  const hubSubmissions = submissions
   
   // Unique filter options
   const trades = Array.from(new Set(hubSubmissions.map(s => s.trade)))
@@ -151,19 +166,68 @@ export default function ApprovalsScreen() {
     return true
   })
 
-  function handleApprove() {
-    if (!selected || !passphrase) return
-    setSubmissions(ss => ss.map(s => s.id === selected.id ? { ...s, status: 'approved', mintingStatus: 'queued' } : s))
-    setModal('none')
-    setPassphrase('')
-    // In a real app, successful approval would trigger blockchain minting queue
+  async function loadQueue() {
+    setLoading(true)
+    setLoadError('')
+    try {
+      const res = await api.getQueue()
+      // Keep items actioned in this session so the Approved/Rejected tabs still show them
+      setSubmissions(prev => [...res.assessments.map(toSubmission), ...prev.filter(p => p.status !== 'submitted')])
+    } catch (err: any) {
+      setLoadError(err instanceof ApiError && err.status === 403
+        ? 'Only Center Superintendents can view the approval queue.'
+        : err?.message || 'Could not load the approval queue.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  function handleReject() {
+  useEffect(() => { loadQueue() }, [])
+
+  function explain(err: any) {
+    if (err instanceof ApiError) {
+      if (err.status === 409) { loadQueue(); return 'This record is no longer awaiting approval (already actioned). The queue was refreshed.' }
+      if (err.status === 403) return 'This record belongs to another hub.'
+      if (err.status === 404) return 'Record not found.'
+      if (err.status === 0) return 'Cannot reach the server. Please try again.'
+      return err.message
+    }
+    return err?.message || 'Something went wrong.'
+  }
+
+  async function handleApprove() {
+    if (!selected) return
+    setBusy(true)
+    setActionError('')
+    try {
+      await api.approveAssessment(selected.id)
+      setSubmissions(ss => ss.map(s => s.id === selected.id ? { ...s, status: 'approved' } : s))
+      setModal('none')
+      setPassphrase('')
+      setToast('Assessment approved. Minting is not active yet.')
+    } catch (err) {
+      setActionError(explain(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleReject() {
     if (!selected || !rejectionReason.trim()) return
-    setSubmissions(ss => ss.map(s => s.id === selected.id ? { ...s, status: 'rejected', rejectionReason } : s))
-    setModal('none')
-    setRejectionReason('')
+    setBusy(true)
+    setActionError('')
+    try {
+      await api.rejectAssessment(selected.id, rejectionReason.trim())
+      // Server auto-returns the record to DRAFT; REJECTED is never a resting state.
+      setSubmissions(ss => ss.map(s => s.id === selected.id ? { ...s, status: 'rejected', rejectionReason: rejectionReason.trim() } : s))
+      setModal('none')
+      setRejectionReason('')
+      setToast('Rejected. Returned to the tester as a draft with your reason attached.')
+    } catch (err) {
+      setActionError(explain(err))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const scoreColor = (pct: number) => pct >= 85 ? '#4C7A6E' : pct >= 70 ? '#4C7A6E' : pct >= 50 ? '#B08D46' : '#A6453D'
@@ -174,6 +238,19 @@ export default function ApprovalsScreen() {
         <h1 className="display" style={{ fontSize: 32, fontWeight: 400, color: '#4C7A6E', margin: '0 0 8px', letterSpacing: -0.2 }}>Approval Queue</h1>
         <p style={{ fontSize: 16, color: '#5C5A50', margin: 0 }}>Review and action submitted assessment records for {SUPERINTENDENT_HUB}.</p>
       </div>
+
+      {toast && (
+        <div style={{ background: '#EAF3DE', border: '1px solid #4C7A6E', borderRadius: 6, padding: '12px 16px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#173404' }}>
+          <span>{toast}</span>
+          <button onClick={() => setToast('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5C5A50' }}>✕</button>
+        </div>
+      )}
+      {loadError && (
+        <div style={{ background: '#FCEBEB', border: '1px solid #A6453D', borderRadius: 6, padding: '12px 16px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, color: '#501313' }}>
+          <span>{loadError}</span>
+          <button onClick={loadQueue} style={{ height: 30, padding: '0 14px', background: '#fff', color: '#501313', border: '1px solid #A6453D', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>Retry</button>
+        </div>
+      )}
 
       <div style={{ background: '#fff', border: '1px solid #D6D3C6', borderRadius: 8 }}>
         {/* Filters */}
@@ -264,7 +341,7 @@ export default function ApprovalsScreen() {
               {displayed.length === 0 && (
                 <tr>
                   <td colSpan={8} style={{ padding: '64px 24px', textAlign: 'center', fontSize: 14, color: '#5C5A50' }}>
-                    No records found matching the criteria.
+                    {loading ? 'Loading queue…' : 'No pending approvals.'}
                   </td>
                 </tr>
               )}
@@ -340,8 +417,8 @@ export default function ApprovalsScreen() {
           <div style={{ display: 'flex', gap: 12 }}>
             {selected.status === 'submitted' && (
               <>
-                <button onClick={() => { setModal('approve'); setPassphrase('') }} style={{ flex: 1, height: 44, background: '#4C7A6E', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Approve</button>
-                <button onClick={() => { setModal('reject'); setRejectionReason('') }} style={{ flex: 1, height: 44, background: '#fff', color: '#A6453D', border: '1px solid #A6453D', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Reject</button>
+                <button onClick={() => { setModal('approve'); setPassphrase(''); setActionError('') }} style={{ flex: 1, height: 44, background: '#4C7A6E', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Approve</button>
+                <button onClick={() => { setModal('reject'); setRejectionReason(''); setActionError('') }} style={{ flex: 1, height: 44, background: '#fff', color: '#A6453D', border: '1px solid #A6453D', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Reject</button>
               </>
             )}
             <button onClick={() => setModal('none')} style={{ height: 44, padding: '0 24px', background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer', flex: selected.status === 'submitted' ? 'none' : 1 }}>Close</button>
@@ -354,7 +431,7 @@ export default function ApprovalsScreen() {
         <ModalOverlay>
           <div style={{ marginBottom: 24 }}>
             <h2 className="display" style={{ fontSize: 24, color: '#4C7A6E', margin: '0 0 8px' }}>Approve & Sign Record</h2>
-            <p style={{ fontSize: 14, color: '#5C5A50', margin: 0 }}>You are approving the following assessment record. This action will initiate credential minting.</p>
+            <p style={{ fontSize: 14, color: '#5C5A50', margin: 0 }}>You are approving the following assessment record. Minting is not active yet, so the record will move to Approved.</p>
           </div>
 
           <div style={{ background: '#F1F0EA', border: '1px solid #D6D3C6', borderRadius: 8, padding: 16, marginBottom: 24, fontSize: 14 }}>
@@ -377,7 +454,7 @@ export default function ApprovalsScreen() {
 
           <div style={{ marginBottom: 24 }}>
             <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#4C7A6E', marginBottom: 8 }}>
-              Superintendent Passphrase <span style={{ color: '#A6453D' }}>*</span>
+              Superintendent Passphrase <span style={{ color: '#8C897C', fontWeight: 400 }}>(not used yet. Signing arrives with minting)</span>
             </label>
             <p style={{ fontSize: 13, color: '#5C5A50', marginBottom: 12 }}>Enter your passphrase to unlock the hub's private signing key and digitally sign this approval.</p>
             <input
@@ -388,9 +465,9 @@ export default function ApprovalsScreen() {
               style={{ width: '100%', padding: '12px 16px', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, fontFamily: 'Inter, sans-serif', color: '#24302E', background: '#fff' }}
             />
           </div>
-
+          {actionError && <div style={{ background: '#FCEBEB', border: '1px solid #A6453D', borderRadius: 6, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#501313' }}>{actionError}</div>}
           <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={handleApprove} disabled={!passphrase} style={{ flex: 1, height: 44, background: passphrase ? '#4C7A6E' : '#D6D3C6', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: passphrase ? 'pointer' : 'not-allowed' }}>Sign & Approve</button>
+            <button onClick={handleApprove} disabled={busy} style={{ flex: 1, height: 44, background: busy ? '#4C7A6E' : '#D6D3C6', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: passphrase ? 'pointer' : 'not-allowed' }}>Sign & Approve</button>
             <button onClick={() => { setModal('detail'); setPassphrase('') }} style={{ height: 44, padding: '0 24px', background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
           </div>
         </ModalOverlay>
@@ -436,8 +513,9 @@ export default function ApprovalsScreen() {
             {!rejectionReason.trim() && <p style={{ fontSize: 12, color: '#A6453D', margin: '6px 0 0' }}>A mandatory rejection reason is required.</p>}
           </div>
 
+        {actionError && <div style={{ background: '#FCEBEB', border: '1px solid #A6453D', borderRadius: 6, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#501313' }}>{actionError}</div>}
           <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={handleReject} disabled={!rejectionReason.trim()} style={{ flex: 1, height: 44, background: rejectionReason.trim() ? '#A6453D' : '#D6D3C6', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: rejectionReason.trim() ? 'pointer' : 'not-allowed' }}>Confirm Rejection</button>
+            <button onClick={handleReject} disabled={!rejectionReason.trim() || busy} style={{ flex: 1, height: 44, background: rejectionReason.trim() && !busy ? '#A6453D' : '#D6D3C6', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: rejectionReason.trim() ? 'pointer' : 'not-allowed' }}>Confirm Rejection</button>
             <button onClick={() => { setModal('detail'); setRejectionReason('') }} style={{ height: 44, padding: '0 24px', background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
           </div>
         </ModalOverlay>

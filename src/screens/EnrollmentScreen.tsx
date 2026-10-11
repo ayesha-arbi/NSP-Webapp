@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import Select from '@/components/Select'
-import { api, CandidateRecord, ApiError } from '../services/api'
+import { api, CandidateRecord, ApiError, uploadCandidatePhoto } from '../services/api'
 
 interface EnrollmentScreenProps {
   onNavigateToAssessment?: (candidate: CandidateRecord) => void
@@ -34,6 +34,9 @@ export default function EnrollmentScreen({ onNavigateToAssessment }: EnrollmentS
   const [uploadProgress, setUploadProgress] = useState(0)
   const [enrollmentStatus, setEnrollmentStatus] = useState<'draft' | 'in-progress'>('draft')
   const fileRef = useRef<HTMLInputElement>(null)
+  const lastFile = useRef<File | null>(null)
+  const [photoS3Uri, setPhotoS3Uri] = useState<string | null>(null)
+  const [photoError, setPhotoError] = useState('')
 
   const field = (key: keyof typeof form, label: string, placeholder: string, type = 'text', mono = false) => (
     <div>
@@ -83,19 +86,31 @@ export default function EnrollmentScreen({ onNavigateToAssessment }: EnrollmentS
     }
   }
 
+  // request pre-signed URL, PUT straight to S3, keep the s3Uri for enrolment.
+  async function uploadPhoto(file: File) {
+    setPhotoS3Uri(null)
+    setPhotoError('')
+    setUploadProgress(30)
+    setModal('photo-uploading')
+    try {
+      const uri = await uploadCandidatePhoto(file)
+      setPhotoS3Uri(uri)
+      setUploadProgress(100)
+      setModal('photo-done')
+    } catch (err: any) {
+      setPhotoError(err?.message || 'Upload failed')
+      setUploadProgress(100)
+      setModal('photo-fail')
+    }
+  }
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    const url = URL.createObjectURL(file)
-    setPhotoFile(url)
-    setModal('photo-uploading')
-    setUploadProgress(0)
-    let p = 0
-    const t = setInterval(() => {
-      p += Math.random() * 25 + 10
-      if (p >= 100) { p = 100; clearInterval(t); setTimeout(() => setModal('photo-done'), 300) }
-      setUploadProgress(Math.min(p, 100))
-    }, 150)
+    lastFile.current = file
+    if (photoFile) URL.revokeObjectURL(photoFile)
+    setPhotoFile(URL.createObjectURL(file))
+    void uploadPhoto(file)
   }
 
   function handleSaveDraft(e: React.FormEvent) {
@@ -106,17 +121,20 @@ export default function EnrollmentScreen({ onNavigateToAssessment }: EnrollmentS
   async function handleContinue(e: React.FormEvent) {
     e.preventDefault()
     if (!validate()) return
+    if (!photoS3Uri) {
+      setApiError('Please upload the candidate photo before continuing.')
+      return
+    }
     setApiError('')
     setIsSubmitting(true)
 
     try {
-      // Guide #2 §2.1: photoS3Uri placeholder until S3 presigned endpoint is deployed
       const res = await api.enrolCandidate({
         fullName: form.fullName.trim(),
         fatherName: form.fatherName.trim(),
         dob: form.dob,
         cnic: form.cnic.trim(),
-        photoS3Uri: 's3://nsp-dev-media/candidates/placeholder-photo.jpg',
+        photoS3Uri,
         tradeCategory: form.trade,
       })
 
@@ -139,26 +157,12 @@ export default function EnrollmentScreen({ onNavigateToAssessment }: EnrollmentS
         }
       }
 
-      // Offline simulation fallback
-      if (form.cnic.trim() === '35202-1111111-1') {
-        setModal('duplicate')
-      } else if (form.cnic.trim() === '35202-0000000-0') {
-        setNadraStatus('failed')
-        setModal('nadra-fail')
-      } else {
-        const mockCandidate: CandidateRecord = {
-          id: `cand-${Date.now().toString(36)}`,
-          fullName: form.fullName.trim(),
-          fatherName: form.fatherName.trim(),
-          dob: form.dob,
-          tradeCategory: form.trade,
-          createdAt: new Date().toISOString(),
-        }
-        setCreatedCandidate(mockCandidate)
-        setNadraStatus('verified')
-        setEnrollmentStatus('in-progress')
-        setModal('enrol-success')
-      }
+      // Never fabricate a candidate locally: a fake id would 404 at assessment creation.
+      setApiError(
+        err instanceof ApiError && err.status === 0
+          ? 'Cannot reach the server. Enrolment needs a connection, please try again when online.'
+          : err?.message || 'Enrolment failed.'
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -210,6 +214,13 @@ export default function EnrollmentScreen({ onNavigateToAssessment }: EnrollmentS
           </button>
         </div>
       </div>
+
+      {apiError && (
+        <div role="alert" style={{ background: '#FCEBEB', border: '1px solid #A6453D', borderRadius: 6, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#501313', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{apiError}</span>
+          <button type="button" onClick={() => setApiError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#501313' }}>✕</button>
+        </div>
+      )}
 
       <form onSubmit={handleContinue} noValidate>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 24 }}>
@@ -308,7 +319,7 @@ export default function EnrollmentScreen({ onNavigateToAssessment }: EnrollmentS
                 <div>
                   <img src={photoFile} alt="Candidate photo preview" style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 6, border: '1px solid #D6D3C6', marginBottom: 12 }} />
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button type="button" onClick={() => { setPhotoFile(null); if (fileRef.current) fileRef.current.value = '' }} style={{ flex: 1, height: 34, background: '#fff', color: '#8C3B34', border: '1px solid #A6453D', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}>Remove</button>
+                    <button type="button" onClick={() => { setPhotoFile(null); setPhotoS3Uri(null); lastFile.current = null; if (fileRef.current) fileRef.current.value = '' }} style={{ flex: 1, height: 34, background: '#fff', color: '#8C3B34', border: '1px solid #A6453D', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}>Remove</button>
                     <button type="button" onClick={() => fileRef.current?.click()} style={{ flex: 1, height: 34, background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 4, fontSize: 12, cursor: 'pointer' }}>Replace</button>
                   </div>
                 </div>
@@ -332,7 +343,7 @@ export default function EnrollmentScreen({ onNavigateToAssessment }: EnrollmentS
               <h3 style={{ fontSize: 14, fontWeight: 600, color: '#24302E', margin: '0 0 12px' }}>Enrollment Summary</h3>
               {[
                 { label: 'NADRA', val: nadraStatus === 'verified' ? 'Verified ✓' : nadraStatus === 'failed' ? 'Failed' : 'Pending', color: nadraStatus === 'verified' ? '#173404' : nadraStatus === 'failed' ? '#501313' : '#8C897C' },
-                { label: 'Photo', val: photoFile ? 'Uploaded ✓' : 'Not uploaded', color: photoFile ? '#173404' : '#8C897C' },
+                { label: 'Photo', val: photoS3Uri ? 'Uploaded ✓' : 'Not uploaded', color: photoS3Uri ? '#173404' : '#8C897C' },
                 { label: 'Status', val: enrollmentStatus === 'draft' ? 'Draft' : 'In Progress', color: '#24302E' },
               ].map(s => (
                 <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: '1px solid #E8E6DF' }}>
@@ -514,14 +525,14 @@ export default function EnrollmentScreen({ onNavigateToAssessment }: EnrollmentS
             <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 20 }}>
               <img src={photoFile} alt="Preview" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 4, border: '1px solid #D6D3C6', flexShrink: 0 }} />
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#24302E', marginBottom: 2 }}>candidate_photo.jpg</div>
-                <div style={{ fontSize: 12, color: '#8C897C' }}>2.4 MB</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#24302E', marginBottom: 2 }}>{lastFile.current?.name ?? 'photo'}</div>
+                <div style={{ fontSize: 12, color: '#8C897C' }}>{lastFile.current ? `${(lastFile.current.size / 1024 / 1024).toFixed(1)} MB` : ''}</div>
               </div>
             </div>
           )}
           <div style={{ background: '#F1F0EA', borderRadius: 6, padding: '12px 16px', marginBottom: 20 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
-              <span style={{ color: '#5C5A50' }}>{modal === 'photo-uploading' ? 'Uploading to S3…' : modal === 'photo-done' ? 'Upload successful' : 'Upload failed'}</span>
+              <span style={{ color: '#5C5A50' }}>{modal === 'photo-uploading' ? 'Uploading to S3…' : modal === 'photo-done' ? 'Upload successful' : (photoError || 'Upload failed')}</span>
               <span style={{ fontWeight: 600, color: '#24302E' }}>{Math.round(uploadProgress)}%</span>
             </div>
             <div style={{ height: 6, background: '#D6D3C6', borderRadius: 3 }}>
@@ -535,7 +546,7 @@ export default function EnrollmentScreen({ onNavigateToAssessment }: EnrollmentS
           )}
           {modal === 'photo-fail' && (
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => { setUploadProgress(0); setModal('photo-uploading') }} style={{ flex: 1, height: 40, background: '#4C7A6E', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+              <button onClick={() => lastFile.current && uploadPhoto(lastFile.current)} style={{ flex: 1, height: 40, background: '#4C7A6E', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
                 Retry Upload
               </button>
               <button onClick={() => setModal('none')} style={{ height: 40, padding: '0 20px', background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, cursor: 'pointer' }}>

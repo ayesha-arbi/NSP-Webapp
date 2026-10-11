@@ -64,28 +64,16 @@ export default function MFAScreen({ email = 'tradetester@nsp.com', onSuccess, on
         setTimeout(onSuccess, 600)
         return
       }
-    } catch (err: any) {
-      // Fallback offline mock for testing
-      if (code === '123456' || code === '000000') {
-        if (code === '123456') {
-          authStore.setSession({
-            id: 'd3b07384-d113-4e6a-a82a-5cf4b5f88411',
-            email: email || 'tradetester@nsp.com',
-            role: 'TRADE_TESTER',
-            hubLocationId: 1,
-            name: 'Trade Tester',
-          }, 'mock-jwt-token-trade-tester')
-          setState('success')
-          setTimeout(onSuccess, 600)
-          return
-        } else {
-          setState('expired')
-          return
-        }
-      }
-
       setState('invalid')
-      setCustomError(err?.message || 'Invalid MFA verification code.')
+      setCustomError(res.message || 'Verification failed.')
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 429) { setState('too-many'); return }
+      setState('invalid')
+      setCustomError(
+        err instanceof ApiError && err.status === 0
+          ? 'Cannot reach the server. Check your connection and try again.'
+          : err?.message || 'Invalid MFA verification code.'
+      )
     }
   }
 
@@ -102,19 +90,8 @@ export default function MFAScreen({ email = 'tradetester@nsp.com', onSuccess, on
     if (!backupCode.trim()) { setBackupError('Please enter your backup code.'); return }
     setBackupError('')
     
-    // Per Guide #2 §1.3: backup codes backend endpoint is coming in Guide 3
-    if (backupCode.trim() === 'BACKUP-1234-5678') {
-      authStore.setSession({
-        id: 'd3b07384-d113-4e6a-a82a-5cf4b5f88411',
-        email: email || 'tradetester@nsp.com',
-        role: 'TRADE_TESTER',
-        hubLocationId: 1,
-        name: 'Trade Tester',
-      }, 'mock-jwt-token-trade-tester')
-      onSuccess()
-    } else {
-      setBackupError('Backup code recovery is scheduled for backend Guide 3 (currently pending API deployment).')
-    }
+    // Backup-code endpoints still return 500 (Guide 3: do not build against them).
+    setBackupError('Backup-code recovery is not available yet. Please use your authenticator app.')
   }
 
   const code = digits.join('')
@@ -235,10 +212,6 @@ export default function MFAScreen({ email = 'tradetester@nsp.com', onSuccess, on
                 Back to login
               </button>
             </div>
-
-            <p style={{ marginTop: 16, fontSize: 11, color: '#8C897C', textAlign: 'center' }}>
-              Demo: enter <code style={{ fontFamily: 'IBM Plex Mono, monospace' }}>123456</code> to proceed
-            </p>
           </div>
         </div>
       </div>
@@ -277,10 +250,6 @@ export default function MFAScreen({ email = 'tradetester@nsp.com', onSuccess, on
                 Cancel
               </button>
             </div>
-
-            <p style={{ marginTop: 12, fontSize: 11, color: '#8C897C', textAlign: 'center' }}>
-              Demo backup code: <code style={{ fontFamily: 'IBM Plex Mono, monospace' }}>BACKUP-1234-5678</code>
-            </p>
           </div>
         </div>
       )}

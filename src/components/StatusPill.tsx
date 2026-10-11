@@ -72,7 +72,8 @@ function PillIcon({ iconType, iconColor }: { iconType: string; iconColor: string
 }
 
 export default function StatusPill({ status }: { status: PillStatus }) {
-  const c = CONFIG[status];
+  // Unknown/future statuses (e.g. MINTED) must not crash: fall back to a neutral pill.
+  const c = CONFIG[status] ?? { ...CONFIG.draft, label: String(status) };
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 8,

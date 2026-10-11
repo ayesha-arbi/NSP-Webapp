@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import { api, Assessment, CandidateRecord, ApiError } from '../services/api'
+import { useState, useEffect, useRef } from 'react'
+import { api, Assessment, CandidateRecord, ApiError, uploadAssessmentPhoto } from '../services/api'
+import { enqueueAssessment } from '../services/offlineQueue'
 
 interface Criterion {
   id: number
@@ -28,12 +29,8 @@ interface CandidateItem {
   hub: string
 }
 
-const DEFAULT_CANDIDATES: CandidateItem[] = [
-  { id: 'c1-uuid-001', name: 'Muhammad Aamir Khan', cnic: '35202-1234567-1', trade: 'Electrician', hub: 'Lahore-C01' },
-  { id: 'c2-uuid-002', name: 'Sara Bibi', cnic: '35201-9876543-2', trade: 'Plumbing', hub: 'Lahore-C01' },
-  { id: 'c3-uuid-003', name: 'Ali Nawaz', cnic: '35202-5551234-3', trade: 'Welding', hub: 'Lahore-C01' },
-  { id: 'c4-uuid-004', name: 'Rabia Qureshi', cnic: '35203-7778889-4', trade: 'Masonry', hub: 'Lahore-C01' },
-]
+// No demo candidates: only real candidates enrolled in this session or seen in the tester's assessments.
+const DEFAULT_CANDIDATES: CandidateItem[] = []
 
 function ModalOverlay({ children }: { children: React.ReactNode }) {
   return (
@@ -91,7 +88,13 @@ export default function AssessmentScreen({ initialCandidate }: AssessmentScreenP
   const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
-  const [attachments, setAttachments] = useState<string[]>(['practical_task_wiring.jpg', 'safety_checklist.pdf'])
+  const [attachments, setAttachments] = useState<string[]>([])
+
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  //one clientRequestId per logical assessment, reused on every retry.
+  const requestIds = useRef<Record<string, string>>({})
+  const getRequestId = (candidateId: string) =>
+    (requestIds.current[candidateId] ??= crypto.randomUUID())
 
   // Load tester's live assessments on mount
   useEffect(() => {
@@ -108,6 +111,26 @@ export default function AssessmentScreen({ initialCandidate }: AssessmentScreenP
       // Backend not running or no assessments yet, keep empty/mock list
     }
   }
+
+// No list-candidates endpoint exists yet: also surface candidates seen in existing assessments.
+  useEffect(() => {
+    setCandidatesList(list => {
+      const known = new Set(list.map(c => c.id))
+      const extra = new Map<string, CandidateItem>()
+      for (const a of assessmentsList) {
+        if (!known.has(a.candidateId) && !extra.has(a.candidateId)) {
+          extra.set(a.candidateId, {
+            id: a.candidateId,
+            name: a.candidateName || `Candidate ${a.candidateId.slice(0, 8)}`,
+            cnic: '—',
+            trade: a.tradeCategory || '—',
+            hub: a.testingHubId != null ? `Hub ${a.testingHubId}` : '',
+          })
+        }
+      }
+      return extra.size ? [...list, ...extra.values()] : list
+    })
+  }, [assessmentsList])
 
   const filtered = candidatesList.filter(
     c => !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.cnic.includes(search)
@@ -128,105 +151,145 @@ export default function AssessmentScreen({ initialCandidate }: AssessmentScreenP
     }))
   }
 
+  async function loadMedia(assessmentId: string) {
+    try {
+      const res: any = await api.listMedia(assessmentId)
+      const arr = res?.media ?? res?.items ?? res?.records ?? []
+      setAttachments(Array.isArray(arr) ? arr.map((_: any, i: number) => `Evidence photo ${i + 1}`) : [])
+    } catch {
+      setAttachments([])
+    }
+  }
+
   function handleSelectCandidate(c: CandidateItem) {
     setSelected(c)
     setFeedbackMsg(null)
+    setAttachments([])
     const existing = assessmentsList.find(a => a.candidateId === c.id)
     if (existing) {
       setCurrentAssessment(existing)
+      loadMedia(existing.assessmentId)
     } else {
       setCurrentAssessment(null)
       setCriteria(CRITERIA.map(cr => ({ ...cr })))
     }
   }
 
+  function describeError(err: any) {
+    if (err instanceof ApiError) {
+      if (err.status === 0) return 'You appear to be offline.'
+      if (err.status === 401) return 'Your session expired. Please sign in again.'
+      if (err.status === 404) return 'Candidate or assessment not found.'
+      return err.message
+    }
+    return err?.message || 'Something went wrong.'
+  }
+
+  // Creates the draft if it doesn't exist yet (idempotent via clientRequestId).
+  async function ensureAssessment(): Promise<Assessment> {
+    if (currentAssessment) return currentAssessment
+    const res = await api.createAssessment({
+      candidateId: selected!.id,
+      score: totalScore,
+      grade: grade.code,
+      clientRequestId: getRequestId(selected!.id),
+    })
+    setCurrentAssessment(res.assessment)
+    return res.assessment
+  }
+  
   async function handleSaveDraft() {
     if (!selected) return
     setIsProcessing(true)
     setFeedbackMsg(null)
-
     try {
       if (currentAssessment) {
-        // PATCH existing draft
-        const res = await api.updateAssessment(currentAssessment.assessmentId, {
-          score: totalScore,
-          grade: grade.code,
-        })
-        if (res.success && res.assessment) {
-          setCurrentAssessment(res.assessment)
-          setFeedbackMsg({ text: 'Draft assessment updated successfully.', type: 'success' })
-          loadAssessments()
-        }
+        const res = await api.updateAssessment(currentAssessment.assessmentId, { score: totalScore, grade: grade.code })
+        setCurrentAssessment(res.assessment ?? { ...currentAssessment, score: totalScore, grade: grade.code })
+        setFeedbackMsg({ text: 'Draft assessment updated successfully.', type: 'success' })
       } else {
-        // POST new assessment
         const res = await api.createAssessment({
           candidateId: selected.id,
           score: totalScore,
           grade: grade.code,
+          clientRequestId: getRequestId(selected.id),
         })
-        if (res.success && res.assessment) {
-          setCurrentAssessment(res.assessment)
-          setFeedbackMsg({ text: 'Draft assessment saved successfully.', type: 'success' })
-          loadAssessments()
-        }
+        setCurrentAssessment(res.assessment)
+        setFeedbackMsg({ text: res.replayed ? 'This draft was already saved.' : 'Draft assessment saved successfully.', type: 'success' })
       }
+      loadAssessments()
     } catch (err: any) {
-      // Offline fallback
-      const mockAssessment: Assessment = {
-        assessmentId: currentAssessment?.assessmentId || `asm-${Date.now().toString(36)}`,
-        candidateId: selected.id,
-        candidateName: selected.name,
-        tradeCategory: selected.trade,
-        score: totalScore,
-        grade: grade.code,
-        status: 'DRAFT',
-        createdAt: new Date().toISOString(),
+      if (err instanceof ApiError && err.status === 0 && !currentAssessment) {
+        // Offline create: queue it. Replay is safe because of clientRequestId.
+        await enqueueAssessment(
+          { candidateId: selected.id, score: totalScore, grade: grade.code },
+          getRequestId(selected.id)
+        )
+        setFeedbackMsg({ text: 'You are offline. Saved on this device and will sync automatically.', type: 'success' })
+      } else {
+        setFeedbackMsg({ text: describeError(err), type: 'error' })
       }
-      setCurrentAssessment(mockAssessment)
-      setFeedbackMsg({ text: 'Assessment saved locally as draft.', type: 'success' })
     } finally {
       setIsProcessing(false)
     }
   }
 
-  async function handleConfirmSubmit() {
+ async function handleConfirmSubmit() {
     if (!selected) return
     setIsProcessing(true)
     setShowSubmitModal(false)
     setFeedbackMsg(null)
-
     try {
-      let assessmentId = currentAssessment?.assessmentId
-      if (!assessmentId) {
-        const createRes = await api.createAssessment({
-          candidateId: selected.id,
-          score: totalScore,
-          grade: grade.code,
-        })
-        assessmentId = createRes.assessment.assessmentId
+      const a = await ensureAssessment()
+      // Make sure the server has the scores currently on screen before submitting.
+      if (currentAssessment) {
+        await api.updateAssessment(a.assessmentId, { score: totalScore, grade: grade.code })
       }
-
-      const res = await api.submitAssessment(assessmentId)
-      if (res.success && res.assessment) {
-        setCurrentAssessment(res.assessment)
-        setFeedbackMsg({ text: 'Assessment submitted to Center Superintendent for review.', type: 'success' })
-        loadAssessments()
-      }
+      const res = await api.submitAssessment(a.assessmentId)
+      setCurrentAssessment(res.assessment ?? { ...a, score: totalScore, grade: grade.code, status: 'SUBMITTED' })
+      setFeedbackMsg({ text: 'Assessment submitted to Center Superintendent for review.', type: 'success' })
+      loadAssessments()
     } catch (err: any) {
-      // Offline simulation fallback
-      const submittedAssessment: Assessment = {
-        assessmentId: currentAssessment?.assessmentId || `asm-${Date.now().toString(36)}`,
-        candidateId: selected.id,
-        candidateName: selected.name,
-        tradeCategory: selected.trade,
-        score: totalScore,
-        grade: grade.code,
-        status: 'SUBMITTED',
-        submittedAt: new Date().toISOString(),
-        createdAt: currentAssessment?.createdAt || new Date().toISOString(),
+      if (err instanceof ApiError && err.status === 0 && !currentAssessment) {
+        await enqueueAssessment(
+          { candidateId: selected.id, score: totalScore, grade: grade.code },
+          getRequestId(selected.id)
+        )
+        setFeedbackMsg({ text: 'You are offline. The draft is saved on this device; open it and submit once you are back online.', type: 'success' })
+      } else {
+        setFeedbackMsg({ text: describeError(err), type: 'error' })
       }
-      setCurrentAssessment(submittedAssessment)
-      setFeedbackMsg({ text: 'Assessment submitted for approval.', type: 'success' })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  // DRAFT only, exactly one evidence photo per assessment.
+  async function handleEvidenceFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !selected) return
+    setIsProcessing(true)
+    setFeedbackMsg(null)
+    try {
+      const a = await ensureAssessment()
+      await uploadAssessmentPhoto(a.assessmentId, file)
+      setAttachments([file.name])
+      setFeedbackMsg({ text: 'Evidence photo uploaded.', type: 'success' })
+      loadAssessments()
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 0 && !currentAssessment) {
+        await enqueueAssessment(
+          { candidateId: selected.id, score: totalScore, grade: grade.code, photo: file },
+          getRequestId(selected.id)
+        )
+        setAttachments([file.name])
+        setFeedbackMsg({ text: 'You are offline. Draft and photo are saved on this device and will sync automatically.', type: 'success' })
+      } else if (err instanceof ApiError && err.status === 409) {
+        setFeedbackMsg({ text: err.message || 'This assessment already has an evidence photo.', type: 'error' })
+      } else {
+        setFeedbackMsg({ text: describeError(err), type: 'error' })
+      }
     } finally {
       setIsProcessing(false)
     }
@@ -234,7 +297,8 @@ export default function AssessmentScreen({ initialCandidate }: AssessmentScreenP
 
   const assessmentStatus = currentAssessment?.status || 'DRAFT'
   const isSubmitted = assessmentStatus === 'SUBMITTED' || assessmentStatus === 'APPROVED' || assessmentStatus === 'MINTED'
-  const isRejected = assessmentStatus === 'REJECTED'
+  const isRejected = assessmentStatus === 'REJECTED' || (assessmentStatus === 'DRAFT' && !!currentAssessment?.rejectionReason)
+
 
   return (
     <div>

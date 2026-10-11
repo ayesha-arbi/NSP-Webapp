@@ -24,6 +24,7 @@ import VerificationResultScreen from './screens/VerificationResultScreen'
 import { authStore, AppRole } from './services/authStore'
 import { CandidateRecord } from './services/api'
 import { verifyCertificateOnChain } from './services/contract'
+import { startQueueSync, flushQueue } from './services/offlineQueue'
 
 // ============================================================
 // VERIFIER PORTAL TYPES
@@ -94,6 +95,9 @@ export default function App() {
   const [verifierScreen, setVerifierScreen] = useState<Screen>('landing')
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null)
 
+  // Offline queue: replay on reconnect and at startup (safe via clientRequestId)
+  useEffect(() => startQueueSync(), [])
+
   // Subscribe to authStore
   useEffect(() => {
     const unsubscribe = authStore.subscribe(newSession => {
@@ -115,6 +119,7 @@ export default function App() {
   }
 
   function handleMFASuccess() {
+    void flushQueue() // resume anything paused by an expired token
     setScreen('dashboard')
   }
 
