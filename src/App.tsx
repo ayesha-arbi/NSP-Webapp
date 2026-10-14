@@ -1,131 +1,160 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react"
 
-import Layout from './components/Layout'
+import Layout from "./components/Layout"
 
-import LoginScreen from './screens/LoginScreen'
-import MFAScreen from './screens/MFAScreen'
-import DashboardScreen from './screens/DashboardScreen'
-import EnrollmentScreen from './screens/EnrollmentScreen'
-import AssessmentScreen from './screens/AssessmentScreen'
-import ApprovalsScreen from './screens/ApprovalsScreen'
-import CredentialsScreen from './screens/CredentialsScreen'
-import DevicesScreen from './screens/DevicesScreen'
-import SettingsScreen from './screens/SettingsScreen'
-import NotificationsScreen from './screens/NotificationsScreen'
-import CredentialRevocationScreen from './screens/CredentialRevocationScreen'
-import UserManagementScreen from './screens/UserManagementScreen'
-import CandidateRecordScreen from './screens/CandidateRecordScreen'
+import LoginScreen from "./screens/LoginScreen"
 
-import LandingScreen from './screens/LandingScreen'
-import QRScannerScreen from './screens/QRScannerScreen'
-import ManualEntryScreen from './screens/ManualEntryScreen'
-import VerificationResultScreen from './screens/VerificationResultScreen'
+import MFAScreen from "./screens/MFAScreen"
 
-import { authStore, AppRole } from './services/authStore'
-import { CandidateRecord } from './services/api'
-import { verifyCertificateOnChain } from './services/contract'
-import { startQueueSync, flushQueue } from './services/offlineQueue'
+import DashboardScreen from "./screens/DashboardScreen"
+
+import EnrollmentScreen from "./screens/EnrollmentScreen"
+
+import AssessmentScreen from "./screens/AssessmentScreen"
+
+import ApprovalsScreen from "./screens/ApprovalsScreen"
+
+import CredentialsScreen from "./screens/CredentialsScreen"
+
+import DevicesScreen from "./screens/DevicesScreen"
+
+import SettingsScreen from "./screens/SettingsScreen"
+
+import NotificationsScreen from "./screens/NotificationsScreen"
+
+import CredentialRevocationScreen from "./screens/CredentialRevocationScreen"
+
+import UserManagementScreen from "./screens/UserManagementScreen"
+
+import CandidateRecordScreen from "./screens/CandidateRecordScreen"
+
+import LandingScreen from "./screens/LandingScreen"
+
+import QRScannerScreen from "./screens/QRScannerScreen"
+
+import ManualEntryScreen from "./screens/ManualEntryScreen"
+
+import VerificationResultScreen from "./screens/VerificationResultScreen"
+
+import { authStore, AppRole } from "./services/authStore"
+
+import { CandidateRecord } from "./services/api"
+
+import { verifyCertificateOnChain } from "./services/contract"
+
+import { startQueueSync, flushQueue } from "./services/offlineQueue"
 
 // ============================================================
+
 // VERIFIER PORTAL TYPES
+
 // ============================================================
 
-export type Screen =
-  | 'landing'
-  | 'qr-scanner'
-  | 'manual-entry'
-  | 'result'
+export type Screen = "landing" | "qr-scanner" | "manual-entry" | "result"
 
-export type VerificationStatus =
-  | 'verified'
-  | 'tampered'
-  | 'revoked'
+export type VerificationStatus = "verified" | "tampered" | "revoked"
 
 export interface VerificationResult {
   status: VerificationStatus
+
   credentialId: string
+
   workerName?: string
+
   skill?: string
+
   grade?: string
+
   issueDate?: string
+
   centre?: string
+
   txHash?: string
+
   timestamp: string
 }
 
 // ============================================================
+
 // APP TYPES
-// ============================================================
-
-type AppScreen =
-  | 'login'
-  | 'mfa'
-  | 'verifier'
-  | 'dashboard'
-  | 'enrollment'
-  | 'assessment'
-  | 'approvals'
-  | 'credentials'
-  | 'devices'
-  | 'settings'
-  | 'notifications'
-  | 'credential-revocation'
-  | 'user-management'
-  | 'record-detail'
-
-type AuthedScreen = Exclude<
-  AppScreen,
-  'login' | 'mfa' | 'verifier'
->
 
 // ============================================================
+
+type AppScreen = "login" | "mfa" | "verifier" | "dashboard" | "enrollment" | "assessment" | "approvals" | "credentials" | "devices" | "settings" | "notifications" | "credential-revocation" | "user-management" | "record-detail"
+
+type AuthedScreen = Exclude<AppScreen, "login" | "mfa" | "verifier">
+
+// ============================================================
+
 // APP
+
 // ============================================================
 
 export default function App() {
   const [session, setSession] = useState(() => authStore.getState())
-  const [screen, setScreen] = useState<AppScreen>('login')
-  const [loginEmail, setLoginEmail] = useState('tradetester@nsp.com')
-  const [activePortal, setActivePortal] = useState<'issuer' | 'verifier'>('issuer')
-  const [assessmentCandidate, setAssessmentCandidate] = useState<CandidateRecord | null>(null)
+
+  const [screen, setScreen] = useState<AppScreen>("login")
+
+  const [loginEmail, setLoginEmail] = useState("tradetester@nsp.com")
+
+  const [activePortal, setActivePortal] = useState<"issuer" | "verifier">(
+    "issuer",
+  )
+
+  const [assessmentCandidate, setAssessmentCandidate] =
+    useState<CandidateRecord | null>(null)
 
   // ============================================================
+
   // VERIFIER PORTAL STATE
+
   // ============================================================
-  const [verifierScreen, setVerifierScreen] = useState<Screen>('landing')
-  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null)
+
+  const [verifierScreen, setVerifierScreen] = useState<Screen>("landing")
+
+  const [verificationResult, setVerificationResult] =
+    useState<VerificationResult | null>(null)
 
   // Offline queue: replay on reconnect and at startup (safe via clientRequestId)
+
   useEffect(() => startQueueSync(), [])
 
   // Subscribe to authStore
+
   useEffect(() => {
-    const unsubscribe = authStore.subscribe(newSession => {
+    const unsubscribe = authStore.subscribe((newSession) => {
       setSession(newSession)
-      if (!newSession.isAuthenticated && activePortal === 'issuer') {
-        setScreen('login')
+
+      if (!newSession.isAuthenticated && activePortal === "issuer") {
+        setScreen("login")
       }
     })
+
     return () => unsubscribe()
   }, [activePortal])
 
   // ============================================================
+
   // LOGIN FLOW (IP-01 / IP-02)
+
   // ============================================================
 
   function handleLoginSuccess(_r: AppRole, email: string) {
     setLoginEmail(email)
-    setScreen('mfa')
+
+    setScreen("mfa")
   }
 
   function handleMFASuccess() {
     void flushQueue() // resume anything paused by an expired token
-    setScreen('dashboard')
+
+    setScreen("dashboard")
   }
 
   function handleLogout() {
     authStore.clearSession()
-    setScreen('login')
+
+    setScreen("login")
   }
 
   function handleNavigate(s: AuthedScreen) {
@@ -134,115 +163,184 @@ export default function App() {
 
   function handleNavigateToAssessment(candidate: CandidateRecord) {
     setAssessmentCandidate(candidate)
-    setScreen('assessment')
+
+    setScreen("assessment")
   }
 
   // ============================================================
+
   // VERIFIER PORTAL (VD-01 / VD-02 / VD-03)
+
   // ============================================================
 
   async function handleVerify(credentialId: string) {
-    const timestamp = new Intl.DateTimeFormat('en-PK', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    const timestamp = new Intl.DateTimeFormat("en-PK", {
+      day: "2-digit",
+
+      month: "short",
+
+      year: "numeric",
+
+      hour: "2-digit",
+
+      minute: "2-digit",
+
       hour12: true,
     }).format(new Date())
 
     const id = credentialId.toUpperCase()
+
     const onChain = await verifyCertificateOnChain(id)
 
     if (onChain.isValid) {
       const issueDate = onChain.issuedAt
-        ? new Date(onChain.issuedAt * 1000).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-        : '14 Mar 2025'
+        ? new Date(onChain.issuedAt * 1000).toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
+        : "14 Mar 2025"
 
       setVerificationResult({
-        status: 'verified',
-        credentialId: id || 'NSP-004821',
-        workerName: 'Muhammad Aslam Khan',
-        skill: 'Electrical Work, Level 2',
-        grade: 'Pass with Merit',
+        status: "verified",
+
+        credentialId: id || "NSP-004821",
+
+        workerName: "Muhammad Aslam Khan",
+
+        skill: "Electrical Work, Level 2",
+
+        grade: "Pass with Merit",
+
         issueDate,
-        centre: 'NADRA Regional Centre, Lahore',
+
+        centre: "NADRA Regional Centre, Lahore",
+
         txHash: onChain.dataHash,
+
         timestamp,
       })
-    } else if (id.startsWith('NSP-T')) {
+    } else if (id.startsWith("NSP-T")) {
       setVerificationResult({
-        status: 'tampered',
+        status: "tampered",
+
         credentialId: id,
+
         timestamp,
       })
     } else {
       setVerificationResult({
-        status: 'revoked',
+        status: "revoked",
+
         credentialId: id,
+
         timestamp,
       })
     }
 
-    setVerifierScreen('result')
+    setVerifierScreen("result")
   }
 
   // ============================================================
+
   // TOP PORTAL SWITCHER HEADER
+
   // ============================================================
+
   const renderPortalSwitcher = () => (
-    <div style={{
-      background: '#1A2322',
-      color: '#F1F0EA',
-      padding: '6px 24px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      fontSize: 12,
-      borderBottom: '1px solid rgba(255,255,255,0.1)',
-      zIndex: 100,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ color: '#B08D46', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+    <div
+      style={{
+        background: "#1A2322",
+
+        color: "#F1F0EA",
+
+        padding: "6px 24px",
+
+        display: "flex",
+
+        alignItems: "center",
+
+        justifyContent: "space-between",
+
+        fontSize: 12,
+
+        borderBottom: "1px solid rgba(255,255,255,0.1)",
+
+        zIndex: 100,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <span
+          style={{
+            color: "#B08D46",
+            fontWeight: 700,
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
+          }}
+        >
           Portal Mode:
         </span>
-        <div style={{ display: 'flex', background: 'rgba(255,255,255,0.08)', borderRadius: 4, padding: 2 }}>
+        <div
+          style={{
+            display: "flex",
+            background: "rgba(255,255,255,0.08)",
+            borderRadius: 4,
+            padding: 2,
+          }}
+        >
           <button
             onClick={() => {
-              setActivePortal('issuer')
+              setActivePortal("issuer")
+
               if (!session.isAuthenticated) {
-                setScreen('login')
+                setScreen("login")
               } else {
-                setScreen('dashboard')
+                setScreen("dashboard")
               }
             }}
             style={{
-              border: 'none',
-              background: activePortal === 'issuer' ? '#4C7A6E' : 'transparent',
-              color: '#fff',
-              padding: '3px 10px',
+              border: "none",
+
+              background: activePortal === "issuer" ? "#4C7A6E" : "transparent",
+
+              color: "#fff",
+
+              padding: "3px 10px",
+
               borderRadius: 3,
+
               fontSize: 11,
+
               fontWeight: 600,
-              cursor: 'pointer',
+
+              cursor: "pointer",
             }}
           >
             Issuer Portal (Trade Tester)
           </button>
           <button
             onClick={() => {
-              setActivePortal('verifier')
-              setVerifierScreen('landing')
+              setActivePortal("verifier")
+
+              setVerifierScreen("landing")
             }}
             style={{
-              border: 'none',
-              background: activePortal === 'verifier' ? '#B08D46' : 'transparent',
-              color: '#fff',
-              padding: '3px 10px',
+              border: "none",
+
+              background:
+                activePortal === "verifier" ? "#B08D46" : "transparent",
+
+              color: "#fff",
+
+              padding: "3px 10px",
+
               borderRadius: 3,
+
               fontSize: 11,
+
               fontWeight: 600,
-              cursor: 'pointer',
+
+              cursor: "pointer",
             }}
           >
             Verifier DApp (On-Chain)
@@ -250,13 +348,14 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        {session.isAuthenticated && activePortal === 'issuer' && (
-          <span style={{ color: 'rgba(241,240,234,0.7)', fontSize: 11 }}>
-            Logged in: <strong>{session.user?.email}</strong> (Role: {session.user?.role})
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        {session.isAuthenticated && activePortal === "issuer" && (
+          <span style={{ color: "rgba(241,240,234,0.7)", fontSize: 11 }}>
+            Logged in: <strong>{session.user?.email}</strong> (Role:{" "}
+            {session.user?.role})
           </span>
         )}
-        <span style={{ color: 'rgba(241,240,234,0.4)', fontSize: 11 }}>
+        <span style={{ color: "rgba(241,240,234,0.4)", fontSize: 11 }}>
           NAVTTC / NADRA · Integrated Build #2
         </span>
       </div>
@@ -264,39 +363,44 @@ export default function App() {
   )
 
   // ============================================================
+
   // VERIFIER PORTAL SCREENS
+
   // ============================================================
 
-  if (activePortal === 'verifier') {
+  if (activePortal === "verifier") {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
+      >
         {renderPortalSwitcher()}
-        {verifierScreen === 'landing' && (
+        {verifierScreen === "landing" && (
           <LandingScreen
-            onManualEntry={() => setVerifierScreen('manual-entry')}
-            onQRScan={() => setVerifierScreen('qr-scanner')}
+            onManualEntry={() => setVerifierScreen("manual-entry")}
+            onQRScan={() => setVerifierScreen("qr-scanner")}
           />
         )}
-        {verifierScreen === 'qr-scanner' && (
+        {verifierScreen === "qr-scanner" && (
           <QRScannerScreen
-            onBack={() => setVerifierScreen('landing')}
-            onManualEntry={() => setVerifierScreen('manual-entry')}
+            onBack={() => setVerifierScreen("landing")}
+            onManualEntry={() => setVerifierScreen("manual-entry")}
             onScanSuccess={handleVerify}
           />
         )}
-        {verifierScreen === 'manual-entry' && (
+        {verifierScreen === "manual-entry" && (
           <ManualEntryScreen
-            onBack={() => setVerifierScreen('landing')}
-            onQRScan={() => setVerifierScreen('qr-scanner')}
+            onBack={() => setVerifierScreen("landing")}
+            onQRScan={() => setVerifierScreen("qr-scanner")}
             onVerify={handleVerify}
           />
         )}
-        {verifierScreen === 'result' && verificationResult && (
+        {verifierScreen === "result" && verificationResult && (
           <VerificationResultScreen
             result={verificationResult}
             onVerifyAnother={() => {
               setVerificationResult(null)
-              setVerifierScreen('landing')
+
+              setVerifierScreen("landing")
             }}
           />
         )}
@@ -305,39 +409,49 @@ export default function App() {
   }
 
   // ============================================================
+
   // ISSUER PORTAL LOGIN & MFA SCREENS
+
   // ============================================================
 
-  if (screen === 'login') {
+  if (screen === "login") {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
+      >
         {renderPortalSwitcher()}
         <LoginScreen onSuccess={handleLoginSuccess} />
       </div>
     )
   }
 
-  if (screen === 'mfa') {
+  if (screen === "mfa") {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
+      >
         {renderPortalSwitcher()}
         <MFAScreen
           email={loginEmail}
           onSuccess={handleMFASuccess}
-          onBack={() => setScreen('login')}
+          onBack={() => setScreen("login")}
         />
       </div>
     )
   }
 
   // ============================================================
+
   // ISSUER PORTAL DASHBOARD & WORKFLOWS
+
   // ============================================================
 
   const authedScreen = screen as AuthedScreen
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
+    >
       {renderPortalSwitcher()}
       <Layout
         currentScreen={authedScreen}
@@ -345,56 +459,42 @@ export default function App() {
         onNavigate={handleNavigate}
         onLogout={handleLogout}
       >
-        {authedScreen === 'dashboard' && (
+        {authedScreen === "dashboard" && (
           <DashboardScreen
             role={session.role}
-            onNavigate={s => setScreen(s)}
+            onNavigate={(s) => setScreen(s)}
           />
         )}
 
-        {authedScreen === 'enrollment' && (
+        {authedScreen === "enrollment" && (
           <EnrollmentScreen
             onNavigateToAssessment={handleNavigateToAssessment}
           />
         )}
 
-        {authedScreen === 'assessment' && (
-          <AssessmentScreen
-            initialCandidate={assessmentCandidate}
-          />
+        {authedScreen === "assessment" && (
+          <AssessmentScreen initialCandidate={assessmentCandidate} />
         )}
 
-        {authedScreen === 'approvals' && (
-          <ApprovalsScreen />
-        )}
+        {authedScreen === "approvals" && <ApprovalsScreen />}
 
-        {authedScreen === 'credentials' && (
-          <CredentialsScreen />
-        )}
+        {authedScreen === "credentials" && <CredentialsScreen />}
 
-        {authedScreen === 'devices' && (
-          <DevicesScreen />
-        )}
+        {authedScreen === "devices" && <DevicesScreen />}
 
-        {authedScreen === 'settings' && (
-          <SettingsScreen role={session.role} />
-        )}
+        {authedScreen === "settings" && <SettingsScreen role={session.role} />}
 
-        {authedScreen === 'notifications' && (
-          <NotificationsScreen />
-        )}
+        {authedScreen === "notifications" && <NotificationsScreen />}
 
-        {authedScreen === 'credential-revocation' && (
+        {authedScreen === "credential-revocation" && (
           <CredentialRevocationScreen />
         )}
 
-        {authedScreen === 'user-management' && (
-          <UserManagementScreen />
-        )}
+        {authedScreen === "user-management" && <UserManagementScreen />}
 
-        {authedScreen === 'record-detail' && (
+        {authedScreen === "record-detail" && (
           <CandidateRecordScreen
-            onBack={() => setScreen('dashboard')}
+            onBack={() => setScreen("dashboard")}
             userRole={session.role}
           />
         )}
