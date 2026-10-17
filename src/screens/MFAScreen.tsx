@@ -10,6 +10,8 @@ interface MFAScreenProps {
   onSuccess: () => void
 
   onBack: () => void
+
+  onUseBackupCode?: () => void
 }
 
 type MFAState = "default" | "loading" | "invalid" | "expired" | "too-many" | "success"
@@ -18,6 +20,7 @@ export default function MFAScreen({
   email = "tradetester@nsp.com",
   onSuccess,
   onBack,
+  onUseBackupCode,
 }: MFAScreenProps) {
   const [digits, setDigits] = useState(["", "", "", "", "", ""])
 
@@ -30,6 +33,8 @@ export default function MFAScreen({
   const [showBackup, setShowBackup] = useState(false)
 
   const [backupCode, setBackupCode] = useState("")
+
+  const [backupPassword, setBackupPassword] = useState("")
 
   const [backupError, setBackupError] = useState("")
 
@@ -87,8 +92,13 @@ export default function MFAScreen({
     try {
       const res = await api.verifyMfa(email, code)
 
-      if (res.success && res.user) {
-        authStore.setSession(res.user, res.accessToken)
+      if (
+        res.success &&
+        res.user &&
+        res.accessToken &&
+        res.refreshToken
+      ) {
+        authStore.setSession(res.user, res.accessToken, res.refreshToken)
 
         setState("success")
 
@@ -98,8 +108,13 @@ export default function MFAScreen({
       }
 
       setState("invalid")
-
-      setCustomError(res.message || "Verification failed.")
+      setDigits(["", "", "", "", "", ""])
+      refs.current[0]?.focus()
+      setCustomError(
+        res.success
+          ? "Unable to create a complete authentication session. Please sign in again."
+          : res.message || "Verification failed.",
+      )
     } catch (err: any) {
       if (err instanceof ApiError && err.status === 429) {
         setState("too-many")
@@ -107,6 +122,10 @@ export default function MFAScreen({
       }
 
       setState("invalid")
+
+      setDigits(["", "", "", "", "", ""])
+
+      refs.current[0]?.focus()
 
       setCustomError(
         err instanceof ApiError && err.status === 0
@@ -135,14 +154,31 @@ export default function MFAScreen({
       setBackupError("Please enter your backup code.")
       return
     }
+    if (!backupPassword.trim()) {
+      setBackupError("Please enter your password.")
+      return
+    }
 
     setBackupError("")
 
-    // Backup-code endpoints still return 500 (Guide 3: do not build against them).
-
-    setBackupError(
-      "Backup-code recovery is not available yet. Please use your authenticator app.",
-    )
+    try {
+      const res = await api.verifyBackupCode(email, backupPassword.trim(), backupCode.trim())
+      if (res.success && res.user) {
+        authStore.setSession(res.user, res.accessToken, res.refreshToken)
+        setTimeout(onSuccess, 400)
+        return
+      }
+      setBackupError(res.message || "Verification failed.")
+    } catch (err: any) {
+      const msg = err?.message?.toLowerCase() || ""
+      if (msg.includes("locked")) {
+        setBackupError("Account locked for 15 minutes due to too many failed attempts. Please try again later.")
+      } else if (msg.includes("already-used") || msg.includes("already used")) {
+        setBackupError("This backup code has already been used. Please try another unused code.")
+      } else {
+        setBackupError(err?.message || "Invalid backup code.")
+      }
+    }
   }
 
   const code = digits.join("")
@@ -487,7 +523,7 @@ export default function MFAScreen({
                   : "Resend code"}
               </button>
               <button
-                onClick={() => setShowBackup(true)}
+                onClick={() => onUseBackupCode?.()}
                 style={{
                   background: "none",
                   border: "none",
@@ -498,7 +534,7 @@ export default function MFAScreen({
                   fontSize: 13,
                 }}
               >
-                Use backup code
+                Lost your authenticator device? Use a backup code
               </button>
             </div>
 
@@ -537,7 +573,7 @@ export default function MFAScreen({
       </div>
 
       {/* Backup Code Modal */}
-      {showBackup && (
+      {false && showBackup && (
         <div
           style={{
             position: "fixed",

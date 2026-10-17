@@ -5,6 +5,7 @@ interface LoginScreenProps {
   onSuccess: (
     role: "trade-tester" | "center-superintendent" | "super-admin",
     email: string,
+    password: string,
   ) => void
 }
 
@@ -144,7 +145,9 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
     password?: string
   }>({})
   const [generalError, setGeneralError] = useState("")
-  const [attempts, setAttempts] = useState(0)
+  const [errorKind, setErrorKind] = useState<
+    "default" | "locked" | "network" | "rate-limit"
+  >("default")
   const [modal, setModal] = useState<ModalType>("none")
 
   const lockTimer = useCountdown(1724, modal === "locked")
@@ -177,40 +180,25 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
             : res.user?.role === "SUPER_ADMIN"
               ? "super-admin"
               : "trade-tester"
-        onSuccess(role, email.trim())
+        onSuccess(role, email.trim(), password)
         return
       }
     } catch (err: any) {
-      const next = attempts + 1
-      setAttempts(next)
-
-      if (next >= 5 || err?.message?.toLowerCase().includes("locked")) {
-        setState("idle")
-        setModal("locked")
-        return
-      }
-
-      if (email === "device@hub.pk") {
-        setState("idle")
-        setModal("unauthorized-device")
-        return
-      }
-
-      // Offline simulation fallback for testing when backend server is not running
-      const role = DEMO_ACCOUNTS[(email as keyof typeof DEMO_ACCOUNTS)]
-      if (
-        role &&
-        (password === "TradeTester123" || password === "password123")
-      ) {
-        setState("idle")
-        onSuccess(role, email.trim())
-        return
-      }
-
       setState("error")
-      setGeneralError(
-        err?.message || "Login failed. Please check your credentials.",
-      )
+      const message = err?.message || "Login failed. Please check your credentials."
+      if (message.toLowerCase().includes("account locked")) {
+        setErrorKind("locked")
+        setGeneralError(message)
+      } else if (err instanceof ApiError && err.status === 0) {
+        setErrorKind("network")
+        setGeneralError("Cannot reach the server. Check your connection and try again.")
+      } else if (err instanceof ApiError && err.status === 429) {
+        setErrorKind("rate-limit")
+        setGeneralError("Request cooldown active. Please wait before trying again.")
+      } else {
+        setErrorKind("default")
+        setGeneralError(message)
+      }
     }
   }
 
@@ -406,6 +394,7 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
             {/* general error banner */}
             {generalError && (
               <div
+                role="alert"
                 style={{
                   background: "#FCEBEB",
                   border: "1px solid #E8B4B4",
@@ -435,6 +424,11 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
                 <span
                   style={{ fontSize: 13, color: "#501313", lineHeight: 1.5 }}
                 >
+                  {errorKind === "locked" && (
+                    <>
+                      <strong>Account temporarily suspended for 15 minutes.</strong>{" "}
+                    </>
+                  )}
                   {generalError}
                 </span>
               </div>
@@ -684,7 +678,7 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
             </div>
 
             {/* demo helpers */}
-            <div
+            {false && <div
               style={{
                 marginTop: 28,
                 borderTop: "1px solid #E8E6DF",
@@ -773,7 +767,7 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
                   Preview: Unauthorized Device
                 </button>
               </div>
-            </div>
+            </div>}
           </div>
         </div>
       </div>
