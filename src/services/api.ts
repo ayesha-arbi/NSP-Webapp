@@ -340,7 +340,7 @@ const one = (r: any): WithAssessment => ({
     : undefined as any,
 })
 
-const many = (r: any): { success: boolean assessments: Assessment[] } => ({
+const many = (r: any): { success: boolean; assessments: Assessment[] } => ({
   ...r,
 
   assessments: (r?.assessments ?? []).map(normalizeAssessment),
@@ -467,7 +467,7 @@ export const api = {
 
   // 6. Superintendent approval workflow (role CENTER_SUPERINTENDENT, hub-scoped server-side)
 
-  async getQueue(): Promise<{ success: boolean assessments: Assessment[] }> {
+  async getQueue(): Promise<{ success: boolean; assessments: Assessment[] }> {
     return many(await request<any>("/api/assessments/queue", { method: "GET" }))
   },
 

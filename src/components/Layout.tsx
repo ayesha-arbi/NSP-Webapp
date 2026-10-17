@@ -30,7 +30,7 @@ const roleNames: Record<Role, string> = {
 }
 
 /* ── icons ── */
-function Icon({ d, size = 18 }: { d: string | React.ReactNode size?: number }) {
+function Icon({ d, size = 18 }: { d: string | React.ReactNode; size?: number }) {
   if (typeof d !== "string") return <>{d}</>
   return (
     <svg

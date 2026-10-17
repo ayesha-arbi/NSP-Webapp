@@ -165,7 +165,7 @@ const categoryIcons: Record<NotifCategory | "all", React.ReactNode> = {
   ),
 }
 
-const categoryColors: Record<NotifCategory, { icon: string bg: string }> = {
+const categoryColors: Record<NotifCategory, { icon: string; bg: string }> = {
   all: { icon: "#8C897C", bg: "#F1EFE8" },
   approval: { icon: "#2E6FE0", bg: "#E4EEFC" },
   enrollment: { icon: "#4C7A6E", bg: "#EAF3DE" },

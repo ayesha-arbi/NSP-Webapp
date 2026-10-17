@@ -362,7 +362,7 @@ export default function SettingsScreen({ role }: SettingsProps) {
     </Field>
   )
 
-  const tabs: { key: SettingsTab label: string }[] = [
+  const tabs: { key: SettingsTab; label: string }[] = [
     { key: "profile", label: "Profile" },
     { key: "security", label: "Security" },
     { key: "notifications", label: "Notifications" },

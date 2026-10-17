@@ -12,6 +12,21 @@ export default defineConfig({
   build: {
     sourcemap: false,
     minify: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes("node_modules/ethers")) {
+            return "ethers"
+          }
+          if (
+            id.includes("node_modules/react") ||
+            id.includes("node_modules/react-dom")
+          ) {
+            return "vendor"
+          }
+        },
+      },
+    },
   },
   plugins: [react(), tailwindcss()],
   resolve: {

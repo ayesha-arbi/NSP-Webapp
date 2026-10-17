@@ -93,7 +93,9 @@ type AuthedScreen = Exclude<AppScreen, "login" | "mfa" | "verifier">
 export default function App() {
   const [session, setSession] = useState(() => authStore.getState())
 
-  const [screen, setScreen] = useState<AppScreen>("login")
+  const [screen, setScreen] = useState<AppScreen>(() =>
+    authStore.getState().isAuthenticated ? "dashboard" : "login",
+  )
 
   const [loginEmail, setLoginEmail] = useState("tradetester@nsp.com")
 

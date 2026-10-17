@@ -1515,7 +1515,7 @@ export default function SuperAdminDashboard() {
     setMfaCode("")
   }
 
-  const TABS: { key: Tab label: string alert?: number }[] = [
+  const TABS: { key: Tab; label: string; alert?: number }[] = [
     { key: "overview", label: "Overview" },
     {
       key: "hubs",
