@@ -1,7 +1,16 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
+
+import { api, ApiError } from "../services/api"
+import BackupCodesSection from "./BackupCodesSection"
 
 type Role = "trade-tester" | "center-superintendent" | "super-admin"
+
 type SettingsTab = "profile" | "security" | "notifications" | "sessions"
+
+interface SettingsTabItem {
+  key: SettingsTab
+  label: string
+}
 
 interface SettingsProps {
   role: Role
@@ -9,42 +18,58 @@ interface SettingsProps {
 
 const roleLabels: Record<Role, string> = {
   "trade-tester": "Trade Tester",
+
   "center-superintendent": "Center Superintendent",
+
   "super-admin": "Super Administrator",
 }
 
 /* ── layout helpers ── */
+
 function Section({
   title,
+
   description,
+
   children,
 }: {
   title: string
+
   description?: string
+
   children: React.ReactNode
 }) {
   return (
     <div
       style={{
         background: "#fff",
+
         border: "1px solid #D6D3C6",
+
         borderRadius: 8,
+
         padding: 24,
+
         marginBottom: 20,
       }}
     >
       <div
         style={{
           marginBottom: 20,
+
           paddingBottom: 16,
+
           borderBottom: "1px solid #F1EFE8",
         }}
       >
         <h3
           style={{
             fontSize: 15,
+
             fontWeight: 600,
+
             color: "#24302E",
+
             margin: "0 0 4px",
           }}
         >
@@ -63,13 +88,19 @@ function Section({
 
 function Field({
   label,
+
   required,
+
   children,
+
   hint,
 }: {
   label: string
+
   required?: boolean
+
   children: React.ReactNode
+
   hint?: string
 }) {
   return (
@@ -77,9 +108,13 @@ function Field({
       <label
         style={{
           display: "block",
+
           fontSize: 13,
+
           fontWeight: 600,
+
           color: "#24302E",
+
           marginBottom: 6,
         }}
       >
@@ -100,25 +135,40 @@ function ModalOverlay({ children }: { children: React.ReactNode }) {
     <div
       style={{
         position: "fixed",
+
         inset: 0,
+
         background: "rgba(36,48,46,0.55)",
+
         display: "flex",
+
         alignItems: "center",
+
         justifyContent: "center",
+
         zIndex: 200,
+
         padding: 24,
       }}
     >
       <div
         style={{
           background: "#fff",
+
           border: "1px solid #D6D3C6",
+
           borderRadius: 8,
+
           padding: 32,
+
           maxWidth: 480,
+
           width: "100%",
+
           boxShadow: "0 16px 48px rgba(0,0,0,0.14)",
+
           maxHeight: "90vh",
+
           overflowY: "auto",
         }}
       >
@@ -128,177 +178,269 @@ function ModalOverlay({ children }: { children: React.ReactNode }) {
   )
 }
 
-const BACKUP_CODES = [
-  "A1B2-C3D4-E5F6",
-  "G7H8-I9J0-K1L2",
-  "M3N4-O5P6-Q7R8",
-  "S9T0-U1V2-W3X4",
-  "Y5Z6-A7B8-C9D0",
-  "E1F2-G3H4-I5J6",
-  "K7L8-M9N0-O1P2",
-  "Q3R4-S5T6-U7V8",
-]
-
 const inputStyle: React.CSSProperties = {
   width: "100%",
+
   padding: "10px 12px",
+
   border: "1px solid #D6D3C6",
+
   borderRadius: 6,
+
   fontSize: 14,
+
   background: "#fff",
+
   color: "#24302E",
+
   fontFamily: "Inter, sans-serif",
+
   boxSizing: "border-box",
 }
 
 const disabledInputStyle: React.CSSProperties = {
   ...inputStyle,
+
   background: "#F1F0EA",
+
   color: "#8C897C",
+
   cursor: "not-allowed",
 }
 
 interface Session {
   id: string
+
   device: string
+
   os: string
+
   ip: string
+
   location: string
+
   lastActive: string
+
   current: boolean
 }
 
 const INITIAL_SESSIONS: Session[] = [
   {
     id: "1",
+
     device: "Chrome 126",
+
     os: "Windows 11",
+
     ip: "203.128.22.14",
+
     location: "Lahore, Punjab",
+
     lastActive: "Active now",
+
     current: true,
   },
+
   {
     id: "2",
+
     device: "Safari 17",
+
     os: "iPhone iOS 17",
+
     ip: "42.201.64.88",
+
     location: "Lahore, Punjab",
+
     lastActive: "2 hours ago",
+
     current: false,
   },
+
   {
     id: "3",
+
     device: "Edge 126",
+
     os: "Windows 10",
+
     ip: "203.128.22.15",
+
     location: "Lahore, Punjab",
+
     lastActive: "Yesterday at 16:32",
+
     current: false,
   },
 ]
 
 export default function SettingsScreen({ role }: SettingsProps) {
   const [tab, setTab] = useState<SettingsTab>("profile")
+
   const [profile, setProfile] = useState({
     firstName: "Ahmad",
+
     lastName: "Raza",
+
     email: "ahmad.raza@navttc.gov.pk",
+
     phone: "+92-300-1234567",
   })
+
   const [passwords, setPasswords] = useState({
     current: "",
+
     newPw: "",
+
     confirm: "",
   })
+
   const [showPw, setShowPw] = useState({
     current: false,
+
     newPw: false,
+
     confirm: false,
   })
+
   const [pwError, setPwError] = useState("")
+
   const [pwSuccess, setPwSuccess] = useState(false)
+
   const [mfaEnabled, setMfaEnabled] = useState(true)
+
   const [sessions, setSessions] = useState<Session[]>(INITIAL_SESSIONS)
+
   const [revokeTarget, setRevokeTarget] = useState<string | null>(null)
+
   const [profileSaved, setProfileSaved] = useState(false)
+
   const [notifs, setNotifs] = useState({
     approvalUpdates: true,
+
     enrollmentAlerts: true,
+
     systemAnnouncements: false,
+
     offlineSync: true,
+
     credentialMinted: true,
+
     loginAlerts: true,
   })
 
   /* backup code modals */
+
   const [backupModal, setBackupModal] =
     useState<"none" | "view" | "regenerate" | "regenerate-confirm">("none")
-  const [backupCodes, setBackupCodes] = useState<string[]>(BACKUP_CODES)
+
+  const [backupCodes, setBackupCodes] = useState<string[]>([])
+
   const [codesVisible, setCodesVisible] = useState(false)
+
   const [regenerated, setRegenerated] = useState(false)
 
+  const [backupStatus, setBackupStatus] = useState<{
+    totalCodes: number
+    unusedCodes: number
+    usedCodes: number
+  } | null>(null)
+
+  const [backupLoading, setBackupLoading] = useState(false)
+
+  const [backupError, setBackupError] = useState("")
+
+  const [savedConfirm, setSavedConfirm] = useState(false)
+
+  const [generateLoading, setGenerateLoading] = useState(false)
+
   /* sign out all devices */
+
   const [showSignOutAll, setShowSignOutAll] = useState(false)
+
   const [signedOutAll, setSignedOutAll] = useState(false)
 
   function handleProfileSave() {
     setProfileSaved(true)
+
     setTimeout(() => setProfileSaved(false), 2000)
   }
 
   function handlePwChange(e: React.FormEvent) {
     e.preventDefault()
+
     setPwError("")
+
     setPwSuccess(false)
+
     if (!passwords.current) {
       setPwError("Current password is required.")
+
       return
     }
+
     if (passwords.newPw.length < 8) {
       setPwError("New password must be at least 8 characters.")
+
       return
     }
+
     if (passwords.newPw !== passwords.confirm) {
       setPwError("New passwords do not match.")
+
       return
     }
+
     setPwSuccess(true)
+
     setPasswords({ current: "", newPw: "", confirm: "" })
+
     setTimeout(() => setPwSuccess(false), 3000)
   }
 
   function handleRevokeSession(id: string) {
     setSessions((ss) => ss.filter((s) => s.id !== id))
+
     setRevokeTarget(null)
   }
 
   function handleSignOutAll() {
     setSessions((ss) => ss.filter((s) => s.current))
+
     setShowSignOutAll(false)
+
     setSignedOutAll(true)
+
     setTimeout(() => setSignedOutAll(false), 3000)
   }
 
   function handleRegenerateCodes() {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
     const newCodes = Array.from({ length: 8 }, () =>
       Array.from({ length: 4 }, () =>
         Array.from(
           { length: 4 },
+
           () => chars[Math.floor(Math.random() * chars.length)],
         ).join(""),
       ).join("-"),
     )
+
     setBackupCodes(newCodes)
+
     setBackupModal("view")
+
     setRegenerated(true)
   }
 
   const pwField = (
     key: "current" | "newPw" | "confirm",
+
     label: string,
+
     placeholder: string,
+
     hint?: string,
   ) => (
     <Field label={label} required hint={hint}>
@@ -317,14 +459,23 @@ export default function SettingsScreen({ role }: SettingsProps) {
           onClick={() => setShowPw((s) => ({ ...s, [key]: !s[key] }))}
           style={{
             position: "absolute",
+
             right: 12,
+
             top: "50%",
+
             transform: "translateY(-50%)",
+
             background: "none",
+
             border: "none",
+
             cursor: "pointer",
+
             color: "#8C897C",
+
             padding: 0,
+
             display: "flex",
           }}
         >
@@ -362,10 +513,13 @@ export default function SettingsScreen({ role }: SettingsProps) {
     </Field>
   )
 
-  const tabs: { key: SettingsTab; label: string }[] = [
+  const tabs: SettingsTabItem[] = [
     { key: "profile", label: "Profile" },
+
     { key: "security", label: "Security" },
+
     { key: "notifications", label: "Notifications" },
+
     { key: "sessions", label: "Active Sessions" },
   ]
 
@@ -376,9 +530,13 @@ export default function SettingsScreen({ role }: SettingsProps) {
           className="display"
           style={{
             fontSize: 28,
+
             fontWeight: 400,
+
             color: "#24302E",
+
             margin: "0 0 4px",
+
             letterSpacing: -0.2,
           }}
         >
@@ -392,8 +550,11 @@ export default function SettingsScreen({ role }: SettingsProps) {
       <div
         style={{
           display: "grid",
+
           gridTemplateColumns: "200px 1fr",
+
           gap: 24,
+
           alignItems: "start",
         }}
       >
@@ -401,8 +562,11 @@ export default function SettingsScreen({ role }: SettingsProps) {
         <div
           style={{
             background: "#fff",
+
             border: "1px solid #D6D3C6",
+
             borderRadius: 8,
+
             overflow: "hidden",
           }}
         >
@@ -412,18 +576,29 @@ export default function SettingsScreen({ role }: SettingsProps) {
               onClick={() => setTab(t.key)}
               style={{
                 width: "100%",
+
                 textAlign: "left",
+
                 padding: "12px 16px",
+
                 background: tab === t.key ? "#F0F7FF" : "transparent",
+
                 border: "none",
+
                 borderLeft: `3px solid ${
                   tab === t.key ? "#4C7A6E" : "transparent"
                 }`,
+
                 color: tab === t.key ? "#4C7A6E" : "#5C5A50",
+
                 fontSize: 13,
+
                 fontWeight: tab === t.key ? 600 : 400,
+
                 cursor: "pointer",
+
                 borderBottom: "1px solid #F1EFE8",
+
                 display: "block",
               }}
             >
@@ -444,7 +619,9 @@ export default function SettingsScreen({ role }: SettingsProps) {
                 <div
                   style={{
                     display: "grid",
+
                     gridTemplateColumns: "1fr 1fr",
+
                     gap: 16,
                   }}
                 >
@@ -495,7 +672,9 @@ export default function SettingsScreen({ role }: SettingsProps) {
                 <div
                   style={{
                     display: "grid",
+
                     gridTemplateColumns: "1fr 1fr",
+
                     gap: 16,
                   }}
                 >
@@ -512,6 +691,7 @@ export default function SettingsScreen({ role }: SettingsProps) {
                       disabled
                       style={{
                         ...disabledInputStyle,
+
                         fontFamily: "IBM Plex Mono, monospace",
                       }}
                     />
@@ -522,6 +702,7 @@ export default function SettingsScreen({ role }: SettingsProps) {
                       disabled
                       style={{
                         ...disabledInputStyle,
+
                         fontFamily: "IBM Plex Mono, monospace",
                       }}
                     />
@@ -537,13 +718,21 @@ export default function SettingsScreen({ role }: SettingsProps) {
                   onClick={handleProfileSave}
                   style={{
                     height: 40,
+
                     padding: "0 24px",
+
                     background: "#4C7A6E",
+
                     color: "#fff",
+
                     border: "none",
+
                     borderRadius: 6,
+
                     fontSize: 14,
+
                     fontWeight: 600,
+
                     cursor: "pointer",
                   }}
                 >
@@ -552,12 +741,19 @@ export default function SettingsScreen({ role }: SettingsProps) {
                 <button
                   style={{
                     height: 40,
+
                     padding: "0 24px",
+
                     background: "#fff",
+
                     color: "#24302E",
+
                     border: "1px solid #D6D3C6",
+
                     borderRadius: 6,
+
                     fontSize: 14,
+
                     cursor: "pointer",
                   }}
                 >
@@ -578,11 +774,17 @@ export default function SettingsScreen({ role }: SettingsProps) {
                   <div
                     style={{
                       background: "#FCEBEB",
+
                       border: "1px solid #E8B4B4",
+
                       borderRadius: 6,
+
                       padding: "10px 14px",
+
                       marginBottom: 16,
+
                       fontSize: 13,
+
                       color: "#501313",
                     }}
                   >
@@ -593,14 +795,23 @@ export default function SettingsScreen({ role }: SettingsProps) {
                   <div
                     style={{
                       background: "#EAF3DE",
+
                       border: "1px solid #4C7A6E",
+
                       borderRadius: 6,
+
                       padding: "10px 14px",
+
                       marginBottom: 16,
+
                       fontSize: 13,
+
                       color: "#173404",
+
                       display: "flex",
+
                       alignItems: "center",
+
                       gap: 8,
                     }}
                   >
@@ -621,31 +832,46 @@ export default function SettingsScreen({ role }: SettingsProps) {
                 <form onSubmit={handlePwChange} noValidate>
                   {pwField(
                     "current",
+
                     "Current Password",
+
                     "Enter current password",
                   )}
                   {pwField(
                     "newPw",
+
                     "New Password",
+
                     "Enter new password",
+
                     "Minimum 8 characters, including a number and special character.",
                   )}
                   {pwField(
                     "confirm",
+
                     "Confirm New Password",
+
                     "Re-enter new password",
                   )}
                   <button
                     type="submit"
                     style={{
                       height: 40,
+
                       padding: "0 24px",
+
                       background: "#4C7A6E",
+
                       color: "#fff",
+
                       border: "none",
+
                       borderRadius: 6,
+
                       fontSize: 14,
+
                       fontWeight: 600,
+
                       cursor: "pointer",
                     }}
                   >
@@ -661,11 +887,17 @@ export default function SettingsScreen({ role }: SettingsProps) {
                 <div
                   style={{
                     display: "flex",
+
                     alignItems: "center",
+
                     justifyContent: "space-between",
+
                     padding: "16px",
+
                     background: "#F1F0EA",
+
                     border: "1px solid #D6D3C6",
+
                     borderRadius: 6,
                   }}
                 >
@@ -673,8 +905,11 @@ export default function SettingsScreen({ role }: SettingsProps) {
                     <div
                       style={{
                         fontSize: 14,
+
                         fontWeight: 600,
+
                         color: "#24302E",
+
                         marginBottom: 2,
                       }}
                     >
@@ -683,6 +918,7 @@ export default function SettingsScreen({ role }: SettingsProps) {
                     <div
                       style={{
                         fontSize: 13,
+
                         color: mfaEnabled ? "#173404" : "#8C897C",
                       }}
                     >
@@ -695,15 +931,23 @@ export default function SettingsScreen({ role }: SettingsProps) {
                     onClick={() => setMfaEnabled(!mfaEnabled)}
                     style={{
                       height: 36,
+
                       padding: "0 16px",
+
                       background: mfaEnabled ? "#fff" : "#4C7A6E",
+
                       color: mfaEnabled ? "#8C3B34" : "#fff",
+
                       border: `1px solid ${
                         mfaEnabled ? "#A6453D" : "transparent"
                       }`,
+
                       borderRadius: 6,
+
                       fontSize: 13,
+
                       fontWeight: 600,
+
                       cursor: "pointer",
                     }}
                   >
@@ -714,11 +958,17 @@ export default function SettingsScreen({ role }: SettingsProps) {
                   <div
                     style={{
                       background: "#FCEBEB",
+
                       border: "1px solid #E8B4B4",
+
                       borderRadius: 6,
+
                       padding: "10px 14px",
+
                       marginTop: 12,
+
                       fontSize: 13,
+
                       color: "#501313",
                     }}
                   >
@@ -732,94 +982,7 @@ export default function SettingsScreen({ role }: SettingsProps) {
                 title="Backup Codes"
                 description="Use backup codes to access your account if you lose your authenticator."
               >
-                <div
-                  style={{
-                    background: "#F1F0EA",
-                    border: "1px solid #D6D3C6",
-                    borderRadius: 6,
-                    padding: "14px 16px",
-                    marginBottom: 16,
-                    fontSize: 13,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          fontWeight: 600,
-                          color: "#24302E",
-                          marginBottom: 2,
-                        }}
-                      >
-                        {backupCodes.length} codes available
-                      </div>
-                      <div style={{ color: "#8C897C" }}>
-                        Each code is single-use and invalidated after use.
-                      </div>
-                    </div>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        background: "#EAF3DE",
-                        color: "#173404",
-                        padding: "3px 10px",
-                        borderRadius: 999,
-                      }}
-                    >
-                      Active
-                    </span>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button
-                    onClick={() => {
-                      setBackupModal("view")
-                      setCodesVisible(false)
-                      setRegenerated(false)
-                    }}
-                    style={{
-                      height: 36,
-                      padding: "0 16px",
-                      background: "#4C7A6E",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 6,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    View Backup Codes
-                  </button>
-                  <button
-                    onClick={() => setBackupModal("regenerate")}
-                    style={{
-                      height: 36,
-                      padding: "0 16px",
-                      background: "#fff",
-                      color: "#24302E",
-                      border: "1px solid #D6D3C6",
-                      borderRadius: 6,
-                      fontSize: 13,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Regenerate Codes
-                  </button>
-                </div>
-                <p
-                  style={{ fontSize: 12, color: "#8C897C", margin: "10px 0 0" }}
-                >
-                  Store backup codes in a secure location. Do not share them
-                  with anyone.
-                </p>
+                <BackupCodesSection />
               </Section>
             </div>
           )}
@@ -834,41 +997,58 @@ export default function SettingsScreen({ role }: SettingsProps) {
                 ([key, val]) => {
                   const labels: Record<keyof typeof notifs, {
                     title: string
+
                     desc: string
                   }> = {
                     approvalUpdates: {
                       title: "Approval Queue Updates",
+
                       desc: "When assessments are approved or rejected.",
                     },
+
                     enrollmentAlerts: {
                       title: "Enrollment Alerts",
+
                       desc: "New candidate enrollments and NADRA results.",
                     },
+
                     systemAnnouncements: {
                       title: "System Announcements",
+
                       desc: "Portal maintenance windows and updates.",
                     },
+
                     offlineSync: {
                       title: "Offline Sync Status",
+
                       desc: "When offline records are synchronized.",
                     },
+
                     credentialMinted: {
                       title: "Credential Minted",
+
                       desc: "When a credential is confirmed on-chain.",
                     },
+
                     loginAlerts: {
                       title: "New Login Alerts",
+
                       desc: "When a new device signs into your account.",
                     },
                   }
+
                   return (
                     <div
                       key={key}
                       style={{
                         display: "flex",
+
                         alignItems: "center",
+
                         justifyContent: "space-between",
+
                         padding: "14px 0",
+
                         borderBottom: "1px solid #F1EFE8",
                       }}
                     >
@@ -876,8 +1056,11 @@ export default function SettingsScreen({ role }: SettingsProps) {
                         <div
                           style={{
                             fontSize: 14,
+
                             fontWeight: 500,
+
                             color: "#24302E",
+
                             marginBottom: 2,
                           }}
                         >
@@ -893,26 +1076,42 @@ export default function SettingsScreen({ role }: SettingsProps) {
                         }
                         style={{
                           width: 44,
+
                           height: 24,
+
                           borderRadius: 12,
+
                           border: "none",
+
                           cursor: "pointer",
+
                           flexShrink: 0,
+
                           position: "relative",
+
                           background: val ? "#4C7A6E" : "#D6D3C6",
+
                           transition: "background 0.15s",
                         }}
                       >
                         <span
                           style={{
                             position: "absolute",
+
                             top: 3,
+
                             left: val ? 22 : 3,
+
                             width: 18,
+
                             height: 18,
+
                             background: "#fff",
+
                             borderRadius: "50%",
+
                             transition: "left 0.15s",
+
                             display: "block",
                           }}
                         />
@@ -925,13 +1124,21 @@ export default function SettingsScreen({ role }: SettingsProps) {
                 <button
                   style={{
                     height: 40,
+
                     padding: "0 24px",
+
                     background: "#4C7A6E",
+
                     color: "#fff",
+
                     border: "none",
+
                     borderRadius: 6,
+
                     fontSize: 14,
+
                     fontWeight: 600,
+
                     cursor: "pointer",
                   }}
                 >
@@ -952,14 +1159,23 @@ export default function SettingsScreen({ role }: SettingsProps) {
                   <div
                     style={{
                       background: "#EAF3DE",
+
                       border: "1px solid #4C7A6E",
+
                       borderRadius: 6,
+
                       padding: "10px 14px",
+
                       marginBottom: 16,
+
                       fontSize: 13,
+
                       color: "#173404",
+
                       display: "flex",
+
                       alignItems: "center",
+
                       gap: 8,
                     }}
                   >
@@ -982,21 +1198,32 @@ export default function SettingsScreen({ role }: SettingsProps) {
                     key={s.id}
                     style={{
                       display: "flex",
+
                       alignItems: "center",
+
                       gap: 16,
+
                       padding: "14px 0",
+
                       borderBottom: "1px solid #F1EFE8",
                     }}
                   >
                     <div
                       style={{
                         width: 40,
+
                         height: 40,
+
                         background: s.current ? "#E4EEFC" : "#F1F0EA",
+
                         borderRadius: 8,
+
                         display: "flex",
+
                         alignItems: "center",
+
                         justifyContent: "center",
+
                         flexShrink: 0,
                       }}
                     >
@@ -1019,15 +1246,20 @@ export default function SettingsScreen({ role }: SettingsProps) {
                       <div
                         style={{
                           display: "flex",
+
                           alignItems: "center",
+
                           gap: 8,
+
                           marginBottom: 2,
                         }}
                       >
                         <span
                           style={{
                             fontSize: 14,
+
                             fontWeight: 600,
+
                             color: "#24302E",
                           }}
                         >
@@ -1037,10 +1269,15 @@ export default function SettingsScreen({ role }: SettingsProps) {
                           <span
                             style={{
                               fontSize: 11,
+
                               fontWeight: 600,
+
                               color: "#173404",
+
                               background: "#EAF3DE",
+
                               padding: "2px 8px",
+
                               borderRadius: 999,
                             }}
                           >
@@ -1051,7 +1288,9 @@ export default function SettingsScreen({ role }: SettingsProps) {
                       <div
                         style={{
                           fontSize: 12,
+
                           color: "#8C897C",
+
                           fontFamily: "IBM Plex Mono, monospace",
                         }}
                       >
@@ -1070,13 +1309,21 @@ export default function SettingsScreen({ role }: SettingsProps) {
                             onClick={() => handleRevokeSession(s.id)}
                             style={{
                               height: 30,
+
                               padding: "0 12px",
+
                               background: "#A6453D",
+
                               color: "#fff",
+
                               border: "none",
+
                               borderRadius: 4,
+
                               fontSize: 12,
+
                               fontWeight: 600,
+
                               cursor: "pointer",
                             }}
                           >
@@ -1086,12 +1333,19 @@ export default function SettingsScreen({ role }: SettingsProps) {
                             onClick={() => setRevokeTarget(null)}
                             style={{
                               height: 30,
+
                               padding: "0 12px",
+
                               background: "#fff",
+
                               color: "#24302E",
+
                               border: "1px solid #D6D3C6",
+
                               borderRadius: 4,
+
                               fontSize: 12,
+
                               cursor: "pointer",
                             }}
                           >
@@ -1103,12 +1357,19 @@ export default function SettingsScreen({ role }: SettingsProps) {
                           onClick={() => setRevokeTarget(s.id)}
                           style={{
                             height: 30,
+
                             padding: "0 12px",
+
                             background: "#fff",
+
                             color: "#8C3B34",
+
                             border: "1px solid #A6453D",
+
                             borderRadius: 4,
+
                             fontSize: 12,
+
                             cursor: "pointer",
                           }}
                         >
@@ -1122,7 +1383,9 @@ export default function SettingsScreen({ role }: SettingsProps) {
                     <p
                       style={{
                         fontSize: 13,
+
                         color: "#8C897C",
+
                         margin: "8px 0 0",
                       }}
                     >
@@ -1135,16 +1398,22 @@ export default function SettingsScreen({ role }: SettingsProps) {
               <div
                 style={{
                   background: "#fff",
+
                   border: "1px solid #E8B4B4",
+
                   borderRadius: 8,
+
                   padding: 24,
                 }}
               >
                 <h3
                   style={{
                     fontSize: 15,
+
                     fontWeight: 600,
+
                     color: "#24302E",
+
                     margin: "0 0 4px",
                   }}
                 >
@@ -1153,8 +1422,11 @@ export default function SettingsScreen({ role }: SettingsProps) {
                 <p
                   style={{
                     fontSize: 13,
+
                     color: "#5C5A50",
+
                     margin: "0 0 16px",
+
                     lineHeight: 1.5,
                   }}
                 >
@@ -1167,23 +1439,31 @@ export default function SettingsScreen({ role }: SettingsProps) {
                   disabled={sessions.filter((s) => !s.current).length === 0}
                   style={{
                     height: 40,
+
                     padding: "0 24px",
+
                     background:
                       sessions.filter((s) => !s.current).length === 0
                         ? "#F1EFE8"
                         : "#fff",
+
                     color:
                       sessions.filter((s) => !s.current).length === 0
                         ? "#8C897C"
                         : "#8C3B34",
+
                     border: `1px solid ${
                       sessions.filter((s) => !s.current).length === 0
                         ? "#D6D3C6"
                         : "#A6453D"
                     }`,
+
                     borderRadius: 6,
+
                     fontSize: 14,
+
                     fontWeight: 600,
+
                     cursor:
                       sessions.filter((s) => !s.current).length === 0
                         ? "not-allowed"
@@ -1204,8 +1484,11 @@ export default function SettingsScreen({ role }: SettingsProps) {
           <div
             style={{
               display: "flex",
+
               justifyContent: "space-between",
+
               alignItems: "flex-start",
+
               marginBottom: 16,
             }}
           >
@@ -1213,8 +1496,11 @@ export default function SettingsScreen({ role }: SettingsProps) {
               <h2
                 style={{
                   fontSize: 18,
+
                   fontWeight: 700,
+
                   color: "#24302E",
+
                   margin: "0 0 4px",
                 }}
               >
@@ -1228,11 +1514,17 @@ export default function SettingsScreen({ role }: SettingsProps) {
               <span
                 style={{
                   fontSize: 11,
+
                   fontWeight: 600,
+
                   background: "#EAF3DE",
+
                   color: "#173404",
+
                   padding: "3px 10px",
+
                   borderRadius: 999,
+
                   flexShrink: 0,
                 }}
               >
@@ -1244,13 +1536,21 @@ export default function SettingsScreen({ role }: SettingsProps) {
           <div
             style={{
               background: "#FCE8D6",
+
               border: "1px solid #B08D46",
+
               borderRadius: 6,
+
               padding: "10px 14px",
+
               marginBottom: 20,
+
               fontSize: 13,
+
               color: "#5C3300",
+
               display: "flex",
+
               gap: 8,
             }}
           >
@@ -1276,9 +1576,13 @@ export default function SettingsScreen({ role }: SettingsProps) {
           <div
             style={{
               background: "#F1F0EA",
+
               border: "1px solid #D6D3C6",
+
               borderRadius: 6,
+
               padding: "16px 20px",
+
               marginBottom: 20,
             }}
           >
@@ -1286,7 +1590,9 @@ export default function SettingsScreen({ role }: SettingsProps) {
               <div
                 style={{
                   display: "grid",
+
                   gridTemplateColumns: "1fr 1fr",
+
                   gap: "8px 24px",
                 }}
               >
@@ -1298,9 +1604,13 @@ export default function SettingsScreen({ role }: SettingsProps) {
                     <span
                       style={{
                         fontSize: 11,
+
                         color: "#8C897C",
+
                         width: 16,
+
                         textAlign: "right",
+
                         flexShrink: 0,
                       }}
                     >
@@ -1309,8 +1619,11 @@ export default function SettingsScreen({ role }: SettingsProps) {
                     <code
                       style={{
                         fontSize: 13,
+
                         fontFamily: "IBM Plex Mono, monospace",
+
                         color: "#24302E",
+
                         letterSpacing: 0.5,
                       }}
                     >
@@ -1330,13 +1643,21 @@ export default function SettingsScreen({ role }: SettingsProps) {
                   onClick={() => setCodesVisible(true)}
                   style={{
                     height: 36,
+
                     padding: "0 20px",
+
                     background: "#4C7A6E",
+
                     color: "#fff",
+
                     border: "none",
+
                     borderRadius: 6,
+
                     fontSize: 13,
+
                     fontWeight: 600,
+
                     cursor: "pointer",
                   }}
                 >
@@ -1353,16 +1674,27 @@ export default function SettingsScreen({ role }: SettingsProps) {
               }
               style={{
                 height: 34,
+
                 padding: "0 14px",
+
                 background: "#fff",
+
                 color: "#4C7A6E",
+
                 border: "1px solid #D6D3C6",
+
                 borderRadius: 6,
+
                 fontSize: 13,
+
                 cursor: "pointer",
+
                 marginBottom: 20,
+
                 display: "flex",
+
                 alignItems: "center",
+
                 gap: 6,
               }}
             >
@@ -1388,12 +1720,19 @@ export default function SettingsScreen({ role }: SettingsProps) {
               onClick={() => setBackupModal("regenerate")}
               style={{
                 height: 40,
+
                 padding: "0 20px",
+
                 background: "#fff",
+
                 color: "#24302E",
+
                 border: "1px solid #D6D3C6",
+
                 borderRadius: 6,
+
                 fontSize: 13,
+
                 cursor: "pointer",
               }}
             >
@@ -1402,17 +1741,26 @@ export default function SettingsScreen({ role }: SettingsProps) {
             <button
               onClick={() => {
                 setBackupModal("none")
+
                 setCodesVisible(false)
               }}
               style={{
                 height: 40,
+
                 padding: "0 20px",
+
                 background: "#4C7A6E",
+
                 color: "#fff",
+
                 border: "none",
+
                 borderRadius: 6,
+
                 fontSize: 13,
+
                 fontWeight: 600,
+
                 cursor: "pointer",
               }}
             >
@@ -1428,20 +1776,30 @@ export default function SettingsScreen({ role }: SettingsProps) {
           <div
             style={{
               display: "flex",
+
               gap: 16,
+
               alignItems: "flex-start",
+
               marginBottom: 20,
             }}
           >
             <div
               style={{
                 width: 48,
+
                 height: 48,
+
                 background: "#FCEBEB",
+
                 borderRadius: 8,
+
                 display: "flex",
+
                 alignItems: "center",
+
                 justifyContent: "center",
+
                 flexShrink: 0,
               }}
             >
@@ -1463,8 +1821,11 @@ export default function SettingsScreen({ role }: SettingsProps) {
               <h2
                 style={{
                   fontSize: 18,
+
                   fontWeight: 700,
+
                   color: "#24302E",
+
                   margin: "0 0 6px",
                 }}
               >
@@ -1473,8 +1834,11 @@ export default function SettingsScreen({ role }: SettingsProps) {
               <p
                 style={{
                   fontSize: 14,
+
                   color: "#5C5A50",
+
                   margin: 0,
+
                   lineHeight: 1.5,
                 }}
               >
@@ -1487,11 +1851,17 @@ export default function SettingsScreen({ role }: SettingsProps) {
           <div
             style={{
               background: "#FCEBEB",
+
               border: "1px solid #E8B4B4",
+
               borderRadius: 6,
+
               padding: "10px 14px",
+
               marginBottom: 24,
+
               fontSize: 13,
+
               color: "#501313",
             }}
           >
@@ -1506,13 +1876,21 @@ export default function SettingsScreen({ role }: SettingsProps) {
               onClick={handleRegenerateCodes}
               style={{
                 flex: 1,
+
                 height: 40,
+
                 background: "#A6453D",
+
                 color: "#fff",
+
                 border: "none",
+
                 borderRadius: 6,
+
                 fontSize: 14,
+
                 fontWeight: 600,
+
                 cursor: "pointer",
               }}
             >
@@ -1522,12 +1900,19 @@ export default function SettingsScreen({ role }: SettingsProps) {
               onClick={() => setBackupModal("none")}
               style={{
                 height: 40,
+
                 padding: "0 20px",
+
                 background: "#fff",
+
                 color: "#24302E",
+
                 border: "1px solid #D6D3C6",
+
                 borderRadius: 6,
+
                 fontSize: 14,
+
                 cursor: "pointer",
               }}
             >
@@ -1543,20 +1928,30 @@ export default function SettingsScreen({ role }: SettingsProps) {
           <div
             style={{
               display: "flex",
+
               gap: 16,
+
               alignItems: "flex-start",
+
               marginBottom: 20,
             }}
           >
             <div
               style={{
                 width: 48,
+
                 height: 48,
+
                 background: "#FCEBEB",
+
                 borderRadius: 8,
+
                 display: "flex",
+
                 alignItems: "center",
+
                 justifyContent: "center",
+
                 flexShrink: 0,
               }}
             >
@@ -1579,8 +1974,11 @@ export default function SettingsScreen({ role }: SettingsProps) {
               <h2
                 style={{
                   fontSize: 18,
+
                   fontWeight: 700,
+
                   color: "#24302E",
+
                   margin: "0 0 6px",
                 }}
               >
@@ -1589,8 +1987,11 @@ export default function SettingsScreen({ role }: SettingsProps) {
               <p
                 style={{
                   fontSize: 14,
+
                   color: "#5C5A50",
+
                   margin: 0,
+
                   lineHeight: 1.5,
                 }}
               >
@@ -1607,22 +2008,32 @@ export default function SettingsScreen({ role }: SettingsProps) {
           <div
             style={{
               background: "#F1F0EA",
+
               border: "1px solid #D6D3C6",
+
               borderRadius: 6,
+
               padding: "12px 16px",
+
               marginBottom: 16,
             }}
           >
             {sessions
+
               .filter((s) => !s.current)
+
               .map((s) => (
                 <div
                   key={s.id}
                   style={{
                     display: "flex",
+
                     justifyContent: "space-between",
+
                     fontSize: 13,
+
                     padding: "6px 0",
+
                     borderBottom: "1px solid #F1EFE8",
                   }}
                 >
@@ -1632,7 +2043,9 @@ export default function SettingsScreen({ role }: SettingsProps) {
                   <span
                     style={{
                       color: "#8C897C",
+
                       fontFamily: "IBM Plex Mono, monospace",
+
                       fontSize: 12,
                     }}
                   >
@@ -1645,11 +2058,17 @@ export default function SettingsScreen({ role }: SettingsProps) {
           <div
             style={{
               background: "#FCE8D6",
+
               border: "1px solid #B08D46",
+
               borderRadius: 6,
+
               padding: "10px 14px",
+
               marginBottom: 24,
+
               fontSize: 13,
+
               color: "#5C3300",
             }}
           >
@@ -1661,13 +2080,21 @@ export default function SettingsScreen({ role }: SettingsProps) {
               onClick={handleSignOutAll}
               style={{
                 flex: 1,
+
                 height: 40,
+
                 background: "#A6453D",
+
                 color: "#fff",
+
                 border: "none",
+
                 borderRadius: 6,
+
                 fontSize: 14,
+
                 fontWeight: 600,
+
                 cursor: "pointer",
               }}
             >
@@ -1678,12 +2105,19 @@ export default function SettingsScreen({ role }: SettingsProps) {
               onClick={() => setShowSignOutAll(false)}
               style={{
                 height: 40,
+
                 padding: "0 20px",
+
                 background: "#fff",
+
                 color: "#24302E",
+
                 border: "1px solid #D6D3C6",
+
                 borderRadius: 6,
+
                 fontSize: 14,
+
                 cursor: "pointer",
               }}
             >

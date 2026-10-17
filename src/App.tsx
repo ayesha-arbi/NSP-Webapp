@@ -162,8 +162,8 @@ export default function App() {
     setScreen("dashboard")
   }
 
-  function handleLogout() {
-    authStore.logout()
+  async function handleLogout() {
+    await authStore.logout()
 
     setScreen("login")
   }
@@ -212,7 +212,9 @@ export default function App() {
       const issueDate = onChain.issuedAt
         ? new Date(onChain.issuedAt * 1000).toLocaleDateString("en-GB", {
             day: "2-digit",
+
             month: "short",
+
             year: "numeric",
           })
         : "14 Mar 2025"
@@ -289,8 +291,11 @@ export default function App() {
         <span
           style={{
             color: "#B08D46",
+
             fontWeight: 700,
+
             letterSpacing: "0.05em",
+
             textTransform: "uppercase",
           }}
         >
@@ -299,8 +304,11 @@ export default function App() {
         <div
           style={{
             display: "flex",
+
             background: "rgba(255,255,255,0.08)",
+
             borderRadius: 4,
+
             padding: 2,
           }}
         >
@@ -456,7 +464,6 @@ export default function App() {
       </div>
     )
   }
-
 
   if (screen === "backup-code") {
     return (
