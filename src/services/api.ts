@@ -29,11 +29,48 @@ export interface MfaResponse {
 
   accessToken?: string
 
+  refreshToken?: string
+
   tokenType?: string
 
-  expiresIn?: string
+  expiresIn?: number
 
   user?: User
+}
+
+export interface AuthSessionResponse extends MfaResponse {
+  accessToken: string
+  refreshToken: string
+  tokenType: string
+  expiresIn: number
+  user: User
+}
+
+export interface RefreshResponse {
+  success: boolean
+  message: string
+  accessToken: string
+  refreshToken: string
+  tokenType: string
+  expiresIn: number
+}
+
+export interface RevokeResponse {
+  success: boolean
+  message: string
+}
+
+export interface GenerateBackupCodesResponse {
+  success: boolean
+  message: string
+  backupCodes: string[]
+}
+
+export interface BackupCodesStatusResponse {
+  success: boolean
+  totalCodes: number
+  unusedCodes: number
+  usedCodes: number
 }
 
 export interface HealthResponse {
@@ -170,10 +207,15 @@ export function onAuthExpired(cb: () => void) {
   onAuthExpiredCallback = cb
 }
 
+// ── Refresh queue (prevents parallel refresh storms) ──
+let _refreshPromise: Promise<{ accessToken: string; refreshToken: string }> | null = null
+
 async function request<T>(
   endpoint: string,
 
   options: RequestInit = {},
+
+  retryAuth = true,
 ): Promise<T> {
   const url = `${API_BASE_URL.replace(/\/$/, "")}${
     endpoint.startsWith("/") ? endpoint : `/${endpoint}`
@@ -206,16 +248,54 @@ async function request<T>(
     )
   }
 
-  // If 401 Unauthorized mid-session, token has expired
+// If 401 Unauthorized mid-session, attempt token refresh
+  const isAuthEndpoint = endpoint.startsWith("/api/auth/")
 
-  if (
-    response.status === 401 &&
-    endpoint !== "/api/auth/login" &&
-    endpoint !== "/api/auth/verify-mfa"
-  ) {
-    if (onAuthExpiredCallback) {
-      onAuthExpiredCallback()
+  if (response.status === 401 && !isAuthEndpoint && retryAuth) {
+    if (!_refreshPromise) {
+      _refreshPromise = (async () => {
+        const { authStore } = await import("./authStore")
+        const refreshToken = authStore.getState().refreshToken
+
+        if (!refreshToken) {
+          throw new ApiError("Refresh token is required", 400)
+        }
+
+        const refreshed = await api.refresh(refreshToken)
+        if (
+          typeof refreshed.accessToken !== "string" ||
+          !refreshed.accessToken ||
+          typeof refreshed.refreshToken !== "string" ||
+          !refreshed.refreshToken
+        ) {
+          throw new ApiError("Invalid refresh response", 401, refreshed)
+        }
+
+        authStore.setTokens(refreshed.accessToken, refreshed.refreshToken)
+        return {
+          accessToken: refreshed.accessToken,
+          refreshToken: refreshed.refreshToken,
+        }
+      })()
+        .catch((error) => {
+          onAuthExpiredCallback?.()
+          throw error
+        })
+        .finally(() => {
+          _refreshPromise = null
+        })
     }
+
+    const tokens = await _refreshPromise
+    const retryHeaders = {
+      ...((options.headers as Record<string, string>) ?? {}),
+      Authorization: `Bearer ${tokens.accessToken}`,
+    }
+    return request<T>(endpoint, { ...options, headers: retryHeaders }, false)
+  }
+
+  if (response.status === 401 && !isAuthEndpoint && !retryAuth) {
+    onAuthExpiredCallback?.()
   }
 
   let data: any = {}
@@ -371,8 +451,50 @@ export const api = {
     })
   },
 
-  // 3. Candidate Enrolment
+  // Token refresh (rotating)
+  async refresh(refreshToken: string): Promise<RefreshResponse> {
+    return request<RefreshResponse>("/api/auth/refresh", {
+      method: "POST",
+      body: JSON.stringify({ refreshToken }),
+    })
+  },
 
+  // Session revocation (logout)
+  async revoke(refreshToken: string): Promise<RevokeResponse> {
+    return request<RevokeResponse>("/api/auth/revoke", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    })
+  },
+
+  // Backup codes lifecycle
+  async generateBackupCodes(): Promise<GenerateBackupCodesResponse> {
+    return request<GenerateBackupCodesResponse>(
+      "/api/auth/backup-codes/generate",
+      { method: "POST" },
+    )
+  },
+
+  async backupCodesStatus(): Promise<BackupCodesStatusResponse> {
+    return request<BackupCodesStatusResponse>(
+      "/api/auth/backup-codes/status",
+      { method: "GET" },
+    )
+  },
+
+  async verifyBackupCode(
+    email: string,
+    password: string,
+    backupCode: string,
+  ): Promise<AuthSessionResponse> {
+    return request<AuthSessionResponse>("/api/auth/verify-backup-code", {
+      method: "POST",
+      body: JSON.stringify({ email, password, backupCode }),
+    })
+  },
+
+  // 3. Candidate Enrolment
   async enrolCandidate(payload: EnrolCandidatePayload): Promise<{
     success: boolean
     message: string
