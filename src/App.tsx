@@ -6,6 +6,8 @@ import LoginScreen from "./screens/LoginScreen"
 
 import MFAScreen from "./screens/MFAScreen"
 
+import BackupCodeScreen from "./screens/BackupCodeScreen"
+
 import DashboardScreen from "./screens/DashboardScreen"
 
 import EnrollmentScreen from "./screens/EnrollmentScreen"
@@ -80,9 +82,9 @@ export interface VerificationResult {
 
 // ============================================================
 
-type AppScreen = "login" | "mfa" | "verifier" | "dashboard" | "enrollment" | "assessment" | "approvals" | "credentials" | "devices" | "settings" | "notifications" | "credential-revocation" | "user-management" | "record-detail"
+type AppScreen = "login" | "mfa" | "backup-code" | "verifier" | "dashboard" | "enrollment" | "assessment" | "approvals" | "credentials" | "devices" | "settings" | "notifications" | "credential-revocation" | "user-management" | "record-detail"
 
-type AuthedScreen = Exclude<AppScreen, "login" | "mfa" | "verifier">
+type AuthedScreen = Exclude<AppScreen, "login" | "mfa" | "backup-code" | "verifier">
 
 // ============================================================
 
@@ -98,6 +100,8 @@ export default function App() {
   )
 
   const [loginEmail, setLoginEmail] = useState("tradetester@nsp.com")
+
+  const [loginPassword, setLoginPassword] = useState("")
 
   const [activePortal, setActivePortal] = useState<"issuer" | "verifier">(
     "issuer",
@@ -128,6 +132,7 @@ export default function App() {
       setSession(newSession)
 
       if (!newSession.isAuthenticated && activePortal === "issuer") {
+        setLoginPassword("")
         setScreen("login")
       }
     })
@@ -141,8 +146,10 @@ export default function App() {
 
   // ============================================================
 
-  function handleLoginSuccess(_r: AppRole, email: string) {
+  function handleLoginSuccess(_r: AppRole, email: string, password: string) {
     setLoginEmail(email)
+
+    setLoginPassword(password)
 
     setScreen("mfa")
   }
@@ -150,12 +157,19 @@ export default function App() {
   function handleMFASuccess() {
     void flushQueue() // resume anything paused by an expired token
 
+    setLoginPassword("")
+
     setScreen("dashboard")
   }
 
   function handleLogout() {
-    authStore.clearSession()
+    authStore.logout()
 
+    setScreen("login")
+  }
+
+  function handleBackToLogin() {
+    setLoginPassword("")
     setScreen("login")
   }
 
@@ -436,7 +450,26 @@ export default function App() {
         <MFAScreen
           email={loginEmail}
           onSuccess={handleMFASuccess}
-          onBack={() => setScreen("login")}
+          onBack={handleBackToLogin}
+          onUseBackupCode={() => setScreen("backup-code")}
+        />
+      </div>
+    )
+  }
+
+
+  if (screen === "backup-code") {
+    return (
+      <div
+        style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
+      >
+        {renderPortalSwitcher()}
+        <BackupCodeScreen
+          email={loginEmail}
+          password={loginPassword}
+          onSuccess={handleMFASuccess}
+          onBackToMfa={() => setScreen("mfa")}
+          onBackToLogin={handleBackToLogin}
         />
       </div>
     )
