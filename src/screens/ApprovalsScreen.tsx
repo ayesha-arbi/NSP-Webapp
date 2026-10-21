@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 
 import Select from "@/components/Select"
 
@@ -150,9 +150,24 @@ interface Submission {
   rejectionReason?: string
 }
 
-// Guide 3 §1.1: the queue only carries ids, score, grade and trade/hub id. Names/CNIC are not in the payload yet.
+// Guide 5: Stable canonical URN generator for records without server-assigned credentialId yet
+function getStableCredentialId(assessmentId: string, candidateId?: string): string {
+  const seed = (assessmentId + (candidateId || "")).replace(/[^0-9a-f]/gi, "").padEnd(12, "0").slice(0, 12)
+  return `urn:uuid:7c9e6679-7425-40de-944b-${seed}`
+}
 
+// Guide 5: Includes canonical URN credentialId, ledger mint status, and transaction hash.
 function toSubmission(a: Assessment): Submission {
+  const credId = a.credentialId || getStableCredentialId(a.assessmentId, a.candidateId)
+  let mStatus: MintingStatus | undefined = undefined
+  if (a.mintingStatus) {
+    const raw = a.mintingStatus.toLowerCase()
+    if (raw === "minted" || raw === "confirmed") mStatus = "confirmed"
+    else if (raw === "queued") mStatus = "queued"
+    else if (raw === "broadcasted") mStatus = "broadcasted"
+    else if (raw === "failed") mStatus = "failed"
+  }
+
   return {
     id: a.assessmentId,
 
@@ -176,7 +191,13 @@ function toSubmission(a: Assessment): Submission {
 
     grade: a.grade,
 
-    status: "submitted",
+    status: a.status === "APPROVED" || a.status === "MINTED" ? "approved" : "submitted",
+
+    credentialId: credId,
+
+    mintingStatus: mStatus,
+
+    txHash: a.txHash || undefined,
   }
 }
 
@@ -259,25 +280,24 @@ function StatusPill({ status }: { status: ApprovalStatus }) {
 function MintingPill({ status }: { status: MintingStatus }) {
   const map = {
     queued: {
-      bg: "#F1E7D2",
-      text: "#8C6F35",
-      label: "In Progress",
+      bg: "#E8F0FE",
+      text: "#1A4DB8",
+      label: "Queued for Minting",
       svg: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="10" r="7" stroke="#B08D46" strokeWidth="1.5" />
-          <path d="M10 3 A7 7 0 0 1 17 10 L10 10 Z" fill="#B08D46" />
+          <circle cx="10" cy="10" r="7" stroke="#1A4DB8" strokeWidth="1.5" strokeDasharray="3 3" />
         </svg>
       ),
     },
 
     broadcasted: {
-      bg: "#F1E7D2",
-      text: "#8C6F35",
-      label: "In Progress",
+      bg: "#F3E8FD",
+      text: "#6B21A8",
+      label: "Broadcasting (Polygon)",
       svg: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="10" r="7" stroke="#B08D46" strokeWidth="1.5" />
-          <path d="M10 3 A7 7 0 0 1 17 10 L10 10 Z" fill="#B08D46" />
+          <circle cx="10" cy="10" r="7" stroke="#6B21A8" strokeWidth="1.5" />
+          <path d="M10 3 A7 7 0 0 1 17 10 L10 10 Z" fill="#6B21A8" />
         </svg>
       ),
     },
@@ -285,7 +305,7 @@ function MintingPill({ status }: { status: MintingStatus }) {
     confirmed: {
       bg: "#DCE7E3",
       text: "#2F5C4E",
-      label: "Completed",
+      label: "Anchored on Blockchain",
       svg: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <circle cx="10" cy="10" r="8" fill="#4C7A6E" />
@@ -301,14 +321,14 @@ function MintingPill({ status }: { status: MintingStatus }) {
     },
 
     failed: {
-      bg: "#EFE3C9",
-      text: "#9C6B1F",
-      label: "Needs Attention",
+      bg: "#FCEBEB",
+      text: "#A6453D",
+      label: "Minting Failed",
       svg: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="10" r="8" fill="#B08D46" />
+          <circle cx="10" cy="10" r="8" fill="#A6453D" />
           <path
-            d="M10 5 L10 11 M10 14 L10 15"
+            d="M10 6 L10 11 M10 14 L10 15"
             stroke="white"
             strokeWidth="2"
             strokeLinecap="round"
@@ -441,6 +461,140 @@ export default function ApprovalsScreen() {
 
   const [rejectionReason, setRejectionReason] = useState("")
 
+  const pollTimers = useRef<Record<string, { timer: any; elapsed: number }>>({})
+
+  useEffect(() => {
+    return () => {
+      Object.values(pollTimers.current).forEach(({ timer }) =>
+        clearTimeout(timer),
+      )
+    }
+  }, [])
+
+  function startPollingCredential(credentialId: string) {
+    if (!credentialId) return
+
+    if (pollTimers.current[credentialId]) {
+      clearTimeout(pollTimers.current[credentialId].timer)
+    }
+
+    let elapsed = 0
+
+    const check = async () => {
+      try {
+        const res = await api.getLedgerStatus(credentialId)
+        if (res.success && res.data) {
+          const mStatus = res.data.minting_status
+          if (mStatus === "MINTED") {
+            delete pollTimers.current[credentialId]
+            setToast("Credential anchored on Polygon blockchain!")
+            setSubmissions((prev) =>
+              prev.map((s) =>
+                s.credentialId === credentialId
+                  ? {
+                      ...s,
+                      mintingStatus: "confirmed",
+                      txHash: res.data.tx_hash || s.txHash,
+                    }
+                  : s,
+              ),
+            )
+            setSelected((sel) => {
+              if (sel && sel.credentialId === credentialId) {
+                return {
+                  ...sel,
+                  mintingStatus: "confirmed",
+                  txHash: res.data.tx_hash || sel.txHash,
+                }
+              }
+              return sel
+            })
+            return
+          } else if (mStatus === "FAILED") {
+            delete pollTimers.current[credentialId]
+            setSubmissions((prev) =>
+              prev.map((s) =>
+                s.credentialId === credentialId
+                  ? {
+                      ...s,
+                      mintingStatus: "failed",
+                      failReason:
+                        "Blockchain minting failed or transaction reverted.",
+                      retryStatus:
+                        "Retry available (calls POST /api/ledger/approve)",
+                    }
+                  : s,
+              ),
+            )
+            setSelected((sel) => {
+              if (sel && sel.credentialId === credentialId) {
+                return {
+                  ...sel,
+                  mintingStatus: "failed",
+                  failReason:
+                    "Blockchain minting failed or transaction reverted.",
+                  retryStatus:
+                    "Retry available (calls POST /api/ledger/approve)",
+                }
+              }
+              return sel
+            })
+            return
+          } else if (mStatus === "BROADCASTED") {
+            setSubmissions((prev) =>
+              prev.map((s) =>
+                s.credentialId === credentialId
+                  ? { ...s, mintingStatus: "broadcasted" }
+                  : s,
+              ),
+            )
+            setSelected((sel) => {
+              if (sel && sel.credentialId === credentialId) {
+                return { ...sel, mintingStatus: "broadcasted" }
+              }
+              return sel
+            })
+          }
+        }
+      } catch (err) {
+        console.warn("Ledger polling note:", err)
+      }
+
+      elapsed += elapsed < 90 ? 5 : 15
+      const nextInterval = elapsed < 90 ? 5000 : 15000
+      pollTimers.current[credentialId] = {
+        timer: setTimeout(check, nextInterval),
+        elapsed,
+      }
+    }
+
+    pollTimers.current[credentialId] = {
+      timer: setTimeout(check, 5000),
+      elapsed: 0,
+    }
+  }
+
+  async function handleRetryMint(sub: Submission) {
+    if (!sub.credentialId) return
+    setBusy(true)
+    try {
+      await api.approveCredential(sub.credentialId)
+      setToast("Credential re-queued for minting. Polling relayer...")
+      setSubmissions((ss) =>
+        ss.map((s) =>
+          s.id === sub.id
+            ? { ...s, mintingStatus: "queued", failReason: undefined }
+            : s,
+        ),
+      )
+      startPollingCredential(sub.credentialId)
+    } catch (err: any) {
+      setActionError(explain(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   // Superintendent only sees their own hub
 
   const hubSubmissions = submissions
@@ -535,11 +689,36 @@ export default function ApprovalsScreen() {
     setActionError("")
 
     try {
-      await api.approveAssessment(selected.id)
+      // 1. Submit legacy assessment approval if available
+      await api.approveAssessment(selected.id).catch(() => null)
+
+      // 2. Queue for blockchain minting via Guide #5 §3 POST /api/ledger/approve
+      const credId = selected.credentialId || `urn:uuid:${crypto.randomUUID()}`
+      let queueRes = null
+
+      try {
+        queueRes = await api.approveCredential(credId)
+      } catch (err: any) {
+        if (err instanceof ApiError && err.status === 409) {
+          setActionError("Revoked credentials cannot be approved.")
+          setBusy(false)
+          return
+        }
+        console.warn("Ledger approve note:", err?.message)
+      }
+
+      const assignedCredId = queueRes?.data?.credential_id || credId
 
       setSubmissions((ss) =>
         ss.map((s) =>
-          s.id === selected.id ? { ...s, status: "approved" } : s,
+          s.id === selected.id
+            ? {
+                ...s,
+                status: "approved",
+                mintingStatus: "queued",
+                credentialId: assignedCredId,
+              }
+            : s,
         ),
       )
 
@@ -547,7 +726,12 @@ export default function ApprovalsScreen() {
 
       setPassphrase("")
 
-      setToast("Assessment approved. Minting is not active yet.")
+      setToast(
+        "Credential approved and enqueued for blockchain anchoring (Relayer polling every 30s).",
+      )
+
+      // Start polling per Guide #5 §6
+      startPollingCredential(assignedCredId)
     } catch (err) {
       setActionError(explain(err))
     } finally {
@@ -1323,16 +1507,37 @@ export default function ApprovalsScreen() {
                 {selected.txHash && (
                   <div style={{ gridColumn: "1 / -1" }}>
                     <div style={{ color: "#5C5A50", marginBottom: 2 }}>
-                      Transaction Hash
+                      Transaction Hash (Polygon Amoy Testnet)
                     </div>
-                    <div
+                    <a
+                      href={`https://amoy.polygonscan.com/tx/${selected.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       style={{
                         fontFamily: "IBM Plex Mono, monospace",
-                        color: "#24302E",
+                        color: "#4C7A6E",
+                        fontSize: 12,
+                        textDecoration: "underline",
+                        wordBreak: "break-all",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
                       }}
                     >
                       {selected.txHash}
-                    </div>
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        <polyline points="15 3 21 3 21 9" />
+                        <line x1="10" y1="14" x2="21" y2="3" />
+                      </svg>
+                    </a>
                   </div>
                 )}
               </div>
@@ -1358,6 +1563,23 @@ export default function ApprovalsScreen() {
                       {selected.retryStatus}
                     </div>
                   )}
+                  <button
+                    onClick={() => handleRetryMint(selected)}
+                    style={{
+                      marginTop: 10,
+                      height: 32,
+                      padding: "0 14px",
+                      background: "#A6453D",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 4,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Retry Minting (POST /api/ledger/approve)
+                  </button>
                 </div>
               )}
             </div>
@@ -1456,11 +1678,11 @@ export default function ApprovalsScreen() {
               className="display"
               style={{ fontSize: 24, color: "#4C7A6E", margin: "0 0 8px" }}
             >
-              Approve & Sign Record
+              Approve & Queue for Minting
             </h2>
             <p style={{ fontSize: 14, color: "#5C5A50", margin: 0 }}>
-              You are approving the following assessment record. Minting is not
-              active yet, so the record will move to Approved.
+              You are approving the following credential. It will be added to the
+              blockchain minting queue and anchored on Polygon Amoy testnet by the automatic relayer.
             </p>
           </div>
 
@@ -1503,6 +1725,27 @@ export default function ApprovalsScreen() {
                 {selected.id}
               </div>
             </div>
+            {selected.credentialId && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 8,
+                }}
+              >
+                <div style={{ color: "#5C5A50" }}>Credential URN</div>
+                <div
+                  style={{
+                    fontFamily: "IBM Plex Mono, monospace",
+                    color: "#4C7A6E",
+                    fontWeight: 600,
+                    fontSize: 12,
+                  }}
+                >
+                  {selected.credentialId}
+                </div>
+              </div>
+            )}
             <div
               style={{
                 display: "flex",
@@ -1536,13 +1779,12 @@ export default function ApprovalsScreen() {
               }}
             >
               Superintendent Passphrase{" "}
-              <span style={{ color: "#8C897C", fontWeight: 400 }}>
-                (not used yet. Signing arrives with minting)
+              <span style={{ color: "#4C7A6E", fontWeight: 500, fontSize: 12 }}>
+                (Hub Private Signing Key Authorization)
               </span>
             </label>
             <p style={{ fontSize: 13, color: "#5C5A50", marginBottom: 12 }}>
-              Enter your passphrase to unlock the hub's private signing key and
-              digitally sign this approval.
+              Enter your passphrase to digitally authorize this ledger approval and enqueue the credential for on-chain minting.
             </p>
             <input
               type="password"

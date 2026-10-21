@@ -76,7 +76,9 @@ export interface CandidateRecord {
   createdAt?: string
 }
 
-export type AssessmentStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "MINTED" | string & {}
+export type AssessmentStatus = "DRAFT" | "SUBMITTED" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "MINTED" | string & {}
+
+export type MintingStatus = "QUEUED" | "BROADCASTED" | "MINTED" | "FAILED" | null
 
 export interface Assessment {
   assessmentId: string
@@ -106,6 +108,14 @@ export interface Assessment {
   superintendentUserId?: string
 
   approvedAt?: string
+
+  credentialId?: string
+
+  mintingStatus?: MintingStatus
+
+  txHash?: string | null
+
+  rootHash?: string | null
 }
 
 export interface CreateAssessmentPayload {
@@ -134,6 +144,94 @@ export interface UploadUrlResponse {
   s3Uri: string
 
   expiresIn: number
+}
+
+// ============================================================
+// GUIDE #5 LEDGER & BLOCKCHAIN MINTING TYPES
+// ============================================================
+
+export interface CredentialSubjectPayload {
+  skillName: string
+  issuer: string
+  awardLevel?: string
+  practicalScore?: number
+  theoryScore?: number
+  [key: string]: any
+}
+
+export interface IssueCredentialPayload {
+  candidateId: string
+  credentialSubject: CredentialSubjectPayload
+}
+
+export interface IssueCredentialResponse {
+  success: boolean
+  message: string
+  data: {
+    credential_id: string
+    candidate_id: string
+    created_by: string
+    credential_subject: any
+    root_hash: string
+    issued_at: string
+    status: "PENDING_APPROVAL" | string
+  }
+}
+
+export interface ApproveCredentialPayload {
+  credentialId: string
+}
+
+export interface ApproveCredentialResponse {
+  success: boolean
+  message: string
+  data: {
+    id: number
+    credential_id: string
+    payload?: {
+      credentialId: string
+      rootHash: string
+      w3cCredential?: any
+    }
+    status: MintingStatus | string
+    tx_hash: string | null
+    attempt_count: number
+    created_at: string
+  }
+}
+
+export interface LedgerStatusData {
+  credential_id: string
+  credential_status: string
+  issued_at: string
+  approved_at?: string | null
+  minting_status: MintingStatus
+  tx_hash: string | null
+  attempt_count: number
+}
+
+export interface LedgerStatusResponse {
+  success: boolean
+  data: LedgerStatusData
+}
+
+export interface VerifyCredentialResponse {
+  success: boolean
+  verified: boolean
+  data?: {
+    credentialId: string
+    issuedAt: string
+    onChainHash: string
+  }
+  message?: string
+}
+
+export interface VerificationResult {
+  verified: boolean
+  credentialId?: string
+  issuedAt?: string
+  onChainHash?: string
+  errorMessage?: string
 }
 
 export class ApiError extends Error {
@@ -242,7 +340,11 @@ async function request<T>(
     } else if (response.status === 403) {
       errorMsg =
         data?.message ||
-        "Permission denied: Action requires Trade Tester permissions."
+        "Permission denied: Action requires authorized hub permissions."
+    } else if (response.status === 409) {
+      errorMsg =
+        data?.message ||
+        "Conflict: Revoked credentials cannot be approved or record already processed."
     }
 
     throw new ApiError(errorMsg, response.status, data)
@@ -290,6 +392,14 @@ export function normalizeAssessment(r: any): Assessment {
     submittedAt: pick(r, "submittedAt", "submitted_at"),
 
     approvedAt: pick(r, "approvedAt", "approved_at"),
+
+    credentialId: pick(r, "credentialId", "credential_id"),
+
+    mintingStatus: pick(r, "mintingStatus", "minting_status"),
+
+    txHash: pick(r, "txHash", "tx_hash"),
+
+    rootHash: pick(r, "rootHash", "root_hash"),
   }
 }
 
@@ -491,6 +601,102 @@ export const api = {
       }),
     )
   },
+
+  // 7. Blockchain Minting & Ledger Module (Guide #5)
+
+  /**
+   * Issue a Credential (POST /api/ledger/issue)
+   * Allowed Roles: TRADE_TESTER only. Hub-scoped server-side.
+   * Compiles W3C VC, calculates root SHA-256, stores pending approval.
+   */
+  async issueCredential(
+    payload: IssueCredentialPayload,
+  ): Promise<IssueCredentialResponse> {
+    return request<IssueCredentialResponse>("/api/ledger/issue", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })
+  },
+
+  /**
+   * Approve Credential & Queue for Minting (POST /api/ledger/approve)
+   * Allowed Roles: CENTER_SUPERINTENDENT or SUPER_ADMIN.
+   * Hub-scoped for superintendents; super admin approves across all hubs.
+   * Idempotent & safe for retries.
+   */
+  async approveCredential(
+    credentialId: string,
+  ): Promise<ApproveCredentialResponse> {
+    return request<ApproveCredentialResponse>("/api/ledger/approve", {
+      method: "POST",
+      body: JSON.stringify({ credentialId }),
+    })
+  },
+
+  /**
+   * Check Credential & Minting Status (GET /api/ledger/:credentialId)
+   * Allowed Roles: TRADE_TESTER, CENTER_SUPERINTENDENT, SUPER_ADMIN.
+   * Returns current minting status (QUEUED, BROADCASTED, MINTED, FAILED) and tx_hash.
+   */
+  async getLedgerStatus(
+    credentialId: string,
+  ): Promise<LedgerStatusResponse> {
+    return request<LedgerStatusResponse>(
+      `/api/ledger/${encodeURIComponent(credentialId)}`,
+      { method: "GET" },
+    )
+  },
+
+  /**
+   * Public On-Chain Verification API (GET /api/ledger/verify/:credentialId)
+   * Zero authentication required. Queries Polygon Amoy smart contract on-chain.
+   */
+  async verifyCredential(
+    credentialId: string,
+  ): Promise<VerifyCredentialResponse> {
+    return request<VerifyCredentialResponse>(
+      `/api/ledger/verify/${encodeURIComponent(credentialId)}`,
+      { method: "GET" },
+    )
+  },
+}
+
+/**
+ * Verifier DApp UI Implementation Recipe (Guide #5 §5.4)
+ * Public on-chain verification without authentication barrier.
+ */
+export async function verifyNspCredential(
+  credentialId: string,
+): Promise<VerificationResult> {
+  try {
+    const res = await fetch(
+      `${API_BASE_URL.replace(/\/$/, "")}/api/ledger/verify/${encodeURIComponent(credentialId)}`,
+    )
+    const json = await res.json().catch(() => ({}))
+
+    if (res.status === 200 && json.verified) {
+      return {
+        verified: true,
+        credentialId: json.data?.credentialId || credentialId,
+        issuedAt: json.data?.issuedAt,
+        onChainHash: json.data?.onChainHash,
+      }
+    } else {
+      return {
+        verified: false,
+        errorMessage:
+          json.message ||
+          "Credential not found, revoked, or invalid on-chain.",
+      }
+    }
+  } catch (err: any) {
+    return {
+      verified: false,
+      errorMessage:
+        err?.message ||
+        "Network error connecting to the verification node.",
+    }
+  }
 }
 
 // Photo helpers browser -> S3 directly.

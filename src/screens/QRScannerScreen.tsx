@@ -378,14 +378,25 @@ export default function QRScannerScreen({
                   <BtnSecondary onClick={() => setScanState("permission")}>
                     Cancel
                   </BtnSecondary>
-                  <div style={{ display: "flex", gap: 10 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <BtnSecondary
                       onClick={() => setScanState("error-notdetected")}
                     >
                       Simulate error
                     </BtnSecondary>
-                    <BtnPrimary onClick={() => onScanSuccess("NSP-004821")}>
-                      Simulate scan
+                    <BtnSecondary
+                      onClick={() => onScanSuccess("NSP-004821")}
+                    >
+                      Scan Legacy ID
+                    </BtnSecondary>
+                    <BtnPrimary
+                      onClick={() =>
+                        onScanSuccess(
+                          "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
+                        )
+                      }
+                    >
+                      Scan Guide #5 URN
                     </BtnPrimary>
                   </div>
                 </div>

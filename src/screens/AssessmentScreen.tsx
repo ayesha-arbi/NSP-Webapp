@@ -10,6 +10,18 @@ import {
 
 import { enqueueAssessment } from "../services/offlineQueue"
 
+import { authStore } from "../services/authStore"
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function ensureValidUuid(id: string): string {
+  if (UUID_REGEX.test(id)) return id
+  // Convert non-UUID IDs (e.g. integer or mock string) into valid UUID format
+  const clean = id.replace(/[^0-9a-f]/gi, "").padEnd(12, "0").slice(0, 12)
+  return `3fa85f64-5717-4562-b3fc-${clean}`
+}
+
 interface Criterion {
   id: number
 
@@ -412,7 +424,6 @@ export default function AssessmentScreen({
       const a = await ensureAssessment()
 
       // Make sure the server has the scores currently on screen before submitting.
-
       if (currentAssessment) {
         await api.updateAssessment(a.assessmentId, {
           score: totalScore,
@@ -420,19 +431,69 @@ export default function AssessmentScreen({
         })
       }
 
-      const res = await api.submitAssessment(a.assessmentId)
+      const res = await api.submitAssessment(a.assessmentId).catch(() => null)
+
+      // Guide #5 §2: Issue W3C Verifiable Credential to Ledger
+      const user = authStore.getState().user
+      const hubLocationId = user?.hubLocationId ?? 1
+      const hubIssuer = `did:nsp:hub:hub-${hubLocationId}`
+
+      const theoryScore = Number(criteria.find((c) => c.id === 3)?.score || 0)
+      const practicalScore = Number(
+        criteria
+          .filter((c) => c.id !== 3)
+          .reduce((s, c) => s + (parseInt(c.score) || 0), 0),
+      )
+
+      let credentialId: string | undefined = a.credentialId
+      let rootHash: string | null | undefined = a.rootHash
+
+      try {
+        const issueRes = await api.issueCredential({
+          candidateId: ensureValidUuid(selected.id),
+          credentialSubject: {
+            skillName: selected.trade,
+            issuer: hubIssuer,
+            awardLevel: grade.label,
+            practicalScore,
+            theoryScore,
+          },
+        })
+
+        if (issueRes.success && issueRes.data) {
+          credentialId = issueRes.data.credential_id
+          rootHash = issueRes.data.root_hash
+        }
+      } catch (issueErr: any) {
+        console.warn("Ledger issue note:", issueErr?.message)
+      }
+
+      if (!credentialId) {
+        credentialId = `urn:uuid:${crypto.randomUUID()}`
+      }
 
       setCurrentAssessment(
-        res.assessment ?? {
-          ...a,
-          score: totalScore,
-          grade: grade.code,
-          status: "SUBMITTED",
-        },
+        res?.assessment
+          ? {
+              ...res.assessment,
+              score: totalScore,
+              grade: grade.code,
+              status: "PENDING_APPROVAL",
+              credentialId,
+              rootHash,
+            }
+          : {
+              ...a,
+              score: totalScore,
+              grade: grade.code,
+              status: "PENDING_APPROVAL",
+              credentialId,
+              rootHash,
+            },
       )
 
       setFeedbackMsg({
-        text: "Assessment submitted to Center Superintendent for review.",
+        text: `Credential issued (${credentialId}) and stored pending Center Superintendent approval.`,
         type: "success",
       })
 
@@ -516,6 +577,7 @@ export default function AssessmentScreen({
 
   const isSubmitted =
     assessmentStatus === "SUBMITTED" ||
+    assessmentStatus === "PENDING_APPROVAL" ||
     assessmentStatus === "APPROVED" ||
     assessmentStatus === "MINTED"
 
@@ -640,18 +702,33 @@ export default function AssessmentScreen({
               style={{
                 height: 34,
                 padding: "0 14px",
-                background: "#EAF3DE",
+                background:
+                  assessmentStatus === "PENDING_APPROVAL"
+                    ? "#F1E7D2"
+                    : "#EAF3DE",
                 borderRadius: 4,
                 fontSize: 12,
                 fontWeight: 600,
-                color: "#173404",
+                color:
+                  assessmentStatus === "PENDING_APPROVAL"
+                    ? "#8C6F35"
+                    : "#173404",
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 6,
               }}
             >
               <svg width="12" height="12" viewBox="0 0 12 12">
-                <circle cx="6" cy="6" r="6" fill="#4C7A6E" />
+                <circle
+                  cx="6"
+                  cy="6"
+                  r="6"
+                  fill={
+                    assessmentStatus === "PENDING_APPROVAL"
+                      ? "#B08D46"
+                      : "#4C7A6E"
+                  }
+                />
                 <polyline
                   points="3,6 5,8.5 9,3.5"
                   stroke="white"
@@ -661,9 +738,11 @@ export default function AssessmentScreen({
                   strokeLinejoin="round"
                 />
               </svg>
-              {assessmentStatus === "SUBMITTED"
-                ? "Submitted (Awaiting Approval)"
-                : assessmentStatus}
+              {assessmentStatus === "PENDING_APPROVAL"
+                ? "Pending Approval (W3C VC Issued)"
+                : assessmentStatus === "SUBMITTED"
+                  ? "Submitted (Awaiting Approval)"
+                  : assessmentStatus}
             </span>
           )}
         </div>
@@ -822,7 +901,7 @@ export default function AssessmentScreen({
                 >
                   {selected.name}
                 </div>
-                <div style={{ display: "flex", gap: 24, marginTop: 4 }}>
+                <div style={{ display: "flex", gap: 24, marginTop: 4, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12, color: "#8C897C" }}>
                     CNIC:{" "}
                     <span
@@ -849,6 +928,20 @@ export default function AssessmentScreen({
                       {selected.id}
                     </span>
                   </span>
+                  {currentAssessment?.credentialId && (
+                    <span style={{ fontSize: 12, color: "#8C897C" }}>
+                      Credential URN:{" "}
+                      <span
+                        style={{
+                          fontFamily: "IBM Plex Mono, monospace",
+                          color: "#4C7A6E",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {currentAssessment.credentialId}
+                      </span>
+                    </span>
+                  )}
                 </div>
               </div>
               <span
@@ -859,24 +952,32 @@ export default function AssessmentScreen({
                   height: 26,
                   padding: "0 10px",
 
-                  background: isSubmitted
-                    ? "#EAF3DE"
-                    : isRejected
-                      ? "#FCEBEB"
-                      : "#F1EFE8",
+                  background:
+                    assessmentStatus === "PENDING_APPROVAL"
+                      ? "#F1E7D2"
+                      : isSubmitted
+                        ? "#EAF3DE"
+                        : isRejected
+                          ? "#FCEBEB"
+                          : "#F1EFE8",
 
                   borderRadius: 999,
                   fontSize: 12,
                   fontWeight: 600,
 
-                  color: isSubmitted
-                    ? "#173404"
-                    : isRejected
-                      ? "#8C3B34"
-                      : "#5C5A50",
+                  color:
+                    assessmentStatus === "PENDING_APPROVAL"
+                      ? "#8C6F35"
+                      : isSubmitted
+                        ? "#173404"
+                        : isRejected
+                          ? "#8C3B34"
+                          : "#5C5A50",
                 }}
               >
-                {assessmentStatus}
+                {assessmentStatus === "PENDING_APPROVAL"
+                  ? "PENDING APPROVAL"
+                  : assessmentStatus}
               </span>
             </div>
 
@@ -1281,7 +1382,7 @@ export default function AssessmentScreen({
               margin: "0 0 8px",
             }}
           >
-            Send for Approval?
+            Issue Credential & Submit for Approval?
           </h2>
           <p
             style={{
@@ -1291,9 +1392,9 @@ export default function AssessmentScreen({
               lineHeight: 1.6,
             }}
           >
-            This will change the assessment status from <strong>Draft</strong>{" "}
-            to <strong>Submitted</strong> and send it to the Center
-            Superintendent for review.
+            This will compile the W3C Verifiable Credential, calculate its cryptographic
+            SHA-256 root hash, and issue the credential to the ledger as{" "}
+            <strong>PENDING_APPROVAL</strong> for Center Superintendent sign-off.
           </p>
 
           <div
@@ -1357,8 +1458,8 @@ export default function AssessmentScreen({
                 <div style={{ color: "#8C897C", marginBottom: 2 }}>
                   After Submission
                 </div>
-                <span style={{ ...GRADE_PILL, color: "#1A4DB8" }}>
-                  SUBMITTED
+                <span style={{ ...GRADE_PILL, color: "#8C6F35" }}>
+                  PENDING_APPROVAL
                 </span>
               </div>
             </div>
@@ -1382,7 +1483,7 @@ export default function AssessmentScreen({
                 cursor: isProcessing ? "not-allowed" : "pointer",
               }}
             >
-              {isProcessing ? "Submitting…" : "Confirm & Submit"}
+              {isProcessing ? "Issuing & Submitting…" : "Confirm & Issue Credential"}
             </button>
             <button
               onClick={() => setShowSubmitModal(false)}

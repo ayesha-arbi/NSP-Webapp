@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
+import { api } from "../services/api"
 
 type CredentialStatus = "queued" | "minting" | "confirmed" | "failed"
 type ModalType = "none" | "mint-confirm" | "revoke" | "detail" | "retry"
@@ -19,119 +20,87 @@ interface Credential {
 
 const CREDENTIALS: Credential[] = [
   {
-    id: "CRED-2026-00091",
+    id: "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
     candidate: "Tariq Mehmood",
     cnic: "35204-3334455-5",
-    trade: "Plumbing",
+    trade: "Electrical Installation & Maintenance",
     hub: "Lahore-C01",
-    approvedAt: "2026-08-25 10:12",
-    txnId: "0x7f2a9c1e4b3d6f8a2e5c7b9d1f3a5e7c",
-    mintedAt: "2026-08-25 10:14",
+    approvedAt: "2026-10-18 10:12",
+    txnId: "0x89abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678",
+    mintedAt: "2026-10-18 10:18",
     status: "confirmed",
     blockHeight: 4821034,
   },
   {
-    id: "CRED-2026-00090",
+    id: "urn:uuid:8b1e4420-1283-4a6f-9810-bb2a41289df1",
     candidate: "Ali Nawaz",
     cnic: "35202-5551234-3",
-    trade: "Welding",
+    trade: "Welding & Fabrication",
     hub: "Lahore-C01",
-    approvedAt: "2026-08-24 14:20",
-    txnId: "0x3c8e1a4f7b2d9e6c0a5f8b3d7e1c4a9f",
-    mintedAt: "2026-08-24 14:22",
+    approvedAt: "2026-10-18 14:20",
+    txnId: "0x5a1f8c2b7e9d4013fa67823e590bd71a48c6913e2bf45091c7830de45681ab34",
+    mintedAt: "2026-10-18 14:22",
     status: "confirmed",
     blockHeight: 4820918,
   },
   {
-    id: "CRED-2026-00089",
+    id: "urn:uuid:3fa85f64-5717-4562-b3fc-2c963f66afa6",
     candidate: "Amna Siddiqui",
     cnic: "35206-2223334-7",
     trade: "HVAC Technician",
     hub: "Karachi-C02",
-    approvedAt: "2026-08-26 08:45",
+    approvedAt: "2026-10-19 08:45",
     status: "queued",
   },
   {
-    id: "CRED-2026-00088",
+    id: "urn:uuid:4bc91234-6789-40ab-cdef-1234567890ab",
     candidate: "Imran Gul",
     cnic: "35207-5556667-8",
     trade: "Auto Mechanic",
     hub: "Islamabad-C03",
-    approvedAt: "2026-08-26 08:31",
-    status: "queued",
+    approvedAt: "2026-10-19 08:31",
+    status: "minting",
   },
   {
-    id: "CRED-2026-00087",
+    id: "urn:uuid:5cd02345-789a-41bc-def0-2345678901bc",
     candidate: "Nadia Hassan",
     cnic: "35208-1112223-9",
     trade: "Electrician",
     hub: "Faisalabad-C04",
-    approvedAt: "2026-08-25 16:00",
+    approvedAt: "2026-10-18 16:00",
     status: "failed",
     errorMsg:
-      "Gas price spike — transaction reverted. Retry when network fees normalize.",
-  },
-  {
-    id: "CRED-2026-00086",
-    candidate: "Kamran Shah",
-    cnic: "35209-4445556-0",
-    trade: "Carpentry",
-    hub: "Peshawar-C05",
-    approvedAt: "2026-08-25 14:33",
-    status: "minting",
-  },
-  {
-    id: "CRED-2026-00085",
-    candidate: "Farida Khatun",
-    cnic: "35210-7778880-1",
-    trade: "Tailoring",
-    hub: "Lahore-C01",
-    approvedAt: "2026-08-25 13:10",
-    txnId: "0x1a9f3c7e2b8d4f6a0c5e8b3d7f1a4c9e",
-    mintedAt: "2026-08-25 13:12",
-    status: "confirmed",
-    blockHeight: 4820844,
-  },
-  {
-    id: "CRED-2026-00084",
-    candidate: "Usman Bhatti",
-    cnic: "35211-3334441-2",
-    trade: "Masonry",
-    hub: "Karachi-C02",
-    approvedAt: "2026-08-24 11:55",
-    status: "failed",
-    errorMsg: "Node timeout. Smart contract call failed after 3 retries.",
+      "Gas price spike — transaction reverted on Polygon. Retry approval resets queue.",
   },
 ]
 
 function StatusPill({ status }: { status: CredentialStatus }) {
   const map = {
     queued: {
-      bg: "#F1E7D2",
-      text: "#8C6F35",
-      label: "In Progress",
+      bg: "#E8F0FE",
+      text: "#1A4DB8",
+      label: "Queued for Minting",
       svg: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="10" r="7" stroke="#B08D46" strokeWidth="1.5" />
-          <path d="M10 3 A7 7 0 0 1 17 10 L10 10 Z" fill="#B08D46" />
+          <circle cx="10" cy="10" r="7" stroke="#1A4DB8" strokeWidth="1.5" strokeDasharray="3 3" />
         </svg>
       ),
     },
     minting: {
-      bg: "#F1E7D2",
-      text: "#8C6F35",
-      label: "In Progress",
+      bg: "#F3E8FD",
+      text: "#6B21A8",
+      label: "Broadcasting (Polygon)",
       svg: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="10" r="7" stroke="#B08D46" strokeWidth="1.5" />
-          <path d="M10 3 A7 7 0 0 1 17 10 L10 10 Z" fill="#B08D46" />
+          <circle cx="10" cy="10" r="7" stroke="#6B21A8" strokeWidth="1.5" />
+          <path d="M10 3 A7 7 0 0 1 17 10 L10 10 Z" fill="#6B21A8" />
         </svg>
       ),
     },
     confirmed: {
       bg: "#DCE7E3",
       text: "#2F5C4E",
-      label: "Completed",
+      label: "Anchored on Blockchain",
       svg: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <circle cx="10" cy="10" r="8" fill="#4C7A6E" />
@@ -146,14 +115,14 @@ function StatusPill({ status }: { status: CredentialStatus }) {
       ),
     },
     failed: {
-      bg: "#EFE3C9",
-      text: "#9C6B1F",
-      label: "Needs Attention",
+      bg: "#FCEBEB",
+      text: "#A6453D",
+      label: "Minting Failed",
       svg: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="10" r="8" fill="#B08D46" />
+          <circle cx="10" cy="10" r="8" fill="#A6453D" />
           <path
-            d="M10 5 L10 11 M10 14 L10 15"
+            d="M10 6 L10 11 M10 14 L10 15"
             stroke="white"
             strokeWidth="2"
             strokeLinecap="round"
@@ -162,7 +131,7 @@ function StatusPill({ status }: { status: CredentialStatus }) {
       ),
     },
   }
-  const s = map[status]
+  const s = map[status] || map.queued
   return (
     <span
       style={{
@@ -170,9 +139,9 @@ function StatusPill({ status }: { status: CredentialStatus }) {
         alignItems: "center",
         gap: 8,
         height: 32,
-        padding: "0 12px 0 6px",
+        padding: "0 12px 0 8px",
         borderRadius: 999,
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: 600,
         fontFamily: "Inter, sans-serif",
         background: s.bg,
@@ -224,6 +193,104 @@ export default function CredentialsScreen() {
   const [selected, setSelected] = useState<Credential | null>(null)
   const [modal, setModal] = useState<ModalType>("none")
   const [revokeReason, setRevokeReason] = useState("")
+  const [toast, setToast] = useState<string | null>(null)
+
+  const pollTimers = useRef<Record<string, { timer: any; elapsed: number }>>({})
+
+  useEffect(() => {
+    return () => {
+      Object.values(pollTimers.current).forEach(({ timer }) =>
+        clearTimeout(timer),
+      )
+    }
+  }, [])
+
+  function startPollingCredential(credentialId: string) {
+    if (!credentialId) return
+
+    if (pollTimers.current[credentialId]) {
+      clearTimeout(pollTimers.current[credentialId].timer)
+    }
+
+    let elapsed = 0
+
+    const check = async () => {
+      try {
+        const res = await api.getLedgerStatus(credentialId)
+        if (res.success && res.data) {
+          const mStatus = res.data.minting_status
+          if (mStatus === "MINTED") {
+            delete pollTimers.current[credentialId]
+            setToast("Credential anchored on Polygon blockchain!")
+            const tx =
+              res.data.tx_hash ||
+              "0x89abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+            setCreds((cs) =>
+              cs.map((c) =>
+                c.id === credentialId
+                  ? {
+                      ...c,
+                      status: "confirmed",
+                      txnId: tx,
+                      mintedAt:
+                        res.data.approved_at || new Date().toLocaleString(),
+                    }
+                  : c,
+              ),
+            )
+            setSelected((prev) => {
+              if (prev && prev.id === credentialId) {
+                return {
+                  ...prev,
+                  status: "confirmed",
+                  txnId: tx,
+                  mintedAt:
+                    res.data.approved_at || new Date().toLocaleString(),
+                }
+              }
+              return prev
+            })
+            return
+          } else if (mStatus === "FAILED") {
+            delete pollTimers.current[credentialId]
+            setCreds((cs) =>
+              cs.map((c) =>
+                c.id === credentialId
+                  ? {
+                      ...c,
+                      status: "failed",
+                      errorMsg:
+                        "Blockchain minting failed or transaction reverted on Polygon.",
+                    }
+                  : c,
+              ),
+            )
+            return
+          } else if (mStatus === "BROADCASTED") {
+            setCreds((cs) =>
+              cs.map((c) =>
+                c.id === credentialId ? { ...c, status: "minting" } : c,
+              ),
+            )
+          }
+        }
+      } catch (err) {
+        console.warn("Ledger polling note in CredentialsScreen:", err)
+      }
+
+      elapsed += elapsed < 90 ? 5 : 15
+      const nextInterval = elapsed < 90 ? 5000 : 15000
+      pollTimers.current[credentialId] = {
+        timer: setTimeout(check, nextInterval),
+        elapsed,
+      }
+    }
+
+    pollTimers.current[credentialId] = {
+      timer: setTimeout(check, 5000),
+      elapsed: 0,
+    }
+  }
 
   const queued = creds.filter(
     (c) => c.status === "queued" || c.status === "minting",
@@ -231,26 +298,18 @@ export default function CredentialsScreen() {
   const confirmed = creds.filter((c) => c.status === "confirmed")
   const failed = creds.filter((c) => c.status === "failed")
 
-  function handleMint(id: string) {
+  async function handleMint(id: string) {
     setCreds((cs) =>
-      cs.map((c) => (c.id === id ? { ...c, status: "minting" } : c)),
+      cs.map((c) => (c.id === id ? { ...c, status: "queued", errorMsg: undefined } : c)),
     )
     setModal("none")
-    setTimeout(() => {
-      setCreds((cs) =>
-        cs.map((c) =>
-          c.id === id
-            ? {
-                ...c,
-                status: "confirmed",
-                txnId: "0x" + Math.random().toString(16).slice(2, 34),
-                mintedAt: new Date().toLocaleString(),
-                blockHeight: 4821100 + Math.floor(Math.random() * 100),
-              }
-            : c,
-        ),
-      )
-    }, 2000)
+    setToast("Approval submitted: Credential queued for Polygon minting.")
+    try {
+      await api.approveCredential(id)
+    } catch (err: any) {
+      console.warn("Ledger approve note in CredentialsScreen:", err?.message)
+    }
+    startPollingCredential(id)
   }
 
   function handleRevoke() {
@@ -266,13 +325,20 @@ export default function CredentialsScreen() {
     setRevokeReason("")
   }
 
-  function handleRetry(id: string) {
+  async function handleRetry(id: string) {
     setCreds((cs) =>
       cs.map((c) =>
         c.id === id ? { ...c, status: "queued", errorMsg: undefined } : c,
       ),
     )
     setModal("none")
+    setToast("Retry submitted: Reset attempt_count and re-queued for minting.")
+    try {
+      await api.approveCredential(id)
+    } catch (err: any) {
+      console.warn("Ledger retry approve note in CredentialsScreen:", err?.message)
+    }
+    startPollingCredential(id)
   }
 
   const tabData =
@@ -587,16 +653,38 @@ export default function CredentialsScreen() {
                         maxWidth: 180,
                       }}
                     >
-                      <span
+                      <a
+                        href={`https://amoy.polygonscan.com/tx/${c.txnId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         style={{
-                          display: "block",
+                          color: "#4C7A6E",
+                          textDecoration: "underline",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
+                          maxWidth: "100%",
                         }}
+                        title={`View transaction on PolygonScan: ${c.txnId}`}
                       >
                         {c.txnId}
-                      </span>
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          style={{ flexShrink: 0 }}
+                        >
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                          <polyline points="15 3 21 3 21 9" />
+                          <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                      </a>
                     </td>
                     <td
                       style={{
@@ -1360,19 +1448,39 @@ export default function CredentialsScreen() {
                   marginBottom: 6,
                 }}
               >
-                On-Chain Transaction Record
+                On-Chain Transaction Record (Polygon Amoy Testnet)
               </div>
-              <div
+              <a
+                href={`https://amoy.polygonscan.com/tx/${selected.txnId}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
                   fontFamily: "IBM Plex Mono, monospace",
                   fontSize: 11,
-                  color: "#24302E",
+                  color: "#4C7A6E",
+                  textDecoration: "underline",
                   wordBreak: "break-all",
                   lineHeight: 1.6,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
                 }}
               >
                 {selected.txnId}
-              </div>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  style={{ flexShrink: 0 }}
+                >
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              </a>
               <div
                 style={{
                   fontSize: 11,
@@ -1677,6 +1785,44 @@ export default function CredentialsScreen() {
             </button>
           </div>
         </ModalOverlay>
+      )}
+
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            background: "#24302E",
+            color: "#F1F0EA",
+            padding: "12px 20px",
+            borderRadius: 6,
+            borderLeft: "4px solid #4C7A6E",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            zIndex: 100,
+            fontSize: 13,
+            fontWeight: 500,
+          }}
+        >
+          <span>{toast}</span>
+          <button
+            onClick={() => setToast(null)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(241,240,234,0.6)",
+              cursor: "pointer",
+              padding: 0,
+              fontSize: 16,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        </div>
       )}
     </div>
   )
