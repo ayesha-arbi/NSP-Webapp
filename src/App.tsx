@@ -35,6 +35,7 @@ import QRScannerScreen from "./screens/QRScannerScreen"
 import ManualEntryScreen from "./screens/ManualEntryScreen"
 
 import VerificationResultScreen from "./screens/VerificationResultScreen"
+
 import WorkerWalletScreen from "./screens/WorkerWalletScreen"
 
 import { authStore, AppRole } from "./services/authStore"
@@ -100,9 +101,10 @@ export default function App() {
 
   const [loginEmail, setLoginEmail] = useState("tradetester@nsp.com")
 
-  const [activePortal, setActivePortal] = useState<"issuer" | "verifier" | "wallet">(
-    "issuer",
-  )
+  const [activePortal, setActivePortal] =
+    useState<"issuer" | "verifier" | "wallet">(
+      "issuer",
+    )
 
   const [assessmentCandidate, setAssessmentCandidate] =
     useState<CandidateRecord | null>(null)
@@ -179,17 +181,24 @@ export default function App() {
   async function handleVerify(credentialId: string) {
     const timestamp = new Intl.DateTimeFormat("en-PK", {
       day: "2-digit",
+
       month: "short",
+
       year: "numeric",
+
       hour: "2-digit",
+
       minute: "2-digit",
+
       hour12: true,
     }).format(new Date())
 
     const trimmed = credentialId.trim()
 
     // 1. Guide #5 §5: Public on-chain verification endpoint (GET /api/ledger/verify/:credentialId)
+
     // Zero authentication barrier: directly queries Polygon Amoy view method via backend.
+
     try {
       const apiResult = await verifyNspCredential(trimmed)
 
@@ -197,25 +206,37 @@ export default function App() {
         const issueDate = apiResult.issuedAt
           ? new Date(apiResult.issuedAt).toLocaleDateString("en-GB", {
               day: "2-digit",
+
               month: "short",
+
               year: "numeric",
             })
           : "18 Oct 2026"
 
         setVerificationResult({
           status: "verified",
+
           credentialId: apiResult.credentialId || trimmed,
+
           workerName: "Muhammad Aslam Khan",
+
           skill: "Electrical Installation & Maintenance",
+
           grade: "Level 2 (Skilled)",
+
           issueDate,
+
           centre: "NADRA Regional Testing Centre, Lahore (Hub-01)",
+
           txHash:
             apiResult.onChainHash ||
             "0x89abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678",
+
           timestamp,
         })
+
         setVerifierScreen("result")
+
         return
       }
     } catch (apiErr) {
@@ -223,38 +244,54 @@ export default function App() {
     }
 
     // 2. Fallback simulation (for demo / offline testing when backend is offline)
+
     const onChain = await verifyCertificateOnChain(trimmed)
 
     if (onChain.isValid) {
       const issueDate = onChain.issuedAt
         ? new Date(onChain.issuedAt * 1000).toLocaleDateString("en-GB", {
             day: "2-digit",
+
             month: "short",
+
             year: "numeric",
           })
         : "18 Oct 2026"
 
       setVerificationResult({
         status: "verified",
-        credentialId: trimmed || "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
+
+        credentialId:
+          trimmed || "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
+
         workerName: "Muhammad Aslam Khan",
+
         skill: "Electrical Work, Level 2",
+
         grade: "Level 2 (Skilled)",
+
         issueDate,
+
         centre: "NADRA Regional Centre, Lahore",
+
         txHash: onChain.dataHash,
+
         timestamp,
       })
     } else if (trimmed.toUpperCase().startsWith("NSP-T")) {
       setVerificationResult({
         status: "tampered",
+
         credentialId: trimmed,
+
         timestamp,
       })
     } else {
       setVerificationResult({
         status: "revoked",
+
         credentialId: trimmed,
+
         timestamp,
       })
     }
@@ -294,8 +331,11 @@ export default function App() {
         <span
           style={{
             color: "#B08D46",
+
             fontWeight: 700,
+
             letterSpacing: "0.05em",
+
             textTransform: "uppercase",
           }}
         >
@@ -304,8 +344,11 @@ export default function App() {
         <div
           style={{
             display: "flex",
+
             background: "rgba(255,255,255,0.08)",
+
             borderRadius: 4,
+
             padding: 2,
           }}
         >
@@ -342,17 +385,25 @@ export default function App() {
           <button
             onClick={() => {
               setActivePortal("verifier")
+
               setVerifierScreen("landing")
             }}
             style={{
               border: "none",
+
               background:
                 activePortal === "verifier" ? "#B08D46" : "transparent",
+
               color: "#fff",
+
               padding: "3px 10px",
+
               borderRadius: 3,
+
               fontSize: 11,
+
               fontWeight: 600,
+
               cursor: "pointer",
             }}
           >
@@ -364,13 +415,19 @@ export default function App() {
             }}
             style={{
               border: "none",
-              background:
-                activePortal === "wallet" ? "#4C7A6E" : "transparent",
+
+              background: activePortal === "wallet" ? "#4C7A6E" : "transparent",
+
               color: "#fff",
+
               padding: "3px 10px",
+
               borderRadius: 3,
+
               fontSize: 11,
+
               fontWeight: 600,
+
               cursor: "pointer",
             }}
           >
@@ -454,6 +511,7 @@ export default function App() {
         <WorkerWalletScreen
           onVerifyInVerifier={(urn) => {
             setActivePortal("verifier")
+
             handleVerify(urn)
           }}
         />

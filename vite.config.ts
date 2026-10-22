@@ -15,12 +15,17 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          if (id.includes("node_modules/ethers")) {
+          const normalized = id.replace(/\\/g, "/")
+          if (
+            normalized.includes("/node_modules/ethers/") ||
+            id.includes("ethers")
+          ) {
             return "ethers"
           }
           if (
-            id.includes("node_modules/react") ||
-            id.includes("node_modules/react-dom")
+            normalized.includes("/node_modules/react/") ||
+            normalized.includes("/node_modules/react-dom/") ||
+            normalized.includes("/node_modules/react-router-dom/")
           ) {
             return "vendor"
           }
