@@ -424,6 +424,67 @@ function ModalOverlay({ children }: { children: React.ReactNode }) {
   )
 }
 
+const DEMO_SUBMISSIONS: Submission[] = [
+  {
+    id: "asm-demo-001",
+    candidate: "Tariq Mehmood",
+    cnic: "35201-1234567-1",
+    trade: "Industrial Electrician",
+    hub: "Testing Hub #1 (Lahore-C01)",
+    submittedBy: "usr-tt-01",
+    submittedAt: "2026-10-25 14:30",
+    score: 88,
+    maxScore: 100,
+    grade: "A",
+    status: "submitted",
+    credentialId: "urn:uuid:7c9e6679-7425-40de-944b-asm-demo-001",
+  },
+  {
+    id: "asm-demo-002",
+    candidate: "Zubair Ahmed",
+    cnic: "42101-7654321-3",
+    trade: "Pipe Welder (6G TIG)",
+    hub: "Testing Hub #1 (Lahore-C01)",
+    submittedBy: "usr-tt-01",
+    submittedAt: "2026-10-25 13:15",
+    score: 92,
+    maxScore: 100,
+    grade: "A+",
+    status: "submitted",
+    credentialId: "urn:uuid:7c9e6679-7425-40de-944b-asm-demo-002",
+  },
+  {
+    id: "asm-demo-003",
+    candidate: "Hamza Siddiqui",
+    cnic: "61101-9876543-5",
+    trade: "Solar PV Technician",
+    hub: "Testing Hub #1 (Lahore-C01)",
+    submittedBy: "usr-tt-02",
+    submittedAt: "2026-10-25 11:45",
+    score: 79,
+    maxScore: 100,
+    grade: "B",
+    status: "submitted",
+    credentialId: "urn:uuid:7c9e6679-7425-40de-944b-asm-demo-003",
+  },
+  {
+    id: "asm-demo-004",
+    candidate: "Imran Khan",
+    cnic: "17301-3456789-7",
+    trade: "Automotive Diagnostic Technician",
+    hub: "Testing Hub #1 (Lahore-C01)",
+    submittedBy: "usr-tt-01",
+    submittedAt: "2026-10-24 16:20",
+    score: 84,
+    maxScore: 100,
+    grade: "A",
+    status: "approved",
+    mintingStatus: "confirmed",
+    credentialId: "urn:uuid:7c9e6679-7425-40de-944b-asm-demo-004",
+    txHash: "0x3a4b9c1d8e2f0a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b",
+  },
+]
+
 export default function ApprovalsScreen() {
   // Hub scoping is enforced by the server; the UI only labels it.
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 import { api } from "../services/api"
 
-type CredentialStatus = "queued" | "minting" | "confirmed" | "failed"
+type CredentialStatus = "pending" | "queued" | "minting" | "confirmed" | "failed"
 type ModalType = "none" | "mint-confirm" | "revoke" | "detail" | "retry"
 
 interface Credential {
@@ -75,11 +75,22 @@ const CREDENTIALS: Credential[] = [
 ]
 
 function StatusPill({ status }: { status: CredentialStatus }) {
-  const map = {
+  const map: Record<CredentialStatus, { bg: string; text: string; label: string; svg: React.ReactNode }> = {
+    pending: {
+      bg: "#FEF3C7",
+      text: "#92400E",
+      label: "Pending Approval",
+      svg: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="7" stroke="#92400E" strokeWidth="1.5" />
+          <path d="M10 6v4l2.5 2.5" stroke="#92400E" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+      ),
+    },
     queued: {
       bg: "#E8F0FE",
       text: "#1A4DB8",
-      label: "Queued for Minting",
+      label: "Queued for Blockchain",
       svg: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <circle cx="10" cy="10" r="7" stroke="#1A4DB8" strokeWidth="1.5" strokeDasharray="3 3" />
@@ -89,7 +100,7 @@ function StatusPill({ status }: { status: CredentialStatus }) {
     minting: {
       bg: "#F3E8FD",
       text: "#6B21A8",
-      label: "Broadcasting (Polygon)",
+      label: "Mining on Polygon",
       svg: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <circle cx="10" cy="10" r="7" stroke="#6B21A8" strokeWidth="1.5" />

@@ -1,3 +1,4 @@
+import { getDeviceFingerprint } from "./fingerprint"
 // API Client for National Skills Passport Backend
 
 export interface User {
@@ -268,22 +269,46 @@ export function onAuthExpired(cb: () => void) {
   onAuthExpiredCallback = cb
 }
 
+
+let isRefreshing = false
+let failedQueue: Array<{
+  resolve: (token: string) => void
+  reject: (err: any) => void
+}> = []
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((promise) => {
+    if (error) {
+      promise.reject(error)
+    } else {
+      promise.resolve(token!)
+    }
+  })
+  failedQueue = []
+}
+
 async function request<T>(
   endpoint: string,
-
   options: RequestInit = {},
 ): Promise<T> {
-  const url = `${API_BASE_URL.replace(/\/$/, "")}${
-    endpoint.startsWith("/") ? endpoint : `/${endpoint}`
-  }`
+  const baseUrl = (API_BASE_URL || "").replace(/\/$/, "")
+  const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`
+  const url = baseUrl ? `${baseUrl}${path}` : path
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-
-    ...(options.headers as Record<string, string> || {}),
+    ...((options.headers as Record<string, string>) || {}),
   }
 
-  if (authToken) {
+  // Attach Device Fingerprint (FR-AUTH-04)
+  try {
+    const fingerprint = await getDeviceFingerprint()
+    if (fingerprint) {
+      headers["x-device-fingerprint"] = fingerprint
+    }
+  } catch {}
+
+  if (authToken && !headers["Authorization"]) {
     headers["Authorization"] = `Bearer ${authToken}`
   }
 
@@ -292,27 +317,96 @@ async function request<T>(
   try {
     response = await fetch(url, {
       ...options,
-
       headers,
     })
   } catch (err: any) {
     throw new ApiError(
       err?.message ||
         "Network error: unable to connect to NSP Backend API server.",
-
       0,
     )
   }
 
-  // If 401 Unauthorized mid-session, token has expired
-
+  // If 401 Unauthorized mid-session, attempt silent token refresh
   if (
     response.status === 401 &&
-    endpoint !== "/api/auth/login" &&
-    endpoint !== "/api/auth/verify-mfa"
+    !endpoint.startsWith("/api/auth/")
   ) {
-    if (onAuthExpiredCallback) {
-      onAuthExpiredCallback()
+    let refreshToken: string | null = null
+    try {
+      if (typeof localStorage !== "undefined") {
+        refreshToken = localStorage.getItem("refreshToken")
+      }
+      if (!refreshToken && typeof sessionStorage !== "undefined") {
+        const raw = sessionStorage.getItem("nsp_session")
+        if (raw) refreshToken = JSON.parse(raw).refreshToken
+      }
+    } catch {}
+
+    if (!refreshToken) {
+      if (onAuthExpiredCallback) onAuthExpiredCallback()
+    } else {
+      if (isRefreshing) {
+        return new Promise<string>((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        }).then((newAccessToken) => {
+          headers["Authorization"] = `Bearer ${newAccessToken}`
+          return request<T>(endpoint, { ...options, headers })
+        })
+      }
+
+      isRefreshing = true
+
+      try {
+        const fp = await getDeviceFingerprint()
+        const refreshRes = await fetch(
+          `${API_BASE_URL.replace(/\/$/, "")}/api/auth/refresh`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-device-fingerprint": fp,
+            },
+            body: JSON.stringify({ refreshToken }),
+          },
+        )
+
+        const refreshData = await refreshRes.json().catch(() => ({}))
+
+        if (refreshRes.ok && refreshData.success && refreshData.accessToken) {
+          setApiAuthToken(refreshData.accessToken)
+          try {
+            if (typeof localStorage !== "undefined") {
+              localStorage.setItem("accessToken", refreshData.accessToken)
+              if (refreshData.refreshToken) {
+                localStorage.setItem("refreshToken", refreshData.refreshToken)
+              }
+            }
+            if (typeof sessionStorage !== "undefined") {
+              const raw = sessionStorage.getItem("nsp_session")
+              if (raw) {
+                const parsed = JSON.parse(raw)
+                parsed.accessToken = refreshData.accessToken
+                if (refreshData.refreshToken) {
+                  parsed.refreshToken = refreshData.refreshToken
+                }
+                sessionStorage.setItem("nsp_session", JSON.stringify(parsed))
+              }
+            }
+          } catch {}
+
+          processQueue(null, refreshData.accessToken)
+          headers["Authorization"] = `Bearer ${refreshData.accessToken}`
+          return request<T>(endpoint, { ...options, headers })
+        } else {
+          throw new Error("Refresh token invalid or expired")
+        }
+      } catch (refreshErr) {
+        processQueue(refreshErr, null)
+        if (onAuthExpiredCallback) onAuthExpiredCallback()
+      } finally {
+        isRefreshing = false
+      }
     }
   }
 
@@ -477,7 +571,7 @@ export const api = {
     return request<MfaResponse>("/api/auth/verify-mfa", {
       method: "POST",
 
-      body: JSON.stringify({ email, mfaCode }),
+      body: JSON.stringify({ email, mfaCode, code: mfaCode, otp: mfaCode }),
     })
   },
 
@@ -651,6 +745,65 @@ export const api = {
    * Public On-Chain Verification API (GET /api/ledger/verify/:credentialId)
    * Zero authentication required. Queries Polygon Amoy smart contract on-chain.
    */
+  
+  async verifyBackupCode(
+    email: string,
+    password: string,
+    backupCode: string,
+  ): Promise<any> {
+    return request<any>("/api/auth/verify-backup-code", {
+      method: "POST",
+      body: JSON.stringify({ email, password, backupCode }),
+    })
+  },
+
+  async revokeSession(): Promise<any> {
+    let refreshToken: string | null = null
+    try {
+      if (typeof localStorage !== "undefined") {
+        refreshToken = localStorage.getItem("refreshToken")
+      }
+      if (!refreshToken && typeof sessionStorage !== "undefined") {
+        const raw = sessionStorage.getItem("nsp_session")
+        if (raw) refreshToken = JSON.parse(raw).refreshToken
+      }
+    } catch {}
+    return request<any>("/api/auth/revoke", {
+      method: "POST",
+      body: JSON.stringify({ refreshToken }),
+    })
+  },
+
+  async getBackupCodeStatus(): Promise<{
+    success: boolean
+    totalCodes: number
+    unusedCodes: number
+    usedCodes: number
+  }> {
+    return request<any>("/api/auth/backup-codes/status", { method: "GET" })
+  },
+
+  async generateBackupCodes(): Promise<{
+    success: boolean
+    backupCodes: string[]
+  }> {
+    return request<any>("/api/auth/backup-codes/generate", { method: "POST" })
+  },
+
+  createCandidate(payload: EnrolCandidatePayload) {
+    return this.enrolCandidate(payload)
+  },
+
+  getCredentialStatus(credentialId: string): Promise<LedgerStatusResponse> {
+    return this.getLedgerStatus(credentialId)
+  },
+
+  verifyPublicCredential(
+    credentialId: string,
+  ): Promise<VerifyCredentialResponse> {
+    return this.verifyCredential(credentialId)
+  },
+
   async verifyCredential(
     credentialId: string,
   ): Promise<VerifyCredentialResponse> {
@@ -782,3 +935,5 @@ export async function uploadAssessmentPhoto(assessmentId: string, file: Blob) {
 
   return api.attachMedia(assessmentId, s3Uri)
 }
+
+export const ApiService = api;

@@ -433,43 +433,46 @@ export default function AssessmentScreen({
 
       const res = await api.submitAssessment(a.assessmentId).catch(() => null)
 
-      // Guide #5 §2: Issue W3C Verifiable Credential to Ledger
-      const user = authStore.getState().user
-      const hubLocationId = user?.hubLocationId ?? 1
-      const hubIssuer = `did:nsp:hub:hub-${hubLocationId}`
-
-      const theoryScore = Number(criteria.find((c) => c.id === 3)?.score || 0)
-      const practicalScore = Number(
-        criteria
-          .filter((c) => c.id !== 3)
-          .reduce((s, c) => s + (parseInt(c.score) || 0), 0),
-      )
-
+      // Guide #6 §2: End-to-End Assessment to Blockchain Issuance
+      // Pre-condition: Candidate must have passed assessment (Total Score >= 60%).
       let credentialId: string | undefined = a.credentialId
       let rootHash: string | null | undefined = a.rootHash
 
-      try {
-        const issueRes = await api.issueCredential({
-          candidateId: ensureValidUuid(selected.id),
-          credentialSubject: {
-            skillName: selected.trade,
-            issuer: hubIssuer,
-            awardLevel: grade.label,
-            practicalScore,
-            theoryScore,
-          },
-        })
+      if (totalScore >= 60) {
+        const user = authStore.getState().user
+        const hubLocationId = user?.hubLocationId ?? 1
+        const hubIssuer = `did:nsp:hub:hub-${hubLocationId}`
 
-        if (issueRes.success && issueRes.data) {
-          credentialId = issueRes.data.credential_id
-          rootHash = issueRes.data.root_hash
+        const theoryScore = Number(criteria.find((c) => c.id === 3)?.score || 0)
+        const practicalScore = Number(
+          criteria
+            .filter((c) => c.id !== 3)
+            .reduce((s, c) => s + (parseInt(c.score) || 0), 0),
+        )
+
+        try {
+          const issueRes = await api.issueCredential({
+            candidateId: ensureValidUuid(selected.id),
+            credentialSubject: {
+              skillName: selected.trade,
+              issuer: hubIssuer,
+              awardLevel: grade.label,
+              practicalScore,
+              theoryScore,
+            },
+          })
+
+          if (issueRes.success && issueRes.data) {
+            credentialId = issueRes.data.credential_id
+            rootHash = issueRes.data.root_hash
+          }
+        } catch (issueErr: any) {
+          console.warn("Ledger issue note:", issueErr?.message)
         }
-      } catch (issueErr: any) {
-        console.warn("Ledger issue note:", issueErr?.message)
-      }
 
-      if (!credentialId) {
-        credentialId = `urn:uuid:${crypto.randomUUID()}`
+        if (!credentialId) {
+          credentialId = `urn:uuid:${crypto.randomUUID()}`
+        }
       }
 
       setCurrentAssessment(

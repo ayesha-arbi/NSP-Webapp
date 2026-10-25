@@ -1195,6 +1195,68 @@ export default function WorkerWalletScreen({
                   {copied ? "Copied!" : "Copy URN"}
                 </button>
               </div>
+
+              {/* Standard QR Verifier URL (Guide #6 §4.2) */}
+              <div
+                style={{
+                  width: "100%",
+                  background: "rgba(0,0,0,0.3)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 8,
+                  padding: "10px 14px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  marginBottom: 16,
+                }}
+              >
+                <div style={{ textAlign: "left", minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "#B08D46",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Standard Verifier QR URL (Guide #6)
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: "IBM Plex Mono, monospace",
+                      fontSize: 11,
+                      color: "#5DCAA5",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {`https://verifier.nsp.gov.pk/verify?id=${encodeURIComponent(selectedCred.id)}`}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `https://verifier.nsp.gov.pk/verify?id=${encodeURIComponent(selectedCred.id)}`
+                    );
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  style={{
+                    padding: "6px 12px",
+                    background: "rgba(93,202,165,0.2)",
+                    color: "#5DCAA5",
+                    border: "1px solid rgba(93,202,165,0.4)",
+                    borderRadius: 4,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    flexShrink: 0,
+                  }}
+                >
+                  Copy URL
+                </button>
+              </div>
             </div>
           )}
 

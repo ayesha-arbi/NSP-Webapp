@@ -40,7 +40,7 @@ import WorkerWalletScreen from "./screens/WorkerWalletScreen"
 
 import { authStore, AppRole } from "./services/authStore"
 
-import { CandidateRecord, verifyNspCredential } from "./services/api"
+import { CandidateRecord, verifyNspCredential, api } from "./services/api"
 
 import { verifyCertificateOnChain } from "./services/contract"
 
@@ -156,10 +156,13 @@ export default function App() {
     setScreen("dashboard")
   }
 
-  function handleLogout() {
-    authStore.clearSession()
-
-    setScreen("login")
+  async function handleLogout() {
+    try {
+      await api.revokeSession().catch(() => null)
+    } finally {
+      authStore.clearSession()
+      setScreen("login")
+    }
   }
 
   function handleNavigate(s: AuthedScreen) {
@@ -193,7 +196,14 @@ export default function App() {
       hour12: true,
     }).format(new Date())
 
-    const trimmed = credentialId.trim()
+    let trimmed = credentialId.trim()
+    if (trimmed.includes("id=")) {
+      try {
+        const u = new URL(trimmed.startsWith("http") ? trimmed : `https://dummy.com/${trimmed}`)
+        const idVal = u.searchParams.get("id")
+        if (idVal) trimmed = decodeURIComponent(idVal).trim()
+      } catch {}
+    }
 
     // 1. Guide #5 §5: Public on-chain verification endpoint (GET /api/ledger/verify/:credentialId)
 
@@ -525,28 +535,29 @@ export default function App() {
 
   // ============================================================
 
-  if (screen === "login") {
+  // Guard unauthenticated access to protected dashboard & workflows
+  if (!session.isAuthenticated) {
+    if (screen === "mfa") {
+      return (
+        <div
+          style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
+        >
+          {renderPortalSwitcher()}
+          <MFAScreen
+            email={loginEmail}
+            onSuccess={handleMFASuccess}
+            onBack={() => setScreen("login")}
+          />
+        </div>
+      )
+    }
+
     return (
       <div
         style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
       >
         {renderPortalSwitcher()}
         <LoginScreen onSuccess={handleLoginSuccess} />
-      </div>
-    )
-  }
-
-  if (screen === "mfa") {
-    return (
-      <div
-        style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
-      >
-        {renderPortalSwitcher()}
-        <MFAScreen
-          email={loginEmail}
-          onSuccess={handleMFASuccess}
-          onBack={() => setScreen("login")}
-        />
       </div>
     )
   }
