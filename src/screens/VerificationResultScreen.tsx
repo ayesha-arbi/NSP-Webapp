@@ -438,16 +438,36 @@ export default function VerificationResultScreen({
                     <TR label="Credential status">
                       <StatusPill status="active" />
                     </TR>
-                    <TR label="On-chain reference">
-                      <code
-                        style={{
-                          fontFamily: "'IBM Plex Mono', monospace",
-                          fontSize: 12,
-                          color: "#8C897C",
-                        }}
-                      >
-                        {result.txHash}
-                      </code>
+                    <TR label="On-chain reference (Polygon Amoy)">
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <code
+                          style={{
+                            fontFamily: "'IBM Plex Mono', monospace",
+                            fontSize: 12,
+                            color: "#4C7A6E",
+                            wordBreak: "break-all",
+                          }}
+                        >
+                          {result.txHash}
+                        </code>
+                        {result.txHash?.startsWith("0x") && (
+                          <a
+                            href={`https://amoy.polygonscan.com/tx/${result.txHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              fontSize: 11,
+                              color: "#4C7A6E",
+                              textDecoration: "underline",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            View on PolygonScan Amoy Explorer →
+                          </a>
+                        )}
+                      </div>
                     </TR>
                   </>
                 )}
@@ -501,8 +521,8 @@ export default function VerificationResultScreen({
                   </span>
                 </TR>
                 <TR label="Ledger">
-                  <span style={{ fontSize: 13, color: "#5C5A50" }}>
-                    NADRA Blockchain Ledger
+                  <span style={{ fontSize: 13, color: "#24302E", fontWeight: 500 }}>
+                    Polygon Amoy Testnet (Smart Contract Direct Verification)
                   </span>
                 </TR>
               </tbody>

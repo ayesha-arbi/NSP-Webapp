@@ -41,18 +41,19 @@ export default function ManualEntryScreen({
 
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const suffix = value.replace(/^NSP-?/i, "")
+  const isUrn = value.trim().toLowerCase().startsWith("urn:")
+  const suffix = isUrn ? value.trim() : value.replace(/^NSP-?/i, "")
 
   const handleVerify = () => {
     const trimmed = value.trim()
 
-    if (!trimmed || !suffix) {
+    if (!trimmed) {
       setState("error-empty")
       inputRef.current?.focus()
       return
     }
 
-    if (suffix.length < 3) {
+    if (trimmed.length < 5) {
       setState("error-invalid")
       inputRef.current?.focus()
       return
@@ -309,39 +310,47 @@ export default function ManualEntryScreen({
                     style={{
                       background: "#F1F0EA",
                       borderRight: "1px solid #D6D3C6",
-
                       padding: "10px 14px",
                       fontFamily: "'IBM Plex Mono', monospace",
-
-                      fontSize: 14,
-                      fontWeight: 500,
-                      color: "#5C5A50",
-
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: isUrn ? "#4C7A6E" : "#5C5A50",
                       display: "flex",
                       alignItems: "center",
                       flexShrink: 0,
                     }}
                   >
-                    NSP–
+                    {isUrn ? "URN" : "NSP–"}
                   </div>
                   <input
                     ref={inputRef}
                     id="cid"
                     type="text"
-                    value={suffix}
+                    value={isUrn ? value : suffix}
                     onChange={(e) => {
-                      setValue(
-                        "NSP-" +
-                          e.target.value
-                            .toUpperCase()
-                            .replace(/[^0-9A-Z]/g, ""),
-                      )
+                      const val = e.target.value
+                      if (
+                        val.toLowerCase().startsWith("urn:") ||
+                        (val.includes("-") && val.length > 18)
+                      ) {
+                        setValue(val.trim())
+                      } else {
+                        const clean = val
+                          .replace(/^NSP-?/i, "")
+                          .toUpperCase()
+                          .replace(/[^0-9A-Z]/g, "")
+                        setValue(clean ? "NSP-" + clean : "")
+                      }
                       setState("idle")
                     }}
                     onKeyDown={(e) =>
                       e.key === "Enter" && !isLoading && handleVerify()
                     }
-                    placeholder="004821"
+                    placeholder={
+                      isUrn
+                        ? "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7"
+                        : "004821"
+                    }
                     disabled={isLoading}
                     autoComplete="off"
                     spellCheck={false}
@@ -350,16 +359,12 @@ export default function ManualEntryScreen({
                       padding: "10px 12px",
                       border: "none",
                       outline: "none",
-
-                      fontSize: 16,
+                      fontSize: isUrn ? 13 : 16,
                       fontWeight: 600,
-
                       fontFamily: "'IBM Plex Mono', monospace",
-
                       color: "#24302E",
                       background: isLoading ? "#F1F0EA" : "#FFFFFF",
-
-                      letterSpacing: "0.06em",
+                      letterSpacing: "0.04em",
                     }}
                   />
                   {value && !isLoading && (
@@ -746,41 +751,56 @@ export default function ManualEntryScreen({
                     marginBottom: 12,
                   }}
                 >
-                  Demo IDs
+                  Test Credentials (Click to Fill)
                 </p>
                 {[
-                  { id: "NSP-004821", label: "Verified" },
-
+                  {
+                    id: "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
+                    label: "Guide #5 Canonical URN",
+                  },
+                  { id: "NSP-004821", label: "Verified (Legacy)" },
                   { id: "NSP-T001", label: "Tampered" },
-
                   { id: "NSP-R001", label: "Revoked" },
-
                   { id: "NSP-X001", label: "Not found" },
                 ].map((d) => (
                   <div
                     key={d.id}
+                    onClick={() => {
+                      setValue(d.id)
+                      setState("idle")
+                    }}
                     style={{
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-
-                      padding: "6px 0",
+                      gap: 8,
+                      padding: "8px 0",
                       borderBottom: "1px solid rgba(241,240,234,0.07)",
+                      cursor: "pointer",
                     }}
+                    title={`Click to fill ${d.id}`}
                   >
                     <code
                       style={{
                         fontFamily: "'IBM Plex Mono', monospace",
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: 500,
-
-                        color: "rgba(241,240,234,0.75)",
+                        color: "rgba(241,240,234,0.85)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        maxWidth: 160,
                       }}
                     >
                       {d.id}
                     </code>
                     <span
-                      style={{ fontSize: 11, color: "rgba(241,240,234,0.35)" }}
+                      style={{
+                        fontSize: 10,
+                        color: "#B08D46",
+                        fontWeight: 600,
+                        flexShrink: 0,
+                      }}
                     >
                       {d.label}
                     </span>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { api, ApiError } from "../services/api"
+import { mapServerRoleToAppRole } from "../services/authStore"
 
 interface LoginScreenProps {
   onSuccess: (
@@ -174,12 +175,7 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
       const res = await api.login(email.trim(), password)
       if (res.success) {
         setState("idle")
-        const role =
-          res.user?.role === "CENTER_SUPERINTENDENT"
-            ? "center-superintendent"
-            : res.user?.role === "SUPER_ADMIN"
-              ? "super-admin"
-              : "trade-tester"
+        const role = mapServerRoleToAppRole(res.user?.role)
         onSuccess(role, email.trim(), password)
         return
       }

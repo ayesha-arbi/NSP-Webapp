@@ -13,21 +13,24 @@ export interface SessionState {
 
 const STORAGE_KEY = "nsp_session"
 
-function mapServerRoleToAppRole(serverRole?: string): AppRole {
-  switch (serverRole) {
-    case "CENTER_SUPERINTENDENT":
-      return "center-superintendent"
-    case "SUPER_ADMIN":
-      return "super-admin"
-    case "TRADE_TESTER":
-    default:
-      return "trade-tester"
+export function mapServerRoleToAppRole(serverRole?: string): AppRole {
+  const normalized = (serverRole || "").toUpperCase().replace(/[-_\s]/g, "")
+  if (normalized.includes("SUPERINTENDENT")) {
+    return "center-superintendent"
   }
+  if (normalized.includes("ADMIN")) {
+    return "super-admin"
+  }
+  return "trade-tester"
 }
 
 function getInitialState(): SessionState {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
+    const raw =
+      typeof sessionStorage !== "undefined"
+        ? sessionStorage.getItem(STORAGE_KEY)
+        : null
+
     if (raw) {
       const parsed = JSON.parse(raw)
       if (parsed.accessToken && parsed.refreshToken && parsed.user) {
@@ -64,6 +67,24 @@ export const authStore = {
     return currentState
   },
 
+  getRefreshToken(): string | null {
+    if (currentState.refreshToken) return currentState.refreshToken
+    try {
+      if (typeof localStorage !== "undefined") {
+        const local = localStorage.getItem("refreshToken")
+        if (local) return local
+      }
+      if (typeof sessionStorage !== "undefined") {
+        const raw = sessionStorage.getItem(STORAGE_KEY)
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          return parsed.refreshToken || null
+        }
+      }
+    } catch {}
+    return null
+  },
+
   subscribe(listener: (state: SessionState) => void): () => void {
     listeners.add(listener)
     return () => listeners.delete(listener)
@@ -80,10 +101,17 @@ export const authStore = {
     currentState = { user, accessToken: token, refreshToken: rToken, role, isAuthenticated: true }
     setApiAuthToken(token)
     try {
-      sessionStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ user, accessToken: token, refreshToken: rToken })
-      )
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ user, accessToken: token, refreshToken: rToken }),
+        )
+      }
+      if (typeof localStorage !== "undefined") {
+        if (token) localStorage.setItem("accessToken", token)
+        if (rToken) localStorage.setItem("refreshToken", rToken)
+        localStorage.setItem("user", JSON.stringify(user))
+      }
     } catch {}
     notify()
   },
@@ -110,7 +138,16 @@ export const authStore = {
       isAuthenticated: false,
     }
     setApiAuthToken(null)
-    try { sessionStorage.removeItem(STORAGE_KEY) } catch {}
+    try {
+      if (typeof sessionStorage !== "undefined") {
+        sessionStorage.removeItem(STORAGE_KEY)
+      }
+      if (typeof localStorage !== "undefined") {
+        localStorage.removeItem("accessToken")
+        localStorage.removeItem("refreshToken")
+        localStorage.removeItem("user")
+      }
+    } catch {}
     notify()
   },
 

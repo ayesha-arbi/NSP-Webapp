@@ -446,17 +446,17 @@ const DEMO_DATA = {
     rejectedAt: "2026-08-26 11:45",
   },
   credential: {
-    id: "CRED-8A2F99",
+    id: "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
     status: "Valid" as CredentialStatus,
-    issuerDid: "did:polygon:0x4f8b9e...2a1c",
-    hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    issuerDid: "did:nsp:hub:peshawar-01",
+    hash: "0x5a1f8c2b7e9d4013fa67823e590bd71a48c6913e2bf45091c7830de45681ab34",
     txHash:
-      "0x9f8c109d94334a1b0288f33190b395053b29070f96898d9e2a1b9f84a44b3a12",
+      "0x89abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678",
     blockNumber: 15923041,
-    mintedAt: "2026-08-26 11:35",
+    mintedAt: "2026-10-18 10:18",
     revocationReason:
       "Credential was issued for incorrect trade category due to clerical error.",
-    revokedAt: "2026-08-27 09:10",
+    revokedAt: "2026-10-19 09:10",
   },
   media: [
     {
@@ -930,11 +930,23 @@ export default function CandidateRecordScreen({
                         mono
                       />
                       <DataField
-                        label="Polygon Transaction Hash"
+                        label="Polygon Transaction Hash (Amoy Testnet)"
                         value={
-                          <span style={{ wordBreak: "break-all" }}>
-                            {data.credential.txHash}
-                          </span>
+                          <a
+                            href={`https://amoy.polygonscan.com/tx/${data.credential.txHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              color: "#4C7A6E",
+                              textDecoration: "underline",
+                              wordBreak: "break-all",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            {data.credential.txHash} ↗
+                          </a>
                         }
                         mono
                       />

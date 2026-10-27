@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react"
 import Select from "@/components/Select"
+import { api } from "../services/api"
 
 /* ── Types ── */
 type Tab = "overview" | "hubs" | "minting" | "devices" | "audit"
@@ -1480,6 +1481,11 @@ export default function SuperAdminDashboard() {
     }
     if (!selectedTx) return
     if (pendingAction === "retry") {
+      // Guide #5 §3: Super Admin triggers ledger approval across any hub
+      api.approveCredential(selectedTx.credId).catch((err) => {
+        console.warn("Super Admin approveCredential note:", err?.message)
+      })
+
       setTxs((ts) =>
         ts.map((t) =>
           t.id === selectedTx.id
