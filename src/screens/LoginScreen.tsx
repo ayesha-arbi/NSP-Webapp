@@ -8,6 +8,8 @@ interface LoginScreenProps {
     email: string,
     password: string,
   ) => void
+  onEnrollmentRequired?: (email: string, enrollmentToken: string) => void
+  enrollmentSuccessMessage?: string
 }
 
 type LoginState = "idle" | "loading" | "error"
@@ -135,7 +137,11 @@ function LogoMark({
   )
 }
 
-export default function LoginScreen({ onSuccess }: LoginScreenProps) {
+export default function LoginScreen({
+  onSuccess,
+  onEnrollmentRequired,
+  enrollmentSuccessMessage,
+}: LoginScreenProps) {
   const [email, setEmail] = useState("tradetester@nsp.com")
   const [password, setPassword] = useState("TradeTester123")
   const [showPw, setShowPw] = useState(false)
@@ -173,6 +179,16 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
 
     try {
       const res = await api.login(email.trim(), password)
+
+      // Guide #7 §1.1: If enrollmentRequired, redirect to MFA enrollment
+      if (res.enrollmentRequired && res.enrollmentToken) {
+        setState("idle")
+        if (onEnrollmentRequired) {
+          onEnrollmentRequired(email.trim(), res.enrollmentToken)
+          return
+        }
+      }
+
       if (res.success) {
         setState("idle")
         const role = mapServerRoleToAppRole(res.user?.role)
@@ -388,6 +404,37 @@ export default function LoginScreen({ onSuccess }: LoginScreenProps) {
             </div>
 
             {/* general error banner */}
+            {enrollmentSuccessMessage && !generalError && (
+              <div
+                style={{
+                  background: "#EAF3DE",
+                  border: "1px solid #4C7A6E",
+                  borderRadius: 6,
+                  padding: "10px 14px",
+                  marginBottom: 20,
+                  fontSize: 13,
+                  color: "#173404",
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "center",
+                }}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#4C7A6E"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span>{enrollmentSuccessMessage}</span>
+              </div>
+            )}
+
             {generalError && (
               <div
                 role="alert"

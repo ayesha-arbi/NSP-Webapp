@@ -5,6 +5,7 @@ import Layout from "./components/Layout"
 import LoginScreen from "./screens/LoginScreen"
 
 import MFAScreen from "./screens/MFAScreen"
+import MFAEnrollmentScreen from "./screens/MFAEnrollmentScreen"
 
 import BackupCodeScreen from "./screens/BackupCodeScreen"
 
@@ -84,9 +85,9 @@ export interface VerificationResult {
 
 // ============================================================
 
-type AppScreen = "login" | "mfa" | "backup-code" | "verifier" | "dashboard" | "enrollment" | "assessment" | "approvals" | "credentials" | "devices" | "settings" | "notifications" | "credential-revocation" | "user-management" | "record-detail"
+type AppScreen = "login" | "mfa" | "backup-code" | "enroll-mfa" | "verifier" | "dashboard" | "enrollment" | "assessment" | "approvals" | "credentials" | "devices" | "settings" | "notifications" | "credential-revocation" | "user-management" | "record-detail"
 
-type AuthedScreen = Exclude<AppScreen, "login" | "mfa" | "backup-code" | "verifier">
+type AuthedScreen = Exclude<AppScreen, "login" | "mfa" | "backup-code" | "enroll-mfa" | "verifier">
 
 // ============================================================
 
@@ -104,6 +105,8 @@ export default function App() {
   const [loginEmail, setLoginEmail] = useState("tradetester@nsp.com")
 
   const [loginPassword, setLoginPassword] = useState("")
+  const [enrollmentToken, setEnrollmentToken] = useState("")
+  const [enrollmentSuccessMessage, setEnrollmentSuccessMessage] = useState("")
 
   const [activePortal, setActivePortal] =
     useState<"issuer" | "verifier" | "wallet">("issuer")
@@ -152,7 +155,24 @@ export default function App() {
 
     setLoginPassword(password)
 
+    setEnrollmentSuccessMessage("")
+
     setScreen("mfa")
+  }
+
+  function handleEnrollmentRequired(email: string, token: string) {
+    setLoginEmail(email)
+    setEnrollmentToken(token)
+    setEnrollmentSuccessMessage("")
+    setScreen("enroll-mfa")
+  }
+
+  function handleEnrollmentSuccess() {
+    setEnrollmentSuccessMessage(
+      "MFA enrollment completed. Log in using your password and authenticator code.",
+    )
+    setEnrollmentToken("")
+    setScreen("login")
   }
 
   function handleMFASuccess() {
@@ -589,12 +609,36 @@ export default function App() {
       )
     }
 
+    if (screen === "enroll-mfa") {
+      return (
+        <div
+          style={{
+            minHeight: "100vh",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {renderPortalSwitcher()}
+          <MFAEnrollmentScreen
+            email={loginEmail}
+            enrollmentToken={enrollmentToken}
+            onSuccess={handleEnrollmentSuccess}
+            onBackToLogin={handleBackToLogin}
+          />
+        </div>
+      )
+    }
+
     return (
       <div
         style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
       >
         {renderPortalSwitcher()}
-        <LoginScreen onSuccess={handleLoginSuccess} />
+        <LoginScreen
+          onSuccess={handleLoginSuccess}
+          onEnrollmentRequired={handleEnrollmentRequired}
+          enrollmentSuccessMessage={enrollmentSuccessMessage}
+        />
       </div>
     )
   }

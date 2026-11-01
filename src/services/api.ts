@@ -20,6 +20,10 @@ export interface LoginResponse {
 
   mfaRequired?: boolean
 
+  enrollmentRequired?: boolean
+
+  enrollmentToken?: string
+
   user?: User
 }
 
@@ -60,6 +64,153 @@ export interface RevokeResponse {
   success: boolean
   message: string
 }
+
+// ============================================================
+// GUIDE #7 MFA ENROLLMENT & SUPER ADMIN TYPES
+// ============================================================
+
+export interface MfaEnrollStartResponse {
+  success: boolean
+  message: string
+  secret: string
+  otpauthUrl: string
+}
+
+export interface MfaEnrollConfirmResponse {
+  success: boolean
+  message: string
+}
+
+export interface UserStats {
+  total: number
+  superAdmins: number
+  centerSuperintendents: number
+  tradeTesters: number
+  activeMfa: number
+  pendingMfa: number
+  adminLocked: number
+}
+
+export interface DashboardStats {
+  users: UserStats
+  sessions: { activeCount: number }
+  candidates: { totalEnrolled: number; verifiedCnic: number }
+  assessments: { totalAssessed: number; submitted: number; approved: number; rejected: number }
+  ledger: {
+    totalCredentials: number
+    pendingApproval: number
+    approved: number
+    mintedOnChain: number
+    queuePending?: number
+    queueFailed?: number
+  }
+}
+
+export interface HubUser {
+  userId: string
+  id?: string
+  email: string
+  name?: string
+  role: "TRADE_TESTER" | "CENTER_SUPERINTENDENT" | "SUPER_ADMIN"
+  hubLocationId?: number
+  hubName?: string
+  isMfaActive?: boolean
+  mfaEnrollmentPending?: boolean
+  adminLocked?: boolean
+  isLocked?: boolean
+  mfaEnabled?: boolean
+  failedLoginAttempts?: number
+  lockedUntil?: string | null
+  createdAt?: string
+  lastLoginAt?: string
+  tokenVersion?: number
+}
+
+export interface UserSession {
+  sessionId: string
+  ipAddress: string
+  deviceFingerprint: string
+  createdAt: string
+  expiresAt: string
+}
+
+export interface HubUserDetail {
+  user: HubUser
+  sessions: UserSession[]
+  recentAuditEvents: Array<{
+    logId: number
+    eventType: string
+    ipAddress: string
+    createdAt: string
+    details: any
+  }>
+}
+
+export interface CreateHubUserPayload {
+  email: string
+  password?: string
+  name?: string
+  role: "TRADE_TESTER" | "CENTER_SUPERINTENDENT" | "SUPER_ADMIN"
+  hubLocationId?: number
+}
+
+export interface CreateHubUserResponse {
+  success: boolean
+  message: string
+  data: HubUser
+  mfaEnrollment: {
+    secret: string
+    otpauthUrl: string
+  }
+}
+
+export interface LockUserResponse {
+  success: boolean
+  data: {
+    message: string
+    user: Partial<HubUser>
+  }
+}
+
+export interface ResetUserMfaResponse {
+  success: boolean
+  message?: string
+  data?: {
+    message: string
+    user: Partial<HubUser>
+  }
+  mfaEnrollment?: {
+    secret: string
+    otpauthUrl: string
+  }
+  enrollment?: {
+    secret: string
+    otpauthUrl: string
+  }
+}
+
+export interface ActiveSession {
+  sessionId: string
+  userId: string
+  email: string
+  role: "TRADE_TESTER" | "CENTER_SUPERINTENDENT" | "SUPER_ADMIN"
+  hubLocationId: number
+  ipAddress: string
+  deviceFingerprint: string
+  createdAt: string
+  expiresAt: string
+}
+
+export interface AuditLogEntry {
+  logId: number
+  eventType: string
+  userId: string
+  email: string
+  ipAddress: string
+  createdAt: string
+  details?: Record<string, any>
+}
+
 
 export interface GenerateBackupCodesResponse {
   success: boolean
@@ -351,7 +502,35 @@ async function request<T>(
     )
   }
 
-// If 401 Unauthorized mid-session, attempt token refresh
+  let data: any = {}
+
+  const contentType = response.headers.get("content-type")
+
+  if (contentType && contentType.includes("application/json")) {
+    try {
+      data = await response.json()
+    } catch {
+      data = {}
+    }
+  }
+
+  // Guide #7 §1.4: Real-time token invalidation (token_version)
+  // When an admin locks a user or resets their credentials, backend increments token_version.
+  // Subsequent calls return 401 with "Session is no longer valid. Please authenticate again."
+  // When caught, immediately clear local authentication state and do not retry refresh.
+  const isInvalidSession =
+    response.status === 401 &&
+    typeof data?.message === "string" &&
+    (data.message.toLowerCase().includes("session is no longer valid") ||
+     data.message.toLowerCase().includes("token_version") ||
+     data.message.toLowerCase().includes("account locked"))
+
+  if (isInvalidSession) {
+    onAuthExpiredCallback?.()
+    throw new ApiError(data.message, 401, data)
+  }
+
+  // If 401 Unauthorized mid-session, attempt token refresh
   const isAuthEndpoint = endpoint.startsWith("/api/auth/")
 
   if (response.status === 401 && !isAuthEndpoint && retryAuth) {
@@ -399,18 +578,6 @@ async function request<T>(
 
   if (response.status === 401 && !isAuthEndpoint && !retryAuth) {
     onAuthExpiredCallback?.()
-  }
-
-  let data: any = {}
-
-  const contentType = response.headers.get("content-type")
-
-  if (contentType && contentType.includes("application/json")) {
-    try {
-      data = await response.json()
-    } catch {
-      data = {}
-    }
   }
 
   if (!response.ok) {
@@ -827,6 +994,66 @@ export const api = {
       { method: "GET" },
     )
   },
+
+  // 8. Guide #7: MFA Enrollment Lifecycle
+  async startMfaEnrollment(
+    enrollmentToken: string,
+  ): Promise<MfaEnrollStartResponse> {
+    return request<MfaEnrollStartResponse>("/api/auth/mfa/enroll/start", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${enrollmentToken}`,
+      },
+      body: JSON.stringify({ enrollmentToken }),
+    })
+  },
+
+  async confirmMfaEnrollment(
+    enrollmentToken: string,
+    mfaCode: string,
+  ): Promise<MfaEnrollConfirmResponse> {
+    return request<MfaEnrollConfirmResponse>("/api/auth/mfa/enroll/confirm", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${enrollmentToken}`,
+      },
+      body: JSON.stringify({ enrollmentToken, mfaCode, code: mfaCode }),
+    })
+  },
+
+  // 9. Guide #7: Super Admin Engine
+  superAdmin: {
+    getDashboard(): Promise<DashboardStats> {
+      return superAdminApi.getDashboard()
+    },
+    getUsers(params?: { role?: string; search?: string; limit?: number; offset?: number }) {
+      return superAdminApi.getUsers(params)
+    },
+    getUserDetails(userId: string) {
+      return superAdminApi.getUserDetails(userId)
+    },
+    createUser(payload: CreateHubUserPayload) {
+      return superAdminApi.createUser(payload)
+    },
+    lockUser(userId: string) {
+      return superAdminApi.lockUser(userId)
+    },
+    unlockUser(userId: string) {
+      return superAdminApi.unlockUser(userId)
+    },
+    resetUserMfa(userId: string) {
+      return superAdminApi.resetUserMfa(userId)
+    },
+    getSessions(limit?: number) {
+      return superAdminApi.getSessions(limit)
+    },
+    revokeSession(sessionId: string) {
+      return superAdminApi.revokeSession(sessionId)
+    },
+    getAuditLogs(limit?: number) {
+      return superAdminApi.getAuditLogs(limit)
+    },
+  },
 }
 
 /**
@@ -952,3 +1179,83 @@ export async function uploadAssessmentPhoto(assessmentId: string, file: Blob) {
 }
 
 export const ApiService = api;
+
+// ============================================================
+// GUIDE #7 SUPER ADMIN API SERVICE
+// ============================================================
+
+export const superAdminApi = {
+  getDashboard: async (): Promise<DashboardStats> => {
+    const res = await request<any>("/api/super-admin/dashboard", { method: "GET" })
+    return res.data?.stats || res.data || res
+  },
+
+  getUsers: async (params?: {
+    role?: string
+    search?: string
+    limit?: number
+    offset?: number
+  }): Promise<{ users: HubUser[]; pagination: { limit: number; offset: number; total: number } }> => {
+    const query = new URLSearchParams()
+    if (params?.role) query.set("role", params.role)
+    if (params?.search) query.set("search", params.search)
+    if (params?.limit != null) query.set("limit", String(params.limit))
+    if (params?.offset != null) query.set("offset", String(params.offset))
+    const qs = query.toString() ? `?${query.toString()}` : ""
+    const res = await request<any>(`/api/super-admin/users${qs}`, { method: "GET" })
+    return res.data || res
+  },
+
+  getUserDetails: async (userId: string): Promise<HubUserDetail> => {
+    const res = await request<any>(`/api/super-admin/users/${encodeURIComponent(userId)}`, {
+      method: "GET",
+    })
+    return res.data || res
+  },
+
+  createUser: async (payload: CreateHubUserPayload): Promise<CreateHubUserResponse> => {
+    return request<CreateHubUserResponse>("/api/super-admin/users", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })
+  },
+
+  lockUser: async (userId: string, reason?: string): Promise<LockUserResponse> => {
+    return request<LockUserResponse>(`/api/super-admin/users/${encodeURIComponent(userId)}/lock`, {
+      method: "POST",
+      body: reason ? JSON.stringify({ reason }) : undefined,
+    })
+  },
+
+  unlockUser: async (userId: string): Promise<LockUserResponse> => {
+    return request<LockUserResponse>(`/api/super-admin/users/${encodeURIComponent(userId)}/unlock`, {
+      method: "POST",
+    })
+  },
+
+  resetUserMfa: async (userId: string, reason?: string): Promise<ResetUserMfaResponse> => {
+    return request<ResetUserMfaResponse>(
+      `/api/super-admin/users/${encodeURIComponent(userId)}/reset-mfa`,
+      {
+        method: "POST",
+        body: reason ? JSON.stringify({ reason }) : undefined,
+      },
+    )
+  },
+
+  getSessions: async (limit = 50): Promise<ActiveSession[]> => {
+    const res = await request<any>(`/api/super-admin/sessions?limit=${limit}`, { method: "GET" })
+    return res.data || res
+  },
+
+  revokeSession: async (sessionId: string): Promise<{ success: boolean; data: { message: string } }> => {
+    return request<any>(`/api/super-admin/sessions/${encodeURIComponent(sessionId)}/revoke`, {
+      method: "POST",
+    })
+  },
+
+  getAuditLogs: async (limit = 50): Promise<AuditLogEntry[]> => {
+    const res = await request<any>(`/api/super-admin/audit-logs?limit=${limit}`, { method: "GET" })
+    return res.data || res
+  },
+}

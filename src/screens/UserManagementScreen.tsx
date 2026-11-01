@@ -1,11 +1,13 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { QRCodeSVG } from "qrcode.react"
+import { superAdminApi } from "../services/superAdmin"
 import Select from "@/components/Select"
 
 /* ── Types ── */
 type UserRole = "trade-tester" | "center-superintendent" | "super-admin"
 type AcctStatus = "active" | "locked"
 type MfaStatus = "enabled" | "disabled" | "pending-reset"
-type ModalType = "none" | "create" | "edit" | "lock" | "unlock" | "mfa-reset" | "revoke-session"
+type ModalType = "none" | "create" | "edit" | "lock" | "unlock" | "mfa-reset" | "revoke-session" | "provision-mfa-qr"
 type Tab = "users" | "audit"
 
 interface UserSession {
@@ -385,6 +387,44 @@ export default function UserManagementScreen() {
   const [mfaReason, setMfaReason] = useState("")
   const [mfaVerified, setMfaVerified] = useState(false)
   const [formError, setFormError] = useState("")
+  const [provisionMfaData, setProvisionMfaData] = useState<{
+    email: string
+    name: string
+    secret: string
+    otpauthUrl: string
+  } | null>(null)
+  const [copiedKey, setCopiedKey] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    superAdminApi.getUsers()
+      .then((res) => {
+        if (!mounted || !res || !res.users || res.users.length === 0) return
+        const mapped: User[] = res.users.map((hu) => {
+          let role: UserRole = "trade-tester"
+          if (hu.role === "CENTER_SUPERINTENDENT") role = "center-superintendent"
+          else if (hu.role === "SUPER_ADMIN") role = "super-admin"
+          return {
+            id: hu.id || hu.userId,
+            name: hu.name || hu.email.split("@")[0],
+            email: hu.email,
+            role,
+            hub: hu.hubName || (hu.hubLocationId ? `Hub-${hu.hubLocationId}` : "—"),
+            status: (hu.isLocked || hu.adminLocked) ? "locked" : "active",
+            mfa: (hu.mfaEnabled || hu.isMfaActive) ? "enabled" : (hu.mfaEnrollmentPending ? "pending-reset" : "disabled"),
+            lastLogin: hu.lastLoginAt ? new Date(hu.lastLoginAt).toLocaleString("sv").slice(0, 16) : "Never",
+            createdAt: hu.createdAt ? hu.createdAt.slice(0, 10) : "2026-01-01",
+          }
+        })
+        setUsers(mapped)
+      })
+      .catch((err) => {
+        console.warn("superAdminApi.getUsers offline note:", err?.message)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   function addAudit(
     action: string,
@@ -450,12 +490,12 @@ export default function UserManagementScreen() {
     setModal("revoke-session")
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!form.name.trim() || !form.email.trim()) {
       setFormError("Name and email are required.")
       return
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    if (!/^[^s@]+@[^s@]+.[^s@]+$/.test(form.email)) {
       setFormError("Enter a valid email address.")
       return
     }
@@ -464,6 +504,26 @@ export default function UserManagementScreen() {
       return
     }
     const now = new Date().toISOString().slice(0, 10)
+    const hubIdx = HUBS.indexOf(form.hub)
+    const hubLocationId = form.role === "super-admin" ? undefined : (hubIdx >= 0 ? hubIdx + 1 : 1)
+    const apiRole = form.role === "trade-tester" ? "TRADE_TESTER" : form.role === "center-superintendent" ? "CENTER_SUPERINTENDENT" : "SUPER_ADMIN"
+
+    let mfaEnroll: { secret: string; otpauthUrl: string } | undefined
+
+    try {
+      const res = await superAdminApi.createUser({
+        email: form.email.trim().toLowerCase(),
+        name: form.name.trim(),
+        role: apiRole,
+        hubLocationId,
+      })
+      if (res?.mfaEnrollment) {
+        mfaEnroll = res.mfaEnrollment
+      }
+    } catch (err: any) {
+      console.warn("superAdminApi.createUser offline fallback:", err?.message)
+    }
+
     const newUser: User = {
       id: `u${Date.now()}`,
       name: form.name.trim(),
@@ -477,7 +537,19 @@ export default function UserManagementScreen() {
     }
     setUsers((u) => [...u, newUser])
     addAudit("User created", form.name.trim())
-    setModal("none")
+
+    if (mfaEnroll) {
+      setProvisionMfaData({
+        email: newUser.email,
+        name: newUser.name,
+        secret: mfaEnroll.secret,
+        otpauthUrl: mfaEnroll.otpauthUrl,
+      })
+      setCopiedKey(false)
+      setModal("provision-mfa-qr")
+    } else {
+      setModal("none")
+    }
   }
 
   function handleEdit() {
@@ -503,16 +575,21 @@ export default function UserManagementScreen() {
     setModal("none")
   }
 
-  function handleLock() {
+  async function handleLock() {
     if (!target) return
+    const reason = lockReason.trim() || "Manually locked by administrator."
+    try {
+      await superAdminApi.lockUser(target.id, reason)
+    } catch (err: any) {
+      console.warn("superAdminApi.lockUser offline fallback:", err?.message)
+    }
     setUsers((us) =>
       us.map((u) =>
         u.id === target.id
           ? {
               ...u,
               status: "locked",
-              lockReason:
-                lockReason.trim() || "Manually locked by administrator.",
+              lockReason: reason,
               lockedBy: "Zara Khan",
               session: undefined,
             }
@@ -523,8 +600,13 @@ export default function UserManagementScreen() {
     setModal("none")
   }
 
-  function handleUnlock() {
+  async function handleUnlock() {
     if (!target) return
+    try {
+      await superAdminApi.unlockUser(target.id)
+    } catch (err: any) {
+      console.warn("superAdminApi.unlockUser offline fallback:", err?.message)
+    }
     setUsers((us) =>
       us.map((u) =>
         u.id === target.id
@@ -541,17 +623,43 @@ export default function UserManagementScreen() {
     setModal("none")
   }
 
-  function handleMfaReset() {
+  async function handleMfaReset() {
     if (!target || !mfaVerified || !mfaReason.trim()) return
+    let resetEnroll: { secret: string; otpauthUrl: string } | undefined
+    try {
+      const res = await superAdminApi.resetUserMfa(target.id, mfaReason.trim())
+      if (res?.mfaEnrollment || res?.enrollment) {
+        resetEnroll = res.mfaEnrollment || res.enrollment
+      }
+    } catch (err: any) {
+      console.warn("superAdminApi.resetUserMfa offline fallback:", err?.message)
+    }
     setUsers((us) =>
       us.map((u) => (u.id === target.id ? { ...u, mfa: "pending-reset" } : u)),
     )
     addAudit("MFA reset — user must re-enroll on next login", target.name)
-    setModal("none")
+
+    if (resetEnroll) {
+      setProvisionMfaData({
+        email: target.email,
+        name: target.name,
+        secret: resetEnroll.secret,
+        otpauthUrl: resetEnroll.otpauthUrl,
+      })
+      setCopiedKey(false)
+      setModal("provision-mfa-qr")
+    } else {
+      setModal("none")
+    }
   }
 
-  function handleRevokeSession() {
-    if (!target) return
+  async function handleRevokeSession() {
+    if (!target || !target.session) return
+    try {
+      await superAdminApi.revokeSession(target.session.id)
+    } catch (err: any) {
+      console.warn("superAdminApi.revokeSession offline fallback:", err?.message)
+    }
     setUsers((us) =>
       us.map((u) => (u.id === target.id ? { ...u, session: undefined } : u)),
     )
@@ -2504,6 +2612,143 @@ export default function UserManagementScreen() {
               Cancel
             </button>
           </div>
+        </ModalOverlay>
+      )}
+
+      {/* ── PROVISION MFA QR MODAL (Guide #7) ── */}
+      {modal === "provision-mfa-qr" && provisionMfaData && (
+        <ModalOverlay wide>
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                background: "#EAF3DE",
+                borderRadius: "50%",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 12,
+              }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: "#24302E", margin: "0 0 6px" }}>
+              MFA Enrollment Provisioned
+            </h2>
+            <p style={{ fontSize: 13, color: "#5C5A50", margin: 0 }}>
+              Authenticator setup details generated for <strong>{provisionMfaData.name}</strong> ({provisionMfaData.email})
+            </p>
+          </div>
+
+          <div
+            style={{
+              background: "#F7F6F2",
+              border: "1px solid #D6D3C6",
+              borderRadius: 8,
+              padding: 20,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              marginBottom: 20,
+            }}
+          >
+            <div
+              style={{
+                background: "#fff",
+                padding: 12,
+                borderRadius: 8,
+                border: "1px solid #D6D3C6",
+                display: "inline-block",
+                marginBottom: 16,
+              }}
+            >
+              <QRCodeSVG value={provisionMfaData.otpauthUrl} size={180} level="M" />
+            </div>
+            <p style={{ fontSize: 12, color: "#5C5A50", margin: "0 0 8px", textAlign: "center" }}>
+              Scan this QR code using Google Authenticator, Microsoft Authenticator, or compatible TOTP app.
+            </p>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                background: "#fff",
+                border: "1px solid #D6D3C6",
+                borderRadius: 6,
+                padding: "8px 12px",
+                width: "100%",
+                maxWidth: 360,
+                boxSizing: "border-box",
+                justifyContent: "space-between",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 10, color: "#8C897C", fontWeight: 600, textTransform: "uppercase" }}>Manual Entry Key</div>
+                <div style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, letterSpacing: 1, color: "#24302E" }}>
+                  {provisionMfaData.secret}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(provisionMfaData.secret)
+                  setCopiedKey(true)
+                  setTimeout(() => setCopiedKey(false), 2000)
+                }}
+                style={{
+                  background: copiedKey ? "#2D6A4F" : "#E4E2D9",
+                  color: copiedKey ? "#fff" : "#24302E",
+                  border: "none",
+                  borderRadius: 4,
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {copiedKey ? "Copied!" : "Copy Key"}
+              </button>
+            </div>
+          </div>
+
+          <div
+            style={{
+              background: "#EAF3DE",
+              border: "1px solid #B7D9B2",
+              borderRadius: 6,
+              padding: "10px 14px",
+              marginBottom: 20,
+              fontSize: 12.5,
+              color: "#173404",
+              lineHeight: 1.5,
+            }}
+          >
+            <strong>Super Admin Notice:</strong> Securely deliver this setup key or QR code to the staff member. They will be prompted to enter the 6-digit TOTP code upon their next login.
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setProvisionMfaData(null)
+              setModal("none")
+            }}
+            style={{
+              width: "100%",
+              height: 42,
+              background: "#4C7A6E",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Done & Close
+          </button>
         </ModalOverlay>
       )}
     </div>
