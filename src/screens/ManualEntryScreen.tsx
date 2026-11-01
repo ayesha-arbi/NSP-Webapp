@@ -1,4 +1,6 @@
 import { useState, useRef } from "react"
+import NavBar from "../components/NavBar"
+import Footer from "../components/Footer"
 
 import NavBar from "../components/NavBar"
 
@@ -8,6 +10,13 @@ import { BtnPrimary, BtnSecondary } from "../components/Btn"
 
 interface Props {
   onBack: () => void
+  onQRScan: () => void
+  onVerify: (credentialId: string) => void | Promise<void>
+  isLoading?: boolean
+}
+
+type State = "idle" | "loading" | "error-empty" | "error-invalid"
+
 
   onQRScan: () => void
 
@@ -32,6 +41,26 @@ export default function ManualEntryScreen({
   onBack,
   onQRScan,
   onVerify,
+  isLoading: externalLoading,
+}: Props) {
+  const [value, setValue] = useState("")
+  const [state, setState] = useState<State>("idle")
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const isUrnOrDid =
+    value.toLowerCase().startsWith("urn:") ||
+    value.toLowerCase().startsWith("did:")
+  const suffix = isUrnOrDid ? value : value.replace(/^NSP-?/i, "")
+
+  const handleVerify = async () => {
+    const trimmed = value.trim()
+    if (!trimmed || (!isUrnOrDid && !suffix)) {
+      setState("error-empty")
+      inputRef.current?.focus()
+      return
+    }
+
+    if (!isUrnOrDid && suffix.length < 3) {
 }: Props) {
   const [value, setValue] = useState("")
 
@@ -58,6 +87,23 @@ export default function ManualEntryScreen({
       inputRef.current?.focus()
       return
     }
+
+    const idToVerify = isUrnOrDid
+      ? trimmed
+      : trimmed.toUpperCase().startsWith("NSP-")
+        ? trimmed.toUpperCase()
+        : `NSP-${trimmed.toUpperCase()}`
+
+    setState("loading")
+    try {
+      await onVerify(idToVerify)
+    } catch {
+      // Any uncaught error resets loading state
+    } finally {
+      setState("idle")
+    }
+  }
+
 
     setState("loading")
 
@@ -88,6 +134,8 @@ export default function ManualEntryScreen({
     inputRef.current?.focus()
   }
 
+  const isLoading = state === "loading" || !!externalLoading
+  const hasInputError = state === "error-empty" || state === "error-invalid"
   const isLoading = state === "loading"
 
   const hasInputError = state === "error-empty" || state === "error-invalid"
@@ -106,6 +154,7 @@ export default function ManualEntryScreen({
       <NavBar
         breadcrumbs={[
           { label: "Verify a Credential", onClick: onBack },
+          { label: "Scan QR Code", onClick: onQRScan },
 
           { label: "Scan QR Code", onClick: onQRScan },
 
@@ -122,6 +171,9 @@ export default function ManualEntryScreen({
               alignItems: "center",
               gap: 6,
               background: "none",
+              border: "1px solid rgba(241,240,234,0.2)",
+              borderRadius: 6,
+              padding: "6px 12px",
 
               border: "1px solid rgba(241,240,234,0.2)",
               borderRadius: 6,
@@ -183,6 +235,8 @@ export default function ManualEntryScreen({
               lineHeight: 1.6,
             }}
           >
+            Type the ID exactly as it appears on the worker&apos;s certificate
+            or digital wallet.
             Type the ID exactly as it appears on the worker's certificate or
             digital wallet.
           </p>
@@ -203,6 +257,14 @@ export default function ManualEntryScreen({
         >
           <div>
             {/* Error summary */}
+            {hasInputError && (
+              <div
+                style={{
+                  background: "#EBDAD8",
+                  border: "1px solid #A6453D",
+                  borderLeft: "4px solid #A6453D",
+                  borderRadius: "0 6px 6px 0",
+                  padding: "16px 20px",
             {(hasInputError || isNotFound) && (
               <div
                 style={{
@@ -223,6 +285,18 @@ export default function ManualEntryScreen({
                   style={{
                     fontWeight: 700,
                     fontSize: 14,
+                    color: "#8C3B34",
+                    marginBottom: 4,
+                  }}
+                >
+                  There is a problem
+                </p>
+                <p style={{ fontSize: 13, color: "#8C3B34", lineHeight: 1.55 }}>
+                  {state === "error-empty" &&
+                    "Enter a Credential ID to continue."}
+                  {state === "error-invalid" &&
+                    "Enter a valid Credential ID, for example NSP-004821 or a canonical URN."}
+                </p>
                     color: isNotFound ? "#8C6F35" : "#8C3B34",
                     marginBottom: 4,
                   }}
@@ -278,6 +352,20 @@ export default function ManualEntryScreen({
                   Credential ID
                 </label>
                 <p style={{ fontSize: 13, color: "#8C897C", marginBottom: 12 }}>
+                  For example, NSP-004821 or urn:uuid:...
+                </p>
+
+                {/* Input container */}
+                <div
+                  style={{
+                    display: "flex",
+                    maxWidth: 460,
+                    marginBottom: 20,
+                    border: `1px solid ${
+                      hasInputError ? "#A6453D" : "#D6D3C6"
+                    }`,
+                    borderRadius: 6,
+                    overflow: "hidden",
                   For example, NSP-004821
                 </p>
 
@@ -306,6 +394,24 @@ export default function ManualEntryScreen({
                     }`)
                   }
                 >
+                  {!isUrnOrDid && (
+                    <div
+                      style={{
+                        background: "#F1F0EA",
+                        borderRight: "1px solid #D6D3C6",
+                        padding: "10px 14px",
+                        fontFamily: "'IBM Plex Mono', monospace",
+                        fontSize: 14,
+                        fontWeight: 500,
+                        color: "#5C5A50",
+                        display: "flex",
+                        alignItems: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      NSP–
+                    </div>
+                  )}
                   <div
                     style={{
                       background: "#F1F0EA",
@@ -326,6 +432,22 @@ export default function ManualEntryScreen({
                     ref={inputRef}
                     id="cid"
                     type="text"
+                    value={suffix}
+                    onChange={(e) => {
+                      const text = e.target.value.trim()
+                      if (
+                        text.toLowerCase().startsWith("urn:") ||
+                        text.toLowerCase().startsWith("did:") ||
+                        /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(text)
+                      ) {
+                        setValue(text)
+                      } else {
+                        setValue(
+                          "NSP-" +
+                            e.target.value
+                              .toUpperCase()
+                              .replace(/[^0-9A-Z_-]/g, ""),
+                        )
                     value={isUrn ? value : suffix}
                     onChange={(e) => {
                       const val = e.target.value
@@ -346,6 +468,7 @@ export default function ManualEntryScreen({
                     onKeyDown={(e) =>
                       e.key === "Enter" && !isLoading && handleVerify()
                     }
+                    placeholder={isUrnOrDid ? "urn:uuid:..." : "004821"}
                     placeholder={
                       isUrn
                         ? "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7"
@@ -359,6 +482,7 @@ export default function ManualEntryScreen({
                       padding: "10px 12px",
                       border: "none",
                       outline: "none",
+                      fontSize: 15,
                       fontSize: isUrn ? 13 : 16,
                       fontWeight: 600,
                       fontFamily: "'IBM Plex Mono', monospace",
@@ -369,12 +493,19 @@ export default function ManualEntryScreen({
                   />
                   {value && !isLoading && (
                     <button
+                      type="button"
                       onClick={handleClear}
                       title="Clear"
                       style={{
                         background: "#FFFFFF",
                         border: "none",
                         borderLeft: "1px solid #D6D3C6",
+                        padding: "0 12px",
+                        cursor: "pointer",
+                        color: "#8C897C",
+                        display: "flex",
+                        alignItems: "center",
+                        fontFamily: "inherit",
 
                         padding: "0 12px",
                         cursor: "pointer",
@@ -442,19 +573,23 @@ export default function ManualEntryScreen({
                             strokeLinecap="round"
                           />
                         </svg>
-                        Verifying...
+                        Verifying against ledger...
                       </>
                     ) : (
                       "Verify Credential"
                     )}
                   </BtnPrimary>
                   <button
+                    type="button"
                     onClick={onQRScan}
                     style={{
                       background: "none",
                       border: "none",
                       cursor: "pointer",
                       padding: 0,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
 
                       display: "inline-flex",
                       alignItems: "center",
@@ -644,6 +779,86 @@ export default function ManualEntryScreen({
           </div>
 
           {/* Sidebar */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div
+              style={{
+                background: "#FFFFFF",
+                border: "1px solid #D6D3C6",
+                borderRadius: 8,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  padding: "12px 20px",
+                  borderBottom: "1px solid #D6D3C6",
+                  background: "#F1F0EA",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#8C897C",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Where to find the ID
+                </span>
+              </div>
+              <div
+                style={{
+                  padding: "20px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                }}
+              >
+                {[
+                  "Printed below the QR code on the physical certificate",
+                  "Shown in the worker's NSP digital wallet app",
+                  "Begins with NSP- or urn:uuid:",
+                ].map((t) => (
+                  <div
+                    key={t}
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        background: "#B08D46",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        marginTop: 1,
+                      }}
+                    >
+                      <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                        <path
+                          d="M2 4.5l1.8 1.8L7 3"
+                          stroke="#24302E"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        color: "#5C5A50",
+                        lineHeight: 1.55,
+                      }}
+                    >
+                      {t}
           {!isLoading && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div
@@ -808,7 +1023,83 @@ export default function ManualEntryScreen({
                 ))}
               </div>
             </div>
-          )}
+
+            <div
+              style={{
+                background: "#24302E",
+                borderRadius: 8,
+                padding: "20px",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "#B08D46",
+                  letterSpacing: "0.07em",
+                  textTransform: "uppercase",
+                  marginBottom: 12,
+                }}
+              >
+                Quick Test IDs (Click to fill)
+              </p>
+              {[
+                { id: "NSP-004821", label: "Standard ID" },
+                {
+                  id: "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
+                  label: "Canonical URN",
+                },
+                { id: "NSP-T001", label: "Tampered test" },
+                { id: "NSP-R001", label: "Revoked test" },
+              ].map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => {
+                    setValue(d.id)
+                    setState("idle")
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "6px 0",
+                    border: "none",
+                    borderBottom: "1px solid rgba(241,240,234,0.07)",
+                    background: "none",
+                    width: "100%",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    color: "inherit",
+                  }}
+                >
+                  <code
+                    style={{
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: "rgba(241,240,234,0.75)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      maxWidth: 170,
+                    }}
+                  >
+                    {d.id}
+                  </code>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: "rgba(241,240,234,0.35)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {d.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </main>
 
