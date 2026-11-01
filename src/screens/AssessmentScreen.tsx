@@ -17,8 +17,14 @@ const UUID_REGEX =
 
 function ensureValidUuid(id: string): string {
   if (UUID_REGEX.test(id)) return id
+
   // Convert non-UUID IDs (e.g. integer or mock string) into valid UUID format
-  const clean = id.replace(/[^0-9a-f]/gi, "").padEnd(12, "0").slice(0, 12)
+
+  const clean = id
+    .replace(/[^0-9a-f]/gi, "")
+    .padEnd(12, "0")
+    .slice(0, 12)
+
   return `3fa85f64-5717-4562-b3fc-${clean}`
 }
 
@@ -69,22 +75,34 @@ function ModalOverlay({ children }: { children: React.ReactNode }) {
     <div
       style={{
         position: "fixed",
+
         inset: 0,
+
         background: "rgba(36,48,46,0.55)",
+
         display: "flex",
+
         alignItems: "center",
+
         justifyContent: "center",
+
         zIndex: 50,
       }}
     >
       <div
         style={{
           background: "#fff",
+
           border: "1px solid #D6D3C6",
+
           borderRadius: 8,
+
           padding: 32,
+
           maxWidth: 500,
+
           width: "90%",
+
           boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
         }}
       >
@@ -108,13 +126,21 @@ function getGrade(pct: number) {
 
 const GRADE_PILL: React.CSSProperties = {
   display: "inline-flex",
+
   alignItems: "center",
+
   padding: "0 12px",
+
   height: 32,
+
   background: "#E4E2D9",
+
   borderRadius: 999,
+
   fontSize: 14,
+
   fontWeight: 600,
+
   fontFamily: "Inter, sans-serif",
 }
 
@@ -179,6 +205,7 @@ export default function AssessmentScreen({
 
   const [feedbackMsg, setFeedbackMsg] = useState<{
     text: string
+
     type: "success" | "error"
   } | null>(null)
 
@@ -352,19 +379,23 @@ export default function AssessmentScreen({
       if (currentAssessment) {
         const res = await api.updateAssessment(currentAssessment.assessmentId, {
           score: totalScore,
+
           grade: grade.code,
         })
 
         setCurrentAssessment(
           res.assessment ?? {
             ...currentAssessment,
+
             score: totalScore,
+
             grade: grade.code,
           },
         )
 
         setFeedbackMsg({
           text: "Draft assessment updated successfully.",
+
           type: "success",
         })
       } else {
@@ -384,6 +415,7 @@ export default function AssessmentScreen({
           text: res.replayed
             ? "This draft was already saved."
             : "Draft assessment saved successfully.",
+
           type: "success",
         })
       }
@@ -401,6 +433,7 @@ export default function AssessmentScreen({
 
         setFeedbackMsg({
           text: "You are offline. Saved on this device and will sync automatically.",
+
           type: "success",
         })
       } else {
@@ -424,9 +457,11 @@ export default function AssessmentScreen({
       const a = await ensureAssessment()
 
       // Make sure the server has the scores currently on screen before submitting.
+
       if (currentAssessment) {
         await api.updateAssessment(a.assessmentId, {
           score: totalScore,
+
           grade: grade.code,
         })
       }
@@ -434,36 +469,50 @@ export default function AssessmentScreen({
       const res = await api.submitAssessment(a.assessmentId).catch(() => null)
 
       // Guide #6 §2: End-to-End Assessment to Blockchain Issuance
+
       // Pre-condition: Candidate must have passed assessment (Total Score >= 60%).
+
       let credentialId: string | undefined = a.credentialId
+
       let rootHash: string | null | undefined = a.rootHash
 
       if (totalScore >= 60) {
         const user = authStore.getState().user
+
         const hubLocationId = user?.hubLocationId ?? 1
+
         const hubIssuer = `did:nsp:hub:hub-${hubLocationId}`
 
         const theoryScore = Number(criteria.find((c) => c.id === 3)?.score || 0)
+
         const practicalScore = Number(
           criteria
+
             .filter((c) => c.id !== 3)
+
             .reduce((s, c) => s + (parseInt(c.score) || 0), 0),
         )
 
         try {
           const issueRes = await api.issueCredential({
             candidateId: ensureValidUuid(selected.id),
+
             credentialSubject: {
               skillName: selected.trade,
+
               issuer: hubIssuer,
+
               awardLevel: grade.label,
+
               practicalScore,
+
               theoryScore,
             },
           })
 
           if (issueRes.success && issueRes.data) {
             credentialId = issueRes.data.credential_id
+
             rootHash = issueRes.data.root_hash
           }
         } catch (issueErr: any) {
@@ -479,24 +528,35 @@ export default function AssessmentScreen({
         res?.assessment
           ? {
               ...res.assessment,
+
               score: totalScore,
+
               grade: grade.code,
+
               status: "PENDING_APPROVAL",
+
               credentialId,
+
               rootHash,
             }
           : {
               ...a,
+
               score: totalScore,
+
               grade: grade.code,
+
               status: "PENDING_APPROVAL",
+
               credentialId,
+
               rootHash,
             },
       )
 
       setFeedbackMsg({
         text: `Credential issued (${credentialId}) and stored pending Center Superintendent approval.`,
+
         type: "success",
       })
 
@@ -511,6 +571,7 @@ export default function AssessmentScreen({
 
         setFeedbackMsg({
           text: "You are offline. The draft is saved on this device; open it and submit once you are back online.",
+
           type: "success",
         })
       } else {
@@ -549,8 +610,11 @@ export default function AssessmentScreen({
         await enqueueAssessment(
           {
             candidateId: selected.id,
+
             score: totalScore,
+
             grade: grade.code,
+
             photo: file,
           },
 
@@ -561,11 +625,13 @@ export default function AssessmentScreen({
 
         setFeedbackMsg({
           text: "You are offline. Draft and photo are saved on this device and will sync automatically.",
+
           type: "success",
         })
       } else if (err instanceof ApiError && err.status === 409) {
         setFeedbackMsg({
           text: err.message || "This assessment already has an evidence photo.",
+
           type: "error",
         })
       } else {
@@ -601,18 +667,24 @@ export default function AssessmentScreen({
             }`,
 
             borderRadius: 6,
+
             padding: "12px 16px",
+
             marginBottom: 20,
 
             display: "flex",
+
             alignItems: "center",
+
             justifyContent: "space-between",
           }}
         >
           <span
             style={{
               fontSize: 13,
+
               color: feedbackMsg.type === "success" ? "#173404" : "#501313",
+
               fontWeight: 500,
             }}
           >
@@ -622,8 +694,11 @@ export default function AssessmentScreen({
             onClick={() => setFeedbackMsg(null)}
             style={{
               background: "none",
+
               border: "none",
+
               cursor: "pointer",
+
               color: "#5C5A50",
             }}
           >
@@ -637,19 +712,26 @@ export default function AssessmentScreen({
         <div
           style={{
             background: "#FCEBEB",
+
             border: "1px solid #A6453D",
+
             borderLeft: "4px solid #A6453D",
 
             borderRadius: "0 6px 6px 0",
+
             padding: "14px 18px",
+
             marginBottom: 24,
           }}
         >
           <div
             style={{
               fontSize: 14,
+
               fontWeight: 700,
+
               color: "#8C3B34",
+
               marginBottom: 4,
             }}
           >
@@ -658,8 +740,11 @@ export default function AssessmentScreen({
           <p
             style={{
               fontSize: 13,
+
               color: "#501313",
+
               margin: "0 0 10px",
+
               lineHeight: 1.5,
             }}
           >
@@ -676,8 +761,11 @@ export default function AssessmentScreen({
       <div
         style={{
           display: "flex",
+
           justifyContent: "space-between",
+
           alignItems: "flex-start",
+
           marginBottom: 24,
         }}
       >
@@ -686,9 +774,13 @@ export default function AssessmentScreen({
             className="display"
             style={{
               fontSize: 28,
+
               fontWeight: 400,
+
               color: "#24302E",
+
               margin: "0 0 4px",
+
               letterSpacing: -0.2,
             }}
           >
@@ -704,20 +796,29 @@ export default function AssessmentScreen({
             <span
               style={{
                 height: 34,
+
                 padding: "0 14px",
+
                 background:
                   assessmentStatus === "PENDING_APPROVAL"
                     ? "#F1E7D2"
                     : "#EAF3DE",
+
                 borderRadius: 4,
+
                 fontSize: 12,
+
                 fontWeight: 600,
+
                 color:
                   assessmentStatus === "PENDING_APPROVAL"
                     ? "#8C6F35"
                     : "#173404",
+
                 display: "inline-flex",
+
                 alignItems: "center",
+
                 gap: 6,
               }}
             >
@@ -754,7 +855,9 @@ export default function AssessmentScreen({
       <div
         style={{
           display: "grid",
+
           gridTemplateColumns: selected ? "320px 1fr" : "1fr",
+
           gap: 24,
         }}
       >
@@ -762,7 +865,9 @@ export default function AssessmentScreen({
         <div
           style={{
             background: "#fff",
+
             border: "1px solid #D6D3C6",
+
             borderRadius: 8,
           }}
         >
@@ -772,8 +877,11 @@ export default function AssessmentScreen({
             <h2
               style={{
                 fontSize: 15,
+
                 fontWeight: 600,
+
                 color: "#24302E",
+
                 margin: "0 0 12px",
               }}
             >
@@ -786,12 +894,19 @@ export default function AssessmentScreen({
               placeholder="Search name or CNIC…"
               style={{
                 width: "100%",
+
                 padding: "8px 12px",
+
                 border: "1px solid #D6D3C6",
+
                 borderRadius: 6,
+
                 fontSize: 13,
+
                 background: "#F1F0EA",
+
                 color: "#24302E",
+
                 fontFamily: "Inter, sans-serif",
               }}
             />
@@ -803,13 +918,17 @@ export default function AssessmentScreen({
                 onClick={() => handleSelectCandidate(c)}
                 style={{
                   width: "100%",
+
                   textAlign: "left",
+
                   padding: "14px 20px",
 
                   background: selected?.id === c.id ? "#F0F7FF" : "transparent",
 
                   border: "none",
+
                   borderBottom: "1px solid #F1EFE8",
+
                   cursor: "pointer",
 
                   borderLeft:
@@ -821,8 +940,11 @@ export default function AssessmentScreen({
                 <div
                   style={{
                     fontSize: 14,
+
                     fontWeight: 600,
+
                     color: "#24302E",
+
                     marginBottom: 2,
                   }}
                 >
@@ -831,7 +953,9 @@ export default function AssessmentScreen({
                 <div
                   style={{
                     fontSize: 12,
+
                     color: "#8C897C",
+
                     fontFamily: "IBM Plex Mono, monospace",
                   }}
                 >
@@ -846,8 +970,11 @@ export default function AssessmentScreen({
               <div
                 style={{
                   padding: "32px 20px",
+
                   textAlign: "center",
+
                   fontSize: 13,
+
                   color: "#8C897C",
                 }}
               >
@@ -864,23 +991,36 @@ export default function AssessmentScreen({
             <div
               style={{
                 background: "#fff",
+
                 border: "1px solid #D6D3C6",
+
                 borderRadius: 8,
+
                 padding: 20,
+
                 display: "flex",
+
                 alignItems: "center",
+
                 gap: 20,
               }}
             >
               <div
                 style={{
                   width: 56,
+
                   height: 56,
+
                   background: "#F1EFE8",
+
                   borderRadius: 6,
+
                   display: "flex",
+
                   alignItems: "center",
+
                   justifyContent: "center",
+
                   flexShrink: 0,
                 }}
               >
@@ -904,12 +1044,20 @@ export default function AssessmentScreen({
                 >
                   {selected.name}
                 </div>
-                <div style={{ display: "flex", gap: 24, marginTop: 4, flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 24,
+                    marginTop: 4,
+                    flexWrap: "wrap",
+                  }}
+                >
                   <span style={{ fontSize: 12, color: "#8C897C" }}>
                     CNIC:{" "}
                     <span
                       style={{
                         fontFamily: "IBM Plex Mono, monospace",
+
                         color: "#5C5A50",
                       }}
                     >
@@ -925,6 +1073,7 @@ export default function AssessmentScreen({
                     <span
                       style={{
                         fontFamily: "IBM Plex Mono, monospace",
+
                         color: "#5C5A50",
                       }}
                     >
@@ -937,7 +1086,9 @@ export default function AssessmentScreen({
                       <span
                         style={{
                           fontFamily: "IBM Plex Mono, monospace",
+
                           color: "#4C7A6E",
+
                           fontWeight: 600,
                         }}
                       >
@@ -950,9 +1101,13 @@ export default function AssessmentScreen({
               <span
                 style={{
                   display: "inline-flex",
+
                   alignItems: "center",
+
                   gap: 6,
+
                   height: 26,
+
                   padding: "0 10px",
 
                   background:
@@ -965,7 +1120,9 @@ export default function AssessmentScreen({
                           : "#F1EFE8",
 
                   borderRadius: 999,
+
                   fontSize: 12,
+
                   fontWeight: 600,
 
                   color:
@@ -988,21 +1145,27 @@ export default function AssessmentScreen({
             <div
               style={{
                 background: "#fff",
+
                 border: "1px solid #D6D3C6",
+
                 borderRadius: 8,
               }}
             >
               <div
                 style={{
                   padding: "16px 24px",
+
                   borderBottom: "1px solid #D6D3C6",
                 }}
               >
                 <h2
                   style={{
                     fontSize: 15,
+
                     fontWeight: 600,
+
                     color: "#24302E",
+
                     margin: 0,
                   }}
                 >
@@ -1014,18 +1177,26 @@ export default function AssessmentScreen({
                   <tr style={{ background: "#F1F0EA" }}>
                     {[
                       "Criteria",
+
                       "Maximum Score",
+
                       "Score Achieved",
+
                       "Percentage",
                     ].map((h) => (
                       <th
                         key={h}
                         style={{
                           padding: "10px 24px",
+
                           textAlign: "left",
+
                           fontSize: 12,
+
                           fontWeight: 600,
+
                           color: "#5C5A50",
+
                           borderBottom: "1px solid #D6D3C6",
                         }}
                       >
@@ -1048,7 +1219,9 @@ export default function AssessmentScreen({
                         <td
                           style={{
                             padding: "12px 24px",
+
                             fontSize: 14,
+
                             color: "#24302E",
                           }}
                         >
@@ -1057,8 +1230,11 @@ export default function AssessmentScreen({
                         <td
                           style={{
                             padding: "12px 24px",
+
                             fontSize: 14,
+
                             color: "#8C897C",
+
                             fontFamily: "IBM Plex Mono, monospace",
                           }}
                         >
@@ -1075,16 +1251,21 @@ export default function AssessmentScreen({
                             placeholder="—"
                             style={{
                               width: 72,
+
                               padding: "6px 10px",
+
                               border: "1px solid #D6D3C6",
 
                               borderRadius: 4,
+
                               fontSize: 14,
+
                               textAlign: "center",
 
                               fontFamily: "IBM Plex Mono, monospace",
 
                               background: isSubmitted ? "#F1F0EA" : "#fff",
+
                               color: "#24302E",
                             }}
                           />
@@ -1092,7 +1273,9 @@ export default function AssessmentScreen({
                         <td
                           style={{
                             padding: "12px 24px",
+
                             fontSize: 13,
+
                             color:
                               p !== null
                                 ? p >= 70
@@ -1101,6 +1284,7 @@ export default function AssessmentScreen({
                                     ? "#5C3300"
                                     : "#501313"
                                 : "#8C897C",
+
                             fontWeight: p !== null ? 600 : 400,
                           }}
                         >
@@ -1114,14 +1298,18 @@ export default function AssessmentScreen({
                   <tr
                     style={{
                       background: "#F1F0EA",
+
                       borderTop: "2px solid #D6D3C6",
                     }}
                   >
                     <td
                       style={{
                         padding: "14px 24px",
+
                         fontSize: 14,
+
                         fontWeight: 700,
+
                         color: "#24302E",
                       }}
                     >
@@ -1130,9 +1318,13 @@ export default function AssessmentScreen({
                     <td
                       style={{
                         padding: "14px 24px",
+
                         fontSize: 14,
+
                         fontWeight: 600,
+
                         color: "#8C897C",
+
                         fontFamily: "IBM Plex Mono, monospace",
                       }}
                     >
@@ -1141,9 +1333,13 @@ export default function AssessmentScreen({
                     <td
                       style={{
                         padding: "14px 24px",
+
                         fontSize: 16,
+
                         fontWeight: 700,
+
                         color: "#4C7A6E",
+
                         fontFamily: "IBM Plex Mono, monospace",
                       }}
                     >
@@ -1153,14 +1349,18 @@ export default function AssessmentScreen({
                       <div
                         style={{
                           display: "flex",
+
                           alignItems: "center",
+
                           gap: 10,
                         }}
                       >
                         <span
                           style={{
                             fontSize: 16,
+
                             fontWeight: 700,
+
                             color: "#4C7A6E",
                           }}
                         >
@@ -1182,16 +1382,22 @@ export default function AssessmentScreen({
             <div
               style={{
                 background: "#fff",
+
                 border: "1px solid #D6D3C6",
+
                 borderRadius: 8,
+
                 padding: 24,
               }}
             >
               <h2
                 style={{
                   fontSize: 15,
+
                   fontWeight: 600,
+
                   color: "#24302E",
+
                   margin: "0 0 16px",
                 }}
               >
@@ -1200,8 +1406,11 @@ export default function AssessmentScreen({
               <div
                 style={{
                   display: "flex",
+
                   gap: 12,
+
                   flexWrap: "wrap",
+
                   marginBottom: 16,
                 }}
               >
@@ -1210,12 +1419,19 @@ export default function AssessmentScreen({
                     key={i}
                     style={{
                       display: "flex",
+
                       alignItems: "center",
+
                       gap: 8,
+
                       padding: "6px 12px",
+
                       background: "#F1F0EA",
+
                       border: "1px solid #D6D3C6",
+
                       borderRadius: 4,
+
                       fontSize: 13,
                     }}
                   >
@@ -1238,10 +1454,15 @@ export default function AssessmentScreen({
                         }
                         style={{
                           background: "none",
+
                           border: "none",
+
                           cursor: "pointer",
+
                           color: "#8C897C",
+
                           padding: 0,
+
                           display: "flex",
                         }}
                       >
@@ -1265,17 +1486,25 @@ export default function AssessmentScreen({
                     onClick={() =>
                       setAttachments((a) => [
                         ...a,
+
                         `evidence_${a.length + 1}.jpg`,
                       ])
                     }
                     style={{
                       height: 32,
+
                       padding: "0 14px",
+
                       background: "#fff",
+
                       color: "#4C7A6E",
+
                       border: "1px dashed #4C7A6E",
+
                       borderRadius: 4,
+
                       fontSize: 13,
+
                       cursor: "pointer",
                     }}
                   >
@@ -1293,13 +1522,19 @@ export default function AssessmentScreen({
                   disabled={isProcessing}
                   style={{
                     height: 40,
+
                     padding: "0 24px",
+
                     background: isProcessing ? "#5C5A50" : "#4C7A6E",
 
                     color: "#fff",
+
                     border: "none",
+
                     borderRadius: 6,
+
                     fontSize: 14,
+
                     fontWeight: 600,
 
                     cursor: isProcessing ? "not-allowed" : "pointer",
@@ -1312,12 +1547,17 @@ export default function AssessmentScreen({
                   disabled={isProcessing}
                   style={{
                     height: 40,
+
                     padding: "0 24px",
+
                     background: "#fff",
+
                     color: "#24302E",
 
                     border: "1px solid #D6D3C6",
+
                     borderRadius: 6,
+
                     fontSize: 14,
 
                     cursor: isProcessing ? "not-allowed" : "pointer",
@@ -1332,11 +1572,17 @@ export default function AssessmentScreen({
           <div
             style={{
               display: "flex",
+
               alignItems: "center",
+
               justifyContent: "center",
+
               background: "#fff",
+
               border: "1px solid #D6D3C6",
+
               borderRadius: 8,
+
               padding: 64,
             }}
           >
@@ -1358,8 +1604,11 @@ export default function AssessmentScreen({
               <div
                 style={{
                   fontSize: 15,
+
                   fontWeight: 600,
+
                   color: "#24302E",
+
                   marginBottom: 4,
                 }}
               >
@@ -1380,8 +1629,11 @@ export default function AssessmentScreen({
           <h2
             style={{
               fontSize: 18,
+
               fontWeight: 700,
+
               color: "#24302E",
+
               margin: "0 0 8px",
             }}
           >
@@ -1390,30 +1642,41 @@ export default function AssessmentScreen({
           <p
             style={{
               fontSize: 13,
+
               color: "#5C5A50",
+
               margin: "0 0 20px",
+
               lineHeight: 1.6,
             }}
           >
-            This will compile the W3C Verifiable Credential, calculate its cryptographic
-            SHA-256 root hash, and issue the credential to the ledger as{" "}
-            <strong>PENDING_APPROVAL</strong> for Center Superintendent sign-off.
+            This will compile the W3C Verifiable Credential, calculate its
+            cryptographic SHA-256 root hash, and issue the credential to the
+            ledger as <strong>PENDING_APPROVAL</strong> for Center
+            Superintendent sign-off.
           </p>
 
           <div
             style={{
               background: "#F1F0EA",
+
               border: "1px solid #D6D3C6",
+
               borderRadius: 6,
+
               padding: "12px 16px",
+
               marginBottom: 24,
             }}
           >
             <div
               style={{
                 display: "grid",
+
                 gridTemplateColumns: "1fr 1fr",
+
                 gap: "8px 24px",
+
                 fontSize: 13,
               }}
             >
@@ -1436,7 +1699,9 @@ export default function AssessmentScreen({
                 <div
                   style={{
                     color: "#4C7A6E",
+
                     fontWeight: 700,
+
                     fontFamily: "IBM Plex Mono, monospace",
                   }}
                 >
@@ -1474,30 +1739,45 @@ export default function AssessmentScreen({
               disabled={isProcessing}
               style={{
                 flex: 1,
+
                 height: 40,
+
                 background: "#4C7A6E",
+
                 color: "#fff",
 
                 border: "none",
+
                 borderRadius: 6,
+
                 fontSize: 14,
+
                 fontWeight: 600,
 
                 cursor: isProcessing ? "not-allowed" : "pointer",
               }}
             >
-              {isProcessing ? "Issuing & Submitting…" : "Confirm & Issue Credential"}
+              {isProcessing
+                ? "Issuing & Submitting…"
+                : "Confirm & Issue Credential"}
             </button>
             <button
               onClick={() => setShowSubmitModal(false)}
               style={{
                 height: 40,
+
                 padding: "0 20px",
+
                 background: "#fff",
+
                 color: "#24302E",
+
                 border: "1px solid #D6D3C6",
+
                 borderRadius: 6,
+
                 fontSize: 14,
+
                 cursor: "pointer",
               }}
             >
