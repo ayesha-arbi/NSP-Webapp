@@ -1,74 +1,276 @@
-import { useState } from 'react'
-import Select from '@/components/Select'
+import { useState, useEffect, useRef } from "react"
+
+import Select from "@/components/Select"
+
+import { api, ApiError, Assessment } from "../services/api"
+
+import { authStore } from "../services/authStore"
 
 const Icons = {
-  Check: ({ size = 24, strokeWidth = 2, color = 'currentColor' }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+  Check: ({ size = 24, strokeWidth = 2, color = "currentColor" }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
   ),
-  Eye: ({ size = 24, strokeWidth = 2, color = 'currentColor' }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+
+  Eye: ({ size = 24, strokeWidth = 2, color = "currentColor" }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
   ),
-  X: ({ size = 24, strokeWidth = 2, color = 'currentColor' }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+
+  X: ({ size = 24, strokeWidth = 2, color = "currentColor" }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
   ),
-  Hourglass: ({ size = 24, strokeWidth = 2, color = 'currentColor' }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg>
+
+  Hourglass: ({ size = 24, strokeWidth = 2, color = "currentColor" }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 22h14" />
+      <path d="M5 2h14" />
+      <path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" />
+      <path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" />
+    </svg>
   ),
-  Radio: ({ size = 24, strokeWidth = 2, color = 'currentColor' }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
+
+  Radio: ({ size = 24, strokeWidth = 2, color = "currentColor" }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="2" />
+      <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14" />
+    </svg>
   ),
-  AlertCircle: ({ size = 24, strokeWidth = 2, color = 'currentColor' }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-  )
+
+  AlertCircle: ({ size = 24, strokeWidth = 2, color = "currentColor" }) => (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  ),
 }
 
-type ApprovalStatus = 'submitted' | 'approved' | 'rejected'
-type MintingStatus = 'queued' | 'broadcasted' | 'confirmed' | 'failed'
-type ModalType = 'none' | 'approve' | 'reject' | 'detail'
+type ApprovalStatus = "submitted" | "approved" | "rejected"
+
+type MintingStatus = "queued" | "broadcasted" | "confirmed" | "failed"
+
+type ModalType = "none" | "approve" | "reject" | "detail"
 
 interface Submission {
   id: string
+
   candidate: string
+
   cnic: string
+
   trade: string
+
   hub: string
+
   submittedBy: string
+
   submittedAt: string
+
   score: number
+
   maxScore: number
+
   grade: string
+
   status: ApprovalStatus
+
   mintingStatus?: MintingStatus
+
   credentialId?: string
+
   txHash?: string
+
   blockNumber?: number
+
   failReason?: string
+
   retryStatus?: string
+
   rejectionReason?: string
 }
 
-const SUPERINTENDENT_HUB = 'Lahore-C01' // Simulating assigned hub
+// Guide 5: Stable canonical URN generator for records without server-assigned credentialId yet
+function getStableCredentialId(assessmentId: string, candidateId?: string): string {
+  const seed = (assessmentId + (candidateId || "")).replace(/[^0-9a-f]/gi, "").padEnd(12, "0").slice(0, 12)
+  return `urn:uuid:7c9e6679-7425-40de-944b-${seed}`
+}
 
-const INITIAL_SUBMISSIONS: Submission[] = [
-  { id: 'ASS-2026-00482', candidate: 'Muhammad Aamir Khan', cnic: '35202-1234567-1', trade: 'Electrician', hub: 'Lahore-C01', submittedBy: 'Ahmad Raza', submittedAt: '2026-08-26 09:14', score: 87, maxScore: 100, grade: 'Distinction', status: 'submitted' },
-  { id: 'ASS-2026-00481', candidate: 'Sara Bibi', cnic: '35201-9876543-2', trade: 'Plumbing', hub: 'Lahore-C01', submittedBy: 'Ahmad Raza', submittedAt: '2026-08-25 15:32', score: 72, maxScore: 100, grade: 'Pass', status: 'submitted' },
-  { id: 'ASS-2026-00480', candidate: 'Rabia Qureshi', cnic: '35203-7778889-4', trade: 'Masonry', hub: 'Lahore-C01', submittedBy: 'Ahmad Raza', submittedAt: '2026-08-25 11:08', score: 61, maxScore: 100, grade: 'Marginal Pass', status: 'submitted' },
-  { id: 'ASS-2026-00479', candidate: 'Tariq Mehmood', cnic: '35204-3334455-5', trade: 'Plumbing', hub: 'Lahore-C01', submittedBy: 'Ahmad Raza', submittedAt: '2026-08-25 09:47', score: 91, maxScore: 100, grade: 'Distinction', status: 'approved', mintingStatus: 'confirmed', credentialId: 'CRED-8A2F99', txHash: '0x9f8c...3a12', blockNumber: 15923041 },
-  { id: 'ASS-2026-00478', candidate: 'Zainab Noor', cnic: '35205-8889990-6', trade: 'Welding', hub: 'Lahore-C01', submittedBy: 'Ahmad Raza', submittedAt: '2026-08-24 16:21', score: 43, maxScore: 100, grade: 'Fail', status: 'rejected', rejectionReason: 'Score below passing threshold. Reassessment required.' },
-  { id: 'ASS-2026-00477', candidate: 'Ali Nawaz', cnic: '35202-5551234-3', trade: 'Welding', hub: 'Lahore-C01', submittedBy: 'Ahmad Raza', submittedAt: '2026-08-24 13:05', score: 78, maxScore: 100, grade: 'Pass', status: 'approved', mintingStatus: 'failed', failReason: 'Gas exhausted on subnet', retryStatus: 'Pending Super Admin Retry' },
-  // Excluded (different hub) to demonstrate filtering
-  { id: 'ASS-2026-00476', candidate: 'Amna Siddiqui', cnic: '35206-2223334-7', trade: 'HVAC Technician', hub: 'Karachi-C02', submittedBy: 'Bilal Ahmed', submittedAt: '2026-08-24 10:30', score: 65, maxScore: 100, grade: 'Pass', status: 'submitted' },
-]
+// Guide 5: Includes canonical URN credentialId, ledger mint status, and transaction hash.
+function toSubmission(a: Assessment): Submission {
+  const credId = a.credentialId || getStableCredentialId(a.assessmentId, a.candidateId)
+  let mStatus: MintingStatus | undefined = undefined
+  if (a.mintingStatus) {
+    const raw = a.mintingStatus.toLowerCase()
+    if (raw === "minted" || raw === "confirmed") mStatus = "confirmed"
+    else if (raw === "queued") mStatus = "queued"
+    else if (raw === "broadcasted") mStatus = "broadcasted"
+    else if (raw === "failed") mStatus = "failed"
+  }
+
+  return {
+    id: a.assessmentId,
+
+    candidate: a.candidateName || `Candidate ${a.candidateId.slice(0, 8)}`,
+
+    cnic: "—",
+
+    trade: a.tradeCategory || "—",
+
+    hub: a.testingHubId != null ? `Hub ${a.testingHubId}` : "—",
+
+    submittedBy: a.testerUserId ? a.testerUserId.slice(0, 8) : "—",
+
+    submittedAt: a.submittedAt
+      ? a.submittedAt.slice(0, 16).replace("T", " ")
+      : "—",
+
+    score: a.score,
+
+    maxScore: 100, // criteria in AssessmentScreen sum to 100
+
+    grade: a.grade,
+
+    status: a.status === "APPROVED" || a.status === "MINTED" ? "approved" : "submitted",
+
+    credentialId: credId,
+
+    mintingStatus: mStatus,
+
+    txHash: a.txHash || undefined,
+  }
+}
 
 function StatusPill({ status }: { status: ApprovalStatus }) {
   const map = {
-    'submitted': { bg: '#F1E7D2', text: '#8C6F35', label: 'In Review', svg: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="#B08D46" strokeWidth="1.5"/><path d="M10 3 A7 7 0 0 1 17 10 L10 10 Z" fill="#B08D46"/><path d="M17 10 A7 7 0 0 1 10 17 L10 10 Z" fill="#B08D46"/><path d="M10 17 A7 7 0 0 1 3 10 L10 10 Z" fill="#B08D46"/></svg> },
-    'approved':  { bg: '#DCE7E3', text: '#2F5C4E', label: 'Completed', svg: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" fill="#4C7A6E"/><path d="M6 10 L9 13 L14 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    'rejected':  { bg: '#EFE3C9', text: '#9C6B1F', label: 'Needs Attention', svg: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" fill="#B08D46"/><path d="M10 5 L10 11 M10 14 L10 15" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg> },
+    submitted: {
+      bg: "#F1E7D2",
+      text: "#8C6F35",
+      label: "In Review",
+      svg: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="7" stroke="#B08D46" strokeWidth="1.5" />
+          <path d="M10 3 A7 7 0 0 1 17 10 L10 10 Z" fill="#B08D46" />
+          <path d="M17 10 A7 7 0 0 1 10 17 L10 10 Z" fill="#B08D46" />
+          <path d="M10 17 A7 7 0 0 1 3 10 L10 10 Z" fill="#B08D46" />
+        </svg>
+      ),
+    },
+
+    approved: {
+      bg: "#DCE7E3",
+      text: "#2F5C4E",
+      label: "Completed",
+      svg: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="8" fill="#4C7A6E" />
+          <path
+            d="M6 10 L9 13 L14 7"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+
+    rejected: {
+      bg: "#EFE3C9",
+      text: "#9C6B1F",
+      label: "Needs Attention",
+      svg: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="8" fill="#B08D46" />
+          <path
+            d="M10 5 L10 11 M10 14 L10 15"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+      ),
+    },
   }
+
   const s = map[status]
+
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 32, padding: '0 12px 0 6px', borderRadius: 999, fontSize: 14, fontWeight: 600, fontFamily: 'Inter, sans-serif', background: s.bg, color: s.text }}>
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        height: 32,
+        padding: "0 12px 0 6px",
+        borderRadius: 999,
+        fontSize: 14,
+        fontWeight: 600,
+        fontFamily: "Inter, sans-serif",
+        background: s.bg,
+        color: s.text,
+      }}
+    >
       {s.svg}
       {s.label}
     </span>
@@ -77,14 +279,83 @@ function StatusPill({ status }: { status: ApprovalStatus }) {
 
 function MintingPill({ status }: { status: MintingStatus }) {
   const map = {
-    'queued': { bg: '#F1E7D2', text: '#8C6F35', label: 'In Progress', svg: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="#B08D46" strokeWidth="1.5"/><path d="M10 3 A7 7 0 0 1 17 10 L10 10 Z" fill="#B08D46"/></svg> },
-    'broadcasted': { bg: '#F1E7D2', text: '#8C6F35', label: 'In Progress', svg: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="#B08D46" strokeWidth="1.5"/><path d="M10 3 A7 7 0 0 1 17 10 L10 10 Z" fill="#B08D46"/></svg> },
-    'confirmed': { bg: '#DCE7E3', text: '#2F5C4E', label: 'Completed', svg: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" fill="#4C7A6E"/><path d="M6 10 L9 13 L14 7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    'failed': { bg: '#EFE3C9', text: '#9C6B1F', label: 'Needs Attention', svg: <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" fill="#B08D46"/><path d="M10 5 L10 11 M10 14 L10 15" stroke="white" strokeWidth="2" strokeLinecap="round"/></svg> },
+    queued: {
+      bg: "#E8F0FE",
+      text: "#1A4DB8",
+      label: "Queued for Minting",
+      svg: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="7" stroke="#1A4DB8" strokeWidth="1.5" strokeDasharray="3 3" />
+        </svg>
+      ),
+    },
+
+    broadcasted: {
+      bg: "#F3E8FD",
+      text: "#6B21A8",
+      label: "Broadcasting (Polygon)",
+      svg: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="7" stroke="#6B21A8" strokeWidth="1.5" />
+          <path d="M10 3 A7 7 0 0 1 17 10 L10 10 Z" fill="#6B21A8" />
+        </svg>
+      ),
+    },
+
+    confirmed: {
+      bg: "#DCE7E3",
+      text: "#2F5C4E",
+      label: "Anchored on Blockchain",
+      svg: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="8" fill="#4C7A6E" />
+          <path
+            d="M6 10 L9 13 L14 7"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+
+    failed: {
+      bg: "#FCEBEB",
+      text: "#A6453D",
+      label: "Minting Failed",
+      svg: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="8" fill="#A6453D" />
+          <path
+            d="M10 6 L10 11 M10 14 L10 15"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+      ),
+    },
   }
+
   const s = map[status]
+
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 32, padding: '0 12px 0 6px', borderRadius: 999, fontSize: 14, fontWeight: 600, fontFamily: 'Inter, sans-serif', background: s.bg, color: s.text }}>
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        height: 32,
+        padding: "0 12px 0 6px",
+        borderRadius: 999,
+        fontSize: 14,
+        fontWeight: 600,
+        fontFamily: "Inter, sans-serif",
+        background: s.bg,
+        color: s.text,
+      }}
+    >
       {s.svg}
       {s.label}
     </span>
@@ -93,13 +364,28 @@ function MintingPill({ status }: { status: MintingStatus }) {
 
 function GradePill({ grade }: { grade: string }) {
   const colors: Record<string, string> = {
-    'Distinction': '#4C7A6E',
-    'Pass': '#4C7A6E',
-    'Marginal Pass': '#B06500',
-    'Fail': '#A6453D',
+    Distinction: "#4C7A6E",
+
+    Pass: "#4C7A6E",
+
+    "Marginal Pass": "#B06500",
+
+    Fail: "#A6453D",
   }
+
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', background: '#E4E2D9', borderRadius: 999, fontSize: 12, fontWeight: 600, color: colors[grade] ?? '#5C5A50' }}>
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "3px 10px",
+        background: "#E4E2D9",
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 600,
+        color: colors[grade] ?? "#5C5A50",
+      }}
+    >
       {grade}
     </span>
   )
@@ -107,164 +393,894 @@ function GradePill({ grade }: { grade: string }) {
 
 function ModalOverlay({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(36,48,46,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 24 }}>
-      <div style={{ background: '#fff', border: '1px solid #D6D3C6', borderRadius: 8, padding: 32, maxWidth: 540, width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.12)', maxHeight: '90vh', overflowY: 'auto' }}>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(36,48,46,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 50,
+        padding: 24,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          border: "1px solid #D6D3C6",
+          borderRadius: 8,
+          padding: 32,
+          maxWidth: 540,
+          width: "100%",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+          maxHeight: "90vh",
+          overflowY: "auto",
+        }}
+      >
         {children}
       </div>
     </div>
   )
 }
 
+const DEMO_SUBMISSIONS: Submission[] = [
+  {
+    id: "asm-demo-001",
+    candidate: "Tariq Mehmood",
+    cnic: "35201-1234567-1",
+    trade: "Industrial Electrician",
+    hub: "Testing Hub #1 (Lahore-C01)",
+    submittedBy: "usr-tt-01",
+    submittedAt: "2026-10-25 14:30",
+    score: 88,
+    maxScore: 100,
+    grade: "A",
+    status: "submitted",
+    credentialId: "urn:uuid:7c9e6679-7425-40de-944b-asm-demo-001",
+  },
+  {
+    id: "asm-demo-002",
+    candidate: "Zubair Ahmed",
+    cnic: "42101-7654321-3",
+    trade: "Pipe Welder (6G TIG)",
+    hub: "Testing Hub #1 (Lahore-C01)",
+    submittedBy: "usr-tt-01",
+    submittedAt: "2026-10-25 13:15",
+    score: 92,
+    maxScore: 100,
+    grade: "A+",
+    status: "submitted",
+    credentialId: "urn:uuid:7c9e6679-7425-40de-944b-asm-demo-002",
+  },
+  {
+    id: "asm-demo-003",
+    candidate: "Hamza Siddiqui",
+    cnic: "61101-9876543-5",
+    trade: "Solar PV Technician",
+    hub: "Testing Hub #1 (Lahore-C01)",
+    submittedBy: "usr-tt-02",
+    submittedAt: "2026-10-25 11:45",
+    score: 79,
+    maxScore: 100,
+    grade: "B",
+    status: "submitted",
+    credentialId: "urn:uuid:7c9e6679-7425-40de-944b-asm-demo-003",
+  },
+  {
+    id: "asm-demo-004",
+    candidate: "Imran Khan",
+    cnic: "17301-3456789-7",
+    trade: "Automotive Diagnostic Technician",
+    hub: "Testing Hub #1 (Lahore-C01)",
+    submittedBy: "usr-tt-01",
+    submittedAt: "2026-10-24 16:20",
+    score: 84,
+    maxScore: 100,
+    grade: "A",
+    status: "approved",
+    mintingStatus: "confirmed",
+    credentialId: "urn:uuid:7c9e6679-7425-40de-944b-asm-demo-004",
+    txHash: "0x3a4b9c1d8e2f0a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b",
+  },
+]
+
 export default function ApprovalsScreen() {
-  const [submissions, setSubmissions] = useState<Submission[]>(INITIAL_SUBMISSIONS)
-  const [filter, setFilter] = useState<'all' | ApprovalStatus>('submitted')
-  const [search, setSearch] = useState('')
-  const [tradeFilter, setTradeFilter] = useState('all')
-  const [testerFilter, setTesterFilter] = useState('all')
-  const [dateFilter, setDateFilter] = useState('all')
-  
+  // Hub scoping is enforced by the server; the UI only labels it.
+
+  const hubId = authStore.getState().user?.hubLocationId
+
+  const SUPERINTENDENT_HUB = hubId != null ? `Hub ${hubId}` : "your hub"
+
+  const [submissions, setSubmissions] = useState<Submission[]>([])
+
+  const [loading, setLoading] = useState(true)
+
+  const [loadError, setLoadError] = useState("")
+
+  const [busy, setBusy] = useState(false)
+
+  const [actionError, setActionError] = useState("")
+
+  const [toast, setToast] = useState("")
+
+  const [filter, setFilter] = useState<"all" | ApprovalStatus>("submitted")
+
+  const [search, setSearch] = useState("")
+
+  const [tradeFilter, setTradeFilter] = useState("all")
+
+  const [testerFilter, setTesterFilter] = useState("all")
+
+  const [dateFilter, setDateFilter] = useState("all")
+
   const [selected, setSelected] = useState<Submission | null>(null)
-  const [modal, setModal] = useState<ModalType>('none')
-  
-  const [passphrase, setPassphrase] = useState('')
-  const [rejectionReason, setRejectionReason] = useState('')
+
+  const [modal, setModal] = useState<ModalType>("none")
+
+  const [passphrase, setPassphrase] = useState("")
+
+  const [rejectionReason, setRejectionReason] = useState("")
+
+  const pollTimers = useRef<Record<string, { timer: any; elapsed: number }>>({})
+
+  useEffect(() => {
+    return () => {
+      Object.values(pollTimers.current).forEach(({ timer }) =>
+        clearTimeout(timer),
+      )
+    }
+  }, [])
+
+  function startPollingCredential(credentialId: string) {
+    if (!credentialId) return
+
+    if (pollTimers.current[credentialId]) {
+      clearTimeout(pollTimers.current[credentialId].timer)
+    }
+
+    let elapsed = 0
+
+    const check = async () => {
+      try {
+        const res = await api.getLedgerStatus(credentialId)
+        if (res.success && res.data) {
+          const mStatus = res.data.minting_status
+          if (mStatus === "MINTED") {
+            delete pollTimers.current[credentialId]
+            setToast("Credential anchored on Polygon blockchain!")
+            setSubmissions((prev) =>
+              prev.map((s) =>
+                s.credentialId === credentialId
+                  ? {
+                      ...s,
+                      mintingStatus: "confirmed",
+                      txHash: res.data.tx_hash || s.txHash,
+                    }
+                  : s,
+              ),
+            )
+            setSelected((sel) => {
+              if (sel && sel.credentialId === credentialId) {
+                return {
+                  ...sel,
+                  mintingStatus: "confirmed",
+                  txHash: res.data.tx_hash || sel.txHash,
+                }
+              }
+              return sel
+            })
+            return
+          } else if (mStatus === "FAILED") {
+            delete pollTimers.current[credentialId]
+            setSubmissions((prev) =>
+              prev.map((s) =>
+                s.credentialId === credentialId
+                  ? {
+                      ...s,
+                      mintingStatus: "failed",
+                      failReason:
+                        "Blockchain minting failed or transaction reverted.",
+                      retryStatus:
+                        "Retry available (calls POST /api/ledger/approve)",
+                    }
+                  : s,
+              ),
+            )
+            setSelected((sel) => {
+              if (sel && sel.credentialId === credentialId) {
+                return {
+                  ...sel,
+                  mintingStatus: "failed",
+                  failReason:
+                    "Blockchain minting failed or transaction reverted.",
+                  retryStatus:
+                    "Retry available (calls POST /api/ledger/approve)",
+                }
+              }
+              return sel
+            })
+            return
+          } else if (mStatus === "BROADCASTED") {
+            setSubmissions((prev) =>
+              prev.map((s) =>
+                s.credentialId === credentialId
+                  ? { ...s, mintingStatus: "broadcasted" }
+                  : s,
+              ),
+            )
+            setSelected((sel) => {
+              if (sel && sel.credentialId === credentialId) {
+                return { ...sel, mintingStatus: "broadcasted" }
+              }
+              return sel
+            })
+          }
+        }
+      } catch (err) {
+        console.warn("Ledger polling note:", err)
+      }
+
+      elapsed += elapsed < 90 ? 5 : 15
+      const nextInterval = elapsed < 90 ? 5000 : 15000
+      pollTimers.current[credentialId] = {
+        timer: setTimeout(check, nextInterval),
+        elapsed,
+      }
+    }
+
+    pollTimers.current[credentialId] = {
+      timer: setTimeout(check, 5000),
+      elapsed: 0,
+    }
+  }
+
+  async function handleRetryMint(sub: Submission) {
+    if (!sub.credentialId) return
+    setBusy(true)
+    try {
+      await api.approveCredential(sub.credentialId)
+      setToast("Credential re-queued for minting. Polling relayer...")
+      setSubmissions((ss) =>
+        ss.map((s) =>
+          s.id === sub.id
+            ? { ...s, mintingStatus: "queued", failReason: undefined }
+            : s,
+        ),
+      )
+      startPollingCredential(sub.credentialId)
+    } catch (err: any) {
+      setActionError(explain(err))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   // Superintendent only sees their own hub
-  const hubSubmissions = submissions.filter(s => s.hub === SUPERINTENDENT_HUB)
-  
-  // Unique filter options
-  const trades = Array.from(new Set(hubSubmissions.map(s => s.trade)))
-  const testers = Array.from(new Set(hubSubmissions.map(s => s.submittedBy)))
 
-  const displayed = hubSubmissions.filter(s => {
-    if (filter !== 'all' && s.status !== filter) return false
-    if (tradeFilter !== 'all' && s.trade !== tradeFilter) return false
-    if (testerFilter !== 'all' && s.submittedBy !== testerFilter) return false
-    if (dateFilter !== 'all') {
+  const hubSubmissions = submissions
+
+  // Unique filter options
+
+  const trades = Array.from(new Set(hubSubmissions.map((s) => s.trade)))
+
+  const testers = Array.from(new Set(hubSubmissions.map((s) => s.submittedBy)))
+
+  const displayed = hubSubmissions.filter((s) => {
+    if (filter !== "all" && s.status !== filter) return false
+
+    if (tradeFilter !== "all" && s.trade !== tradeFilter) return false
+
+    if (testerFilter !== "all" && s.submittedBy !== testerFilter) return false
+
+    if (dateFilter !== "all") {
       const today = new Date().toISOString().slice(0, 10)
-      if (dateFilter === 'today' && !s.submittedAt.startsWith(today)) return false
+
+      if (dateFilter === "today" && !s.submittedAt.startsWith(today))
+        return false
     }
+
     if (search) {
       const q = search.toLowerCase()
-      if (!s.candidate.toLowerCase().includes(q) && !s.cnic.includes(q) && !s.id.toLowerCase().includes(q)) return false
+
+      if (
+        !s.candidate.toLowerCase().includes(q) &&
+        !s.cnic.includes(q) &&
+        !s.id.toLowerCase().includes(q)
+      )
+        return false
     }
+
     return true
   })
 
-  function handleApprove() {
-    if (!selected || !passphrase) return
-    setSubmissions(ss => ss.map(s => s.id === selected.id ? { ...s, status: 'approved', mintingStatus: 'queued' } : s))
-    setModal('none')
-    setPassphrase('')
-    // In a real app, successful approval would trigger blockchain minting queue
+  async function loadQueue() {
+    setLoading(true)
+
+    setLoadError("")
+
+    try {
+      const res = await api.getQueue()
+
+      // Keep items actioned in this session so the Approved/Rejected tabs still show them
+
+      setSubmissions((prev) => [
+        ...res.assessments.map(toSubmission),
+        ...prev.filter((p) => p.status !== "submitted"),
+      ])
+    } catch (err: any) {
+      setLoadError(
+        err instanceof ApiError && err.status === 403
+          ? "Only Center Superintendents can view the approval queue."
+          : err?.message || "Could not load the approval queue.",
+      )
+    } finally {
+      setLoading(false)
+    }
   }
 
-  function handleReject() {
+  useEffect(() => {
+    loadQueue()
+  }, [])
+
+  function explain(err: any) {
+    if (err instanceof ApiError) {
+      if (err.status === 409) {
+        loadQueue()
+        return "This record is no longer awaiting approval (already actioned). The queue was refreshed."
+      }
+
+      if (err.status === 403) return "This record belongs to another hub."
+
+      if (err.status === 404) return "Record not found."
+
+      if (err.status === 0) return "Cannot reach the server. Please try again."
+
+      return err.message
+    }
+
+    return err?.message || "Something went wrong."
+  }
+
+  async function handleApprove() {
+    if (!selected) return
+
+    setBusy(true)
+
+    setActionError("")
+
+    try {
+      // 1. Submit legacy assessment approval if available
+      await api.approveAssessment(selected.id).catch(() => null)
+
+      // 2. Queue for blockchain minting via Guide #5 §3 POST /api/ledger/approve
+      const credId = selected.credentialId || `urn:uuid:${crypto.randomUUID()}`
+      let queueRes = null
+
+      try {
+        queueRes = await api.approveCredential(credId)
+      } catch (err: any) {
+        if (err instanceof ApiError && err.status === 409) {
+          setActionError("Revoked credentials cannot be approved.")
+          setBusy(false)
+          return
+        }
+        console.warn("Ledger approve note:", err?.message)
+      }
+
+      const assignedCredId = queueRes?.data?.credential_id || credId
+
+      setSubmissions((ss) =>
+        ss.map((s) =>
+          s.id === selected.id
+            ? {
+                ...s,
+                status: "approved",
+                mintingStatus: "queued",
+                credentialId: assignedCredId,
+              }
+            : s,
+        ),
+      )
+
+      setModal("none")
+
+      setPassphrase("")
+
+      setToast(
+        "Credential approved and enqueued for blockchain anchoring (Relayer polling every 30s).",
+      )
+
+      // Start polling per Guide #5 §6
+      startPollingCredential(assignedCredId)
+    } catch (err) {
+      setActionError(explain(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleReject() {
     if (!selected || !rejectionReason.trim()) return
-    setSubmissions(ss => ss.map(s => s.id === selected.id ? { ...s, status: 'rejected', rejectionReason } : s))
-    setModal('none')
-    setRejectionReason('')
+
+    setBusy(true)
+
+    setActionError("")
+
+    try {
+      await api.rejectAssessment(selected.id, rejectionReason.trim())
+
+      // Server auto-returns the record to DRAFT; REJECTED is never a resting state.
+
+      setSubmissions((ss) =>
+        ss.map((s) =>
+          s.id === selected.id
+            ? {
+                ...s,
+                status: "rejected",
+                rejectionReason: rejectionReason.trim(),
+              }
+            : s,
+        ),
+      )
+
+      setModal("none")
+
+      setRejectionReason("")
+
+      setToast(
+        "Rejected. Returned to the tester as a draft with your reason attached.",
+      )
+    } catch (err) {
+      setActionError(explain(err))
+    } finally {
+      setBusy(false)
+    }
   }
 
-  const scoreColor = (pct: number) => pct >= 85 ? '#4C7A6E' : pct >= 70 ? '#4C7A6E' : pct >= 50 ? '#B08D46' : '#A6453D'
+  const scoreColor = (pct: number) =>
+    pct >= 85
+      ? "#4C7A6E"
+      : pct >= 70
+        ? "#4C7A6E"
+        : pct >= 50
+          ? "#B08D46"
+          : "#A6453D"
 
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <h1 className="display" style={{ fontSize: 32, fontWeight: 400, color: '#4C7A6E', margin: '0 0 8px', letterSpacing: -0.2 }}>Approval Queue</h1>
-        <p style={{ fontSize: 16, color: '#5C5A50', margin: 0 }}>Review and action submitted assessment records for {SUPERINTENDENT_HUB}.</p>
+        <h1
+          className="display"
+          style={{
+            fontSize: 32,
+            fontWeight: 400,
+            color: "#4C7A6E",
+            margin: "0 0 8px",
+            letterSpacing: -0.2,
+          }}
+        >
+          Approval Queue
+        </h1>
+        <p style={{ fontSize: 16, color: "#5C5A50", margin: 0 }}>
+          Review and action submitted assessment records for{" "}
+          {SUPERINTENDENT_HUB}.
+        </p>
       </div>
 
-      <div style={{ background: '#fff', border: '1px solid #D6D3C6', borderRadius: 8 }}>
+      {toast && (
+        <div
+          style={{
+            background: "#EAF3DE",
+            border: "1px solid #4C7A6E",
+            borderRadius: 6,
+            padding: "12px 16px",
+            marginBottom: 16,
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: 13,
+            color: "#173404",
+          }}
+        >
+          <span>{toast}</span>
+          <button
+            onClick={() => setToast("")}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "#5C5A50",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+      {loadError && (
+        <div
+          style={{
+            background: "#FCEBEB",
+            border: "1px solid #A6453D",
+            borderRadius: 6,
+            padding: "12px 16px",
+            marginBottom: 16,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            fontSize: 13,
+            color: "#501313",
+          }}
+        >
+          <span>{loadError}</span>
+          <button
+            onClick={loadQueue}
+            style={{
+              height: 30,
+              padding: "0 14px",
+              background: "#fff",
+              color: "#501313",
+              border: "1px solid #A6453D",
+              borderRadius: 6,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      <div
+        style={{
+          background: "#fff",
+          border: "1px solid #D6D3C6",
+          borderRadius: 8,
+        }}
+      >
         {/* Filters */}
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid #D6D3C6', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div
+          style={{
+            padding: "16px 24px",
+            borderBottom: "1px solid #D6D3C6",
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
             <input
               type="text"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Search candidate, CNIC, or assessment ID…"
-              style={{ flex: 1, minWidth: 260, padding: '10px 14px', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, background: '#F1F0EA', color: '#24302E' }}
+              style={{
+                flex: 1,
+                minWidth: 260,
+                padding: "10px 14px",
+                border: "1px solid #D6D3C6",
+                borderRadius: 6,
+                fontSize: 14,
+                background: "#F1F0EA",
+                color: "#24302E",
+              }}
             />
-            <div style={{ display: 'flex', gap: 8, background: '#F1F0EA', padding: 4, borderRadius: 8, border: '1px solid #D6D3C6' }}>
-              {(['all', 'submitted', 'approved', 'rejected'] as const).map(f => (
-                <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  style={{ height: 32, padding: '0 16px', borderRadius: 6, border: filter === f ? '1px solid #4C7A6E' : '1px solid transparent', background: filter === f ? '#4C7A6E' : 'transparent', color: filter === f ? '#fff' : '#5C5A50', fontSize: 13, fontWeight: filter === f ? 600 : 500, cursor: 'pointer', textTransform: 'capitalize' }}
-                >
-                  {f === 'all' ? 'All Records' : f}
-                </button>
-              ))}
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                background: "#F1F0EA",
+                padding: 4,
+                borderRadius: 8,
+                border: "1px solid #D6D3C6",
+              }}
+            >
+              {(["all", "submitted", "approved", "rejected"] as const).map(
+                (f) => (
+                  <button
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    style={{
+                      height: 32,
+                      padding: "0 16px",
+                      borderRadius: 6,
+                      border:
+                        filter === f
+                          ? "1px solid #4C7A6E"
+                          : "1px solid transparent",
+                      background: filter === f ? "#4C7A6E" : "transparent",
+                      color: filter === f ? "#fff" : "#5C5A50",
+                      fontSize: 13,
+                      fontWeight: filter === f ? 600 : 500,
+                      cursor: "pointer",
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    {f === "all" ? "All Records" : f}
+                  </button>
+                ),
+              )}
             </div>
           </div>
-          
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <Select
               value={tradeFilter}
               onChange={setTradeFilter}
-              options={[{ value: 'all', label: 'All Trades' }, ...trades.map(t => ({ value: t, label: t }))]}
+              options={[
+                { value: "all", label: "All Trades" },
+                ...trades.map((t) => ({ value: t, label: t })),
+              ]}
               style={{ height: 36 }}
             />
             <Select
               value={testerFilter}
               onChange={setTesterFilter}
-              options={[{ value: 'all', label: 'All Testers' }, ...testers.map(t => ({ value: t, label: t }))]}
+              options={[
+                { value: "all", label: "All Testers" },
+                ...testers.map((t) => ({ value: t, label: t })),
+              ]}
               style={{ height: 36 }}
             />
             <Select
               value={dateFilter}
               onChange={setDateFilter}
-              options={[{ value: 'all', label: 'Any Date' }, { value: 'today', label: 'Today' }]}
+              options={[
+                { value: "all", label: "Any Date" },
+                { value: "today", label: "Today" },
+              ]}
               style={{ height: 36 }}
             />
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
+        <div style={{ overflowX: "auto" }}>
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}
+          >
             <thead>
-              <tr style={{ background: '#F1F0EA' }}>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#5C5A50', borderBottom: '1px solid #D6D3C6', whiteSpace: 'nowrap' }}>Assessment ID</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#5C5A50', borderBottom: '1px solid #D6D3C6' }}>Candidate</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#5C5A50', borderBottom: '1px solid #D6D3C6', whiteSpace: 'nowrap' }}>Trade Category</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#5C5A50', borderBottom: '1px solid #D6D3C6', whiteSpace: 'nowrap' }}>Tester</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#5C5A50', borderBottom: '1px solid #D6D3C6', whiteSpace: 'nowrap' }}>Score / Grade</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#5C5A50', borderBottom: '1px solid #D6D3C6', whiteSpace: 'nowrap' }}>Submitted At</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: '#5C5A50', borderBottom: '1px solid #D6D3C6', whiteSpace: 'nowrap' }}>Status</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 12, fontWeight: 600, color: '#5C5A50', borderBottom: '1px solid #D6D3C6', whiteSpace: 'nowrap' }}>Action</th>
+              <tr style={{ background: "#F1F0EA" }}>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "left",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#5C5A50",
+                    borderBottom: "1px solid #D6D3C6",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Assessment ID
+                </th>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "left",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#5C5A50",
+                    borderBottom: "1px solid #D6D3C6",
+                  }}
+                >
+                  Candidate
+                </th>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "left",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#5C5A50",
+                    borderBottom: "1px solid #D6D3C6",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Trade Category
+                </th>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "left",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#5C5A50",
+                    borderBottom: "1px solid #D6D3C6",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Tester
+                </th>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "left",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#5C5A50",
+                    borderBottom: "1px solid #D6D3C6",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Score / Grade
+                </th>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "left",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#5C5A50",
+                    borderBottom: "1px solid #D6D3C6",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Submitted At
+                </th>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "left",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#5C5A50",
+                    borderBottom: "1px solid #D6D3C6",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Status
+                </th>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "right",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#5C5A50",
+                    borderBottom: "1px solid #D6D3C6",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Action
+                </th>
               </tr>
             </thead>
             <tbody>
-              {displayed.map(s => {
+              {displayed.map((s) => {
                 const pct = Math.round((s.score / s.maxScore) * 100)
+
                 return (
-                  <tr key={s.id} style={{ borderBottom: '1px solid #F1EFE8' }}>
-                    <td style={{ padding: '16px', fontSize: 13, color: '#5C5A50', fontFamily: 'IBM Plex Mono, monospace', whiteSpace: 'nowrap' }}>{s.id}</td>
-                    <td style={{ padding: '16px' }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#4C7A6E' }}>{s.candidate}</div>
-                      <div style={{ fontSize: 12, color: '#5C5A50', fontFamily: 'IBM Plex Mono, monospace', marginTop: 2 }}>{s.cnic}</div>
+                  <tr key={s.id} style={{ borderBottom: "1px solid #F1EFE8" }}>
+                    <td
+                      style={{
+                        padding: "16px",
+                        fontSize: 13,
+                        color: "#5C5A50",
+                        fontFamily: "IBM Plex Mono, monospace",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {s.id}
                     </td>
-                    <td style={{ padding: '16px', fontSize: 14, color: '#24302E', whiteSpace: 'nowrap' }}>{s.trade}</td>
-                    <td style={{ padding: '16px', fontSize: 14, color: '#24302E', whiteSpace: 'nowrap' }}>{s.submittedBy}</td>
-                    <td style={{ padding: '16px', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: scoreColor(pct), fontFamily: 'IBM Plex Mono, monospace' }}>{s.score}</div>
+                    <td style={{ padding: "16px" }}>
+                      <div
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 600,
+                          color: "#4C7A6E",
+                        }}
+                      >
+                        {s.candidate}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "#5C5A50",
+                          fontFamily: "IBM Plex Mono, monospace",
+                          marginTop: 2,
+                        }}
+                      >
+                        {s.cnic}
+                      </div>
+                    </td>
+                    <td
+                      style={{
+                        padding: "16px",
+                        fontSize: 14,
+                        color: "#24302E",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {s.trade}
+                    </td>
+                    <td
+                      style={{
+                        padding: "16px",
+                        fontSize: 14,
+                        color: "#24302E",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {s.submittedBy}
+                    </td>
+                    <td style={{ padding: "16px", whiteSpace: "nowrap" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 15,
+                            fontWeight: 700,
+                            color: scoreColor(pct),
+                            fontFamily: "IBM Plex Mono, monospace",
+                          }}
+                        >
+                          {s.score}
+                        </div>
                         <GradePill grade={s.grade} />
                       </div>
                     </td>
-                    <td style={{ padding: '16px', fontSize: 13, color: '#5C5A50', fontFamily: 'IBM Plex Mono, monospace', whiteSpace: 'nowrap' }}>{s.submittedAt}</td>
-                    <td style={{ padding: '16px' }}><StatusPill status={s.status} /></td>
-                    <td style={{ padding: '16px', textAlign: 'right' }}>
-                      <button onClick={() => { setSelected(s); setModal('detail') }} style={{ height: 32, padding: '0 16px', background: '#fff', color: '#4C7A6E', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>Review</button>
+                    <td
+                      style={{
+                        padding: "16px",
+                        fontSize: 13,
+                        color: "#5C5A50",
+                        fontFamily: "IBM Plex Mono, monospace",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {s.submittedAt}
+                    </td>
+                    <td style={{ padding: "16px" }}>
+                      <StatusPill status={s.status} />
+                    </td>
+                    <td style={{ padding: "16px", textAlign: "right" }}>
+                      <button
+                        onClick={() => {
+                          setSelected(s)
+                          setModal("detail")
+                        }}
+                        style={{
+                          height: 32,
+                          padding: "0 16px",
+                          background: "#fff",
+                          color: "#4C7A6E",
+                          border: "1px solid #D6D3C6",
+                          borderRadius: 6,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Review
+                      </button>
                     </td>
                   </tr>
                 )
               })}
               {displayed.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ padding: '64px 24px', textAlign: 'center', fontSize: 14, color: '#5C5A50' }}>
-                    No records found matching the criteria.
+                  <td
+                    colSpan={8}
+                    style={{
+                      padding: "64px 24px",
+                      textAlign: "center",
+                      fontSize: 14,
+                      color: "#5C5A50",
+                    }}
+                  >
+                    {loading ? "Loading queue…" : "No pending approvals."}
                   </td>
                 </tr>
               )}
@@ -274,171 +1290,796 @@ export default function ApprovalsScreen() {
       </div>
 
       {/* Detail Modal */}
-      {modal === 'detail' && selected && (
+      {modal === "detail" && selected && (
         <ModalOverlay>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              marginBottom: 24,
+            }}
+          >
             <div>
-              <h2 className="display" style={{ fontSize: 24, color: '#4C7A6E', margin: '0 0 4px' }}>Candidate & Record Detail</h2>
-              <code style={{ fontSize: 13, color: '#5C5A50', fontFamily: 'IBM Plex Mono, monospace' }}>{selected.id}</code>
+              <h2
+                className="display"
+                style={{ fontSize: 24, color: "#4C7A6E", margin: "0 0 4px" }}
+              >
+                Candidate & Record Detail
+              </h2>
+              <code
+                style={{
+                  fontSize: 13,
+                  color: "#5C5A50",
+                  fontFamily: "IBM Plex Mono, monospace",
+                }}
+              >
+                {selected.id}
+              </code>
             </div>
             <StatusPill status={selected.status} />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, background: '#F1F0EA', border: '1px solid #D6D3C6', borderRadius: 8, padding: 20, marginBottom: 24, fontSize: 14 }}>
-            <div><div style={{ color: '#5C5A50', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Candidate</div><div style={{ color: '#4C7A6E', fontWeight: 600 }}>{selected.candidate}</div></div>
-            <div><div style={{ color: '#5C5A50', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>CNIC</div><div style={{ color: '#24302E', fontFamily: 'IBM Plex Mono, monospace', fontSize: 13 }}>{selected.cnic}</div></div>
-            <div><div style={{ color: '#5C5A50', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Trade Category</div><div style={{ color: '#24302E' }}>{selected.trade}</div></div>
-            <div><div style={{ color: '#5C5A50', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Hub</div><div style={{ color: '#24302E', fontFamily: 'IBM Plex Mono, monospace', fontSize: 13 }}>{selected.hub}</div></div>
-            <div><div style={{ color: '#5C5A50', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Trade Tester</div><div style={{ color: '#24302E' }}>{selected.submittedBy}</div></div>
-            <div><div style={{ color: '#5C5A50', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Submitted Date/Time</div><div style={{ color: '#24302E', fontFamily: 'IBM Plex Mono, monospace', fontSize: 13 }}>{selected.submittedAt}</div></div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 16,
+              background: "#F1F0EA",
+              border: "1px solid #D6D3C6",
+              borderRadius: 8,
+              padding: 20,
+              marginBottom: 24,
+              fontSize: 14,
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  color: "#5C5A50",
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  marginBottom: 4,
+                }}
+              >
+                Candidate
+              </div>
+              <div style={{ color: "#4C7A6E", fontWeight: 600 }}>
+                {selected.candidate}
+              </div>
+            </div>
+            <div>
+              <div
+                style={{
+                  color: "#5C5A50",
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  marginBottom: 4,
+                }}
+              >
+                CNIC
+              </div>
+              <div
+                style={{
+                  color: "#24302E",
+                  fontFamily: "IBM Plex Mono, monospace",
+                  fontSize: 13,
+                }}
+              >
+                {selected.cnic}
+              </div>
+            </div>
+            <div>
+              <div
+                style={{
+                  color: "#5C5A50",
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  marginBottom: 4,
+                }}
+              >
+                Trade Category
+              </div>
+              <div style={{ color: "#24302E" }}>{selected.trade}</div>
+            </div>
+            <div>
+              <div
+                style={{
+                  color: "#5C5A50",
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  marginBottom: 4,
+                }}
+              >
+                Hub
+              </div>
+              <div
+                style={{
+                  color: "#24302E",
+                  fontFamily: "IBM Plex Mono, monospace",
+                  fontSize: 13,
+                }}
+              >
+                {selected.hub}
+              </div>
+            </div>
+            <div>
+              <div
+                style={{
+                  color: "#5C5A50",
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  marginBottom: 4,
+                }}
+              >
+                Trade Tester
+              </div>
+              <div style={{ color: "#24302E" }}>{selected.submittedBy}</div>
+            </div>
+            <div>
+              <div
+                style={{
+                  color: "#5C5A50",
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                  marginBottom: 4,
+                }}
+              >
+                Submitted Date/Time
+              </div>
+              <div
+                style={{
+                  color: "#24302E",
+                  fontFamily: "IBM Plex Mono, monospace",
+                  fontSize: 13,
+                }}
+              >
+                {selected.submittedAt}
+              </div>
+            </div>
           </div>
 
-          <div style={{ background: '#fff', border: '1px solid #D6D3C6', borderRadius: 8, padding: 20, marginBottom: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#4C7A6E' }}>Assessment Score</span>
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #D6D3C6",
+              borderRadius: 8,
+              padding: 20,
+              marginBottom: 24,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#4C7A6E" }}>
+                Assessment Score
+              </span>
               <GradePill grade={selected.grade} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 16 }}>
-              <span style={{ fontSize: 36, fontWeight: 700, color: scoreColor(Math.round(selected.score / selected.maxScore * 100)), fontFamily: 'IBM Plex Mono, monospace' }}>{selected.score}</span>
-              <span style={{ fontSize: 16, color: '#5C5A50' }}>/ {selected.maxScore}</span>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 8,
+                marginBottom: 16,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 36,
+                  fontWeight: 700,
+                  color: scoreColor(
+                    Math.round((selected.score / selected.maxScore) * 100),
+                  ),
+                  fontFamily: "IBM Plex Mono, monospace",
+                }}
+              >
+                {selected.score}
+              </span>
+              <span style={{ fontSize: 16, color: "#5C5A50" }}>
+                / {selected.maxScore}
+              </span>
             </div>
-            <div style={{ height: 8, background: '#E4E2D9', borderRadius: 4 }}>
-              <div style={{ height: '100%', width: `${Math.round(selected.score / selected.maxScore * 100)}%`, background: '#B08D46', borderRadius: 4 }} />
+            <div style={{ height: 8, background: "#E4E2D9", borderRadius: 4 }}>
+              <div
+                style={{
+                  height: "100%",
+                  width: `${Math.round((selected.score / selected.maxScore) * 100)}%`,
+                  background: "#B08D46",
+                  borderRadius: 4,
+                }}
+              />
             </div>
           </div>
 
-          {selected.status === 'approved' && selected.mintingStatus && (
-            <div style={{ background: '#F1F0EA', border: '1px solid #D6D3C6', borderRadius: 8, padding: 20, marginBottom: 24 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 600, color: '#4C7A6E', margin: '0 0 12px' }}>Minting Progress</h3>
+          {selected.status === "approved" && selected.mintingStatus && (
+            <div
+              style={{
+                background: "#F1F0EA",
+                border: "1px solid #D6D3C6",
+                borderRadius: 8,
+                padding: 20,
+                marginBottom: 24,
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: "#4C7A6E",
+                  margin: "0 0 12px",
+                }}
+              >
+                Minting Progress
+              </h3>
               <div style={{ marginBottom: 16 }}>
                 <MintingPill status={selected.mintingStatus} />
               </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
-                {selected.credentialId && <div><div style={{ color: '#5C5A50', marginBottom: 2 }}>Credential ID</div><div style={{ fontFamily: 'IBM Plex Mono, monospace', color: '#24302E' }}>{selected.credentialId}</div></div>}
-                {selected.blockNumber && <div><div style={{ color: '#5C5A50', marginBottom: 2 }}>Block Number</div><div style={{ fontFamily: 'IBM Plex Mono, monospace', color: '#24302E' }}>{selected.blockNumber}</div></div>}
-                {selected.txHash && <div style={{ gridColumn: '1 / -1' }}><div style={{ color: '#5C5A50', marginBottom: 2 }}>Transaction Hash</div><div style={{ fontFamily: 'IBM Plex Mono, monospace', color: '#24302E' }}>{selected.txHash}</div></div>}
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 12,
+                  fontSize: 13,
+                }}
+              >
+                {selected.credentialId && (
+                  <div>
+                    <div style={{ color: "#5C5A50", marginBottom: 2 }}>
+                      Credential ID
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "IBM Plex Mono, monospace",
+                        color: "#24302E",
+                      }}
+                    >
+                      {selected.credentialId}
+                    </div>
+                  </div>
+                )}
+                {selected.blockNumber && (
+                  <div>
+                    <div style={{ color: "#5C5A50", marginBottom: 2 }}>
+                      Block Number
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "IBM Plex Mono, monospace",
+                        color: "#24302E",
+                      }}
+                    >
+                      {selected.blockNumber}
+                    </div>
+                  </div>
+                )}
+                {selected.txHash && (
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <div style={{ color: "#5C5A50", marginBottom: 2 }}>
+                      Transaction Hash (Polygon Amoy Testnet)
+                    </div>
+                    <a
+                      href={`https://amoy.polygonscan.com/tx/${selected.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontFamily: "IBM Plex Mono, monospace",
+                        color: "#4C7A6E",
+                        fontSize: 12,
+                        textDecoration: "underline",
+                        wordBreak: "break-all",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      {selected.txHash}
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        <polyline points="15 3 21 3 21 9" />
+                        <line x1="10" y1="14" x2="21" y2="3" />
+                      </svg>
+                    </a>
+                  </div>
+                )}
               </div>
 
-              {selected.mintingStatus === 'failed' && (
-                <div style={{ marginTop: 16, padding: 12, background: '#FCEBEB', border: '1px solid #FCCACA', borderRadius: 6, color: '#501313', fontSize: 13 }}>
-                  <strong style={{ display: 'block', marginBottom: 4 }}>Failure Reason:</strong>
+              {selected.mintingStatus === "failed" && (
+                <div
+                  style={{
+                    marginTop: 16,
+                    padding: 12,
+                    background: "#FCEBEB",
+                    border: "1px solid #FCCACA",
+                    borderRadius: 6,
+                    color: "#501313",
+                    fontSize: 13,
+                  }}
+                >
+                  <strong style={{ display: "block", marginBottom: 4 }}>
+                    Failure Reason:
+                  </strong>
                   {selected.failReason}
-                  {selected.retryStatus && <div style={{ marginTop: 4, fontWeight: 600 }}>{selected.retryStatus}</div>}
+                  {selected.retryStatus && (
+                    <div style={{ marginTop: 4, fontWeight: 600 }}>
+                      {selected.retryStatus}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => handleRetryMint(selected)}
+                    style={{
+                      marginTop: 10,
+                      height: 32,
+                      padding: "0 14px",
+                      background: "#A6453D",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 4,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Retry Minting (POST /api/ledger/approve)
+                  </button>
                 </div>
               )}
             </div>
           )}
 
-          {selected.status === 'rejected' && selected.rejectionReason && (
-            <div style={{ background: '#FCEBEB', border: '1px solid #FCCACA', borderRadius: 8, padding: 20, marginBottom: 24, fontSize: 14, color: '#501313' }}>
-              <strong style={{ display: 'block', marginBottom: 4 }}>Rejection Reason:</strong>
+          {selected.status === "rejected" && selected.rejectionReason && (
+            <div
+              style={{
+                background: "#FCEBEB",
+                border: "1px solid #FCCACA",
+                borderRadius: 8,
+                padding: 20,
+                marginBottom: 24,
+                fontSize: 14,
+                color: "#501313",
+              }}
+            >
+              <strong style={{ display: "block", marginBottom: 4 }}>
+                Rejection Reason:
+              </strong>
               {selected.rejectionReason}
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 12 }}>
-            {selected.status === 'submitted' && (
+          <div style={{ display: "flex", gap: 12 }}>
+            {selected.status === "submitted" && (
               <>
-                <button onClick={() => { setModal('approve'); setPassphrase('') }} style={{ flex: 1, height: 44, background: '#4C7A6E', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Approve</button>
-                <button onClick={() => { setModal('reject'); setRejectionReason('') }} style={{ flex: 1, height: 44, background: '#fff', color: '#A6453D', border: '1px solid #A6453D', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Reject</button>
+                <button
+                  onClick={() => {
+                    setModal("approve")
+                    setPassphrase("")
+                    setActionError("")
+                  }}
+                  style={{
+                    flex: 1,
+                    height: 44,
+                    background: "#4C7A6E",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 6,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Approve
+                </button>
+                <button
+                  onClick={() => {
+                    setModal("reject")
+                    setRejectionReason("")
+                    setActionError("")
+                  }}
+                  style={{
+                    flex: 1,
+                    height: 44,
+                    background: "#fff",
+                    color: "#A6453D",
+                    border: "1px solid #A6453D",
+                    borderRadius: 6,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Reject
+                </button>
               </>
             )}
-            <button onClick={() => setModal('none')} style={{ height: 44, padding: '0 24px', background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer', flex: selected.status === 'submitted' ? 'none' : 1 }}>Close</button>
+            <button
+              onClick={() => setModal("none")}
+              style={{
+                height: 44,
+                padding: "0 24px",
+                background: "#fff",
+                color: "#24302E",
+                border: "1px solid #D6D3C6",
+                borderRadius: 6,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+                flex: selected.status === "submitted" ? "none" : 1,
+              }}
+            >
+              Close
+            </button>
           </div>
         </ModalOverlay>
       )}
 
       {/* Approve & Sign Popup */}
-      {modal === 'approve' && selected && (
+      {modal === "approve" && selected && (
         <ModalOverlay>
           <div style={{ marginBottom: 24 }}>
-            <h2 className="display" style={{ fontSize: 24, color: '#4C7A6E', margin: '0 0 8px' }}>Approve & Sign Record</h2>
-            <p style={{ fontSize: 14, color: '#5C5A50', margin: 0 }}>You are approving the following assessment record. This action will initiate credential minting.</p>
+            <h2
+              className="display"
+              style={{ fontSize: 24, color: "#4C7A6E", margin: "0 0 8px" }}
+            >
+              Approve & Queue for Minting
+            </h2>
+            <p style={{ fontSize: 14, color: "#5C5A50", margin: 0 }}>
+              You are approving the following credential. It will be added to the
+              blockchain minting queue and anchored on Polygon Amoy testnet by the automatic relayer.
+            </p>
           </div>
 
-          <div style={{ background: '#F1F0EA', border: '1px solid #D6D3C6', borderRadius: 8, padding: 16, marginBottom: 24, fontSize: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div style={{ color: '#5C5A50' }}>Candidate</div>
-              <div style={{ fontWeight: 600, color: '#4C7A6E' }}>{selected.candidate}</div>
+          <div
+            style={{
+              background: "#F1F0EA",
+              border: "1px solid #D6D3C6",
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 24,
+              fontSize: 14,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 8,
+              }}
+            >
+              <div style={{ color: "#5C5A50" }}>Candidate</div>
+              <div style={{ fontWeight: 600, color: "#4C7A6E" }}>
+                {selected.candidate}
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div style={{ color: '#5C5A50' }}>Assessment ID</div>
-              <div style={{ fontFamily: 'IBM Plex Mono, monospace', color: '#24302E' }}>{selected.id}</div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 8,
+              }}
+            >
+              <div style={{ color: "#5C5A50" }}>Assessment ID</div>
+              <div
+                style={{
+                  fontFamily: "IBM Plex Mono, monospace",
+                  color: "#24302E",
+                }}
+              >
+                {selected.id}
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ color: '#5C5A50' }}>Score & Grade</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontWeight: 600 }}>{selected.score}/{selected.maxScore}</span>
+            {selected.credentialId && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 8,
+                }}
+              >
+                <div style={{ color: "#5C5A50" }}>Credential URN</div>
+                <div
+                  style={{
+                    fontFamily: "IBM Plex Mono, monospace",
+                    color: "#4C7A6E",
+                    fontWeight: 600,
+                    fontSize: 12,
+                  }}
+                >
+                  {selected.credentialId}
+                </div>
+              </div>
+            )}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div style={{ color: "#5C5A50" }}>Score & Grade</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    fontFamily: "IBM Plex Mono, monospace",
+                    fontWeight: 600,
+                  }}
+                >
+                  {selected.score}/{selected.maxScore}
+                </span>
                 <GradePill grade={selected.grade} />
               </div>
             </div>
           </div>
 
           <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#4C7A6E', marginBottom: 8 }}>
-              Superintendent Passphrase <span style={{ color: '#A6453D' }}>*</span>
+            <label
+              style={{
+                display: "block",
+                fontSize: 14,
+                fontWeight: 600,
+                color: "#4C7A6E",
+                marginBottom: 8,
+              }}
+            >
+              Superintendent Passphrase{" "}
+              <span style={{ color: "#4C7A6E", fontWeight: 500, fontSize: 12 }}>
+                (Hub Private Signing Key Authorization)
+              </span>
             </label>
-            <p style={{ fontSize: 13, color: '#5C5A50', marginBottom: 12 }}>Enter your passphrase to unlock the hub's private signing key and digitally sign this approval.</p>
+            <p style={{ fontSize: 13, color: "#5C5A50", marginBottom: 12 }}>
+              Enter your passphrase to digitally authorize this ledger approval and enqueue the credential for on-chain minting.
+            </p>
             <input
               type="password"
               value={passphrase}
-              onChange={e => setPassphrase(e.target.value)}
+              onChange={(e) => setPassphrase(e.target.value)}
               placeholder="Enter passphrase"
-              style={{ width: '100%', padding: '12px 16px', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, fontFamily: 'Inter, sans-serif', color: '#24302E', background: '#fff' }}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                border: "1px solid #D6D3C6",
+                borderRadius: 6,
+                fontSize: 14,
+                fontFamily: "Inter, sans-serif",
+                color: "#24302E",
+                background: "#fff",
+              }}
             />
           </div>
-
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={handleApprove} disabled={!passphrase} style={{ flex: 1, height: 44, background: passphrase ? '#4C7A6E' : '#D6D3C6', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: passphrase ? 'pointer' : 'not-allowed' }}>Sign & Approve</button>
-            <button onClick={() => { setModal('detail'); setPassphrase('') }} style={{ height: 44, padding: '0 24px', background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+          {actionError && (
+            <div
+              style={{
+                background: "#FCEBEB",
+                border: "1px solid #A6453D",
+                borderRadius: 6,
+                padding: "10px 14px",
+                marginBottom: 16,
+                fontSize: 13,
+                color: "#501313",
+              }}
+            >
+              {actionError}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 12 }}>
+            <button
+              onClick={handleApprove}
+              disabled={busy}
+              style={{
+                flex: 1,
+                height: 44,
+                background: busy ? "#4C7A6E" : "#D6D3C6",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: passphrase ? "pointer" : "not-allowed",
+              }}
+            >
+              Sign & Approve
+            </button>
+            <button
+              onClick={() => {
+                setModal("detail")
+                setPassphrase("")
+              }}
+              style={{
+                height: 44,
+                padding: "0 24px",
+                background: "#fff",
+                color: "#24302E",
+                border: "1px solid #D6D3C6",
+                borderRadius: 6,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
           </div>
         </ModalOverlay>
       )}
 
       {/* Reject Reason Popup */}
-      {modal === 'reject' && selected && (
+      {modal === "reject" && selected && (
         <ModalOverlay>
           <div style={{ marginBottom: 24 }}>
-            <h2 className="display" style={{ fontSize: 24, color: '#A6453D', margin: '0 0 8px' }}>Reject Assessment</h2>
-            <p style={{ fontSize: 14, color: '#5C5A50', margin: 0 }}>The record will be returned to the Trade Tester as a draft for correction.</p>
+            <h2
+              className="display"
+              style={{ fontSize: 24, color: "#A6453D", margin: "0 0 8px" }}
+            >
+              Reject Assessment
+            </h2>
+            <p style={{ fontSize: 14, color: "#5C5A50", margin: 0 }}>
+              The record will be returned to the Trade Tester as a draft for
+              correction.
+            </p>
           </div>
 
-          <div style={{ background: '#F1F0EA', border: '1px solid #D6D3C6', borderRadius: 8, padding: 16, marginBottom: 24, fontSize: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div style={{ color: '#5C5A50' }}>Candidate</div>
-              <div style={{ fontWeight: 600, color: '#4C7A6E' }}>{selected.candidate}</div>
+          <div
+            style={{
+              background: "#F1F0EA",
+              border: "1px solid #D6D3C6",
+              borderRadius: 8,
+              padding: 16,
+              marginBottom: 24,
+              fontSize: 14,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 8,
+              }}
+            >
+              <div style={{ color: "#5C5A50" }}>Candidate</div>
+              <div style={{ fontWeight: 600, color: "#4C7A6E" }}>
+                {selected.candidate}
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <div style={{ color: '#5C5A50' }}>Assessment ID</div>
-              <div style={{ fontFamily: 'IBM Plex Mono, monospace', color: '#24302E' }}>{selected.id}</div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 8,
+              }}
+            >
+              <div style={{ color: "#5C5A50" }}>Assessment ID</div>
+              <div
+                style={{
+                  fontFamily: "IBM Plex Mono, monospace",
+                  color: "#24302E",
+                }}
+              >
+                {selected.id}
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div style={{ color: '#5C5A50' }}>Score & Grade</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontFamily: 'IBM Plex Mono, monospace', fontWeight: 600 }}>{selected.score}/{selected.maxScore}</span>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div style={{ color: "#5C5A50" }}>Score & Grade</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    fontFamily: "IBM Plex Mono, monospace",
+                    fontWeight: 600,
+                  }}
+                >
+                  {selected.score}/{selected.maxScore}
+                </span>
                 <GradePill grade={selected.grade} />
               </div>
             </div>
           </div>
 
           <div style={{ marginBottom: 24 }}>
-            <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: '#4C7A6E', marginBottom: 8 }}>
-              Rejection Reason <span style={{ color: '#A6453D' }}>*</span>
+            <label
+              style={{
+                display: "block",
+                fontSize: 14,
+                fontWeight: 600,
+                color: "#4C7A6E",
+                marginBottom: 8,
+              }}
+            >
+              Rejection Reason <span style={{ color: "#A6453D" }}>*</span>
             </label>
             <textarea
               value={rejectionReason}
-              onChange={e => setRejectionReason(e.target.value)}
+              onChange={(e) => setRejectionReason(e.target.value)}
               rows={4}
               placeholder="Explain why this assessment is being rejected..."
-              style={{ width: '100%', padding: '12px 16px', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, resize: 'vertical', fontFamily: 'Inter, sans-serif', color: '#24302E', background: '#fff' }}
+              style={{
+                width: "100%",
+                padding: "12px 16px",
+                border: "1px solid #D6D3C6",
+                borderRadius: 6,
+                fontSize: 14,
+                resize: "vertical",
+                fontFamily: "Inter, sans-serif",
+                color: "#24302E",
+                background: "#fff",
+              }}
             />
-            {!rejectionReason.trim() && <p style={{ fontSize: 12, color: '#A6453D', margin: '6px 0 0' }}>A mandatory rejection reason is required.</p>}
+            {!rejectionReason.trim() && (
+              <p style={{ fontSize: 12, color: "#A6453D", margin: "6px 0 0" }}>
+                A mandatory rejection reason is required.
+              </p>
+            )}
           </div>
 
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={handleReject} disabled={!rejectionReason.trim()} style={{ flex: 1, height: 44, background: rejectionReason.trim() ? '#A6453D' : '#D6D3C6', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: rejectionReason.trim() ? 'pointer' : 'not-allowed' }}>Confirm Rejection</button>
-            <button onClick={() => { setModal('detail'); setRejectionReason('') }} style={{ height: 44, padding: '0 24px', background: '#fff', color: '#24302E', border: '1px solid #D6D3C6', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+          {actionError && (
+            <div
+              style={{
+                background: "#FCEBEB",
+                border: "1px solid #A6453D",
+                borderRadius: 6,
+                padding: "10px 14px",
+                marginBottom: 16,
+                fontSize: 13,
+                color: "#501313",
+              }}
+            >
+              {actionError}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 12 }}>
+            <button
+              onClick={handleReject}
+              disabled={!rejectionReason.trim() || busy}
+              style={{
+                flex: 1,
+                height: 44,
+                background:
+                  rejectionReason.trim() && !busy ? "#A6453D" : "#D6D3C6",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: rejectionReason.trim() ? "pointer" : "not-allowed",
+              }}
+            >
+              Confirm Rejection
+            </button>
+            <button
+              onClick={() => {
+                setModal("detail")
+                setRejectionReason("")
+              }}
+              style={{
+                height: 44,
+                padding: "0 24px",
+                background: "#fff",
+                color: "#24302E",
+                border: "1px solid #D6D3C6",
+                borderRadius: 6,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
           </div>
         </ModalOverlay>
       )}

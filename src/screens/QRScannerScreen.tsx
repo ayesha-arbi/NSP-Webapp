@@ -243,6 +243,74 @@ export default function QRScannerScreen({
     // Reset file input
     e.target.value = ""
   }
+import { useState, useRef, useEffect } from "react"
+
+import NavBar from "../components/NavBar"
+
+import Footer from "../components/Footer"
+
+import { BtnPrimary, BtnSecondary } from "../components/Btn"
+
+interface Props {
+  onBack: () => void
+
+  onManualEntry: () => void
+
+  onScanSuccess: (credentialId: string) => void
+}
+
+type ScanState = "permission" | "scanning" | "error-notdetected" | "error-format"
+
+export default function QRScannerScreen({
+  onBack,
+
+  onManualEntry,
+
+  onScanSuccess,
+}: Props) {
+  const [scanState, setScanState] = useState<ScanState>("permission")
+
+  const [denied, setDenied] = useState(false)
+  const [streamActive, setStreamActive] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  useEffect(() => {
+    let activeStream: MediaStream | null = null
+
+    if (scanState === "scanning") {
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.mediaDevices &&
+        typeof navigator.mediaDevices.getUserMedia === "function"
+      ) {
+        navigator.mediaDevices
+          .getUserMedia({ video: { facingMode: "environment" } })
+          .then((stream) => {
+            activeStream = stream
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream
+              videoRef.current.play().catch(() => {})
+            }
+            setStreamActive(true)
+          })
+          .catch((err) => {
+            console.info(
+              "Hardware camera unavailable or denied, falling back to simulated viewfinder:",
+              err?.message,
+            )
+            setStreamActive(false)
+          })
+      }
+    } else {
+      setStreamActive(false)
+    }
+
+    return () => {
+      if (activeStream) {
+        activeStream.getTracks().forEach((track) => track.stop())
+      }
+    }
+  }, [scanState])
 
   return (
     <div
@@ -250,12 +318,18 @@ export default function QRScannerScreen({
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
+
+        display: "flex",
+
+        flexDirection: "column",
+
         background: "#F1F0EA",
       }}
     >
       <NavBar
         breadcrumbs={[
           { label: "Verify a Credential", onClick: onBack },
+
           { label: "Scan QR Code" },
         ]}
       />
@@ -277,6 +351,29 @@ export default function QRScannerScreen({
               fontWeight: 500,
               cursor: "pointer",
               marginBottom: 20,
+
+              alignItems: "center",
+
+              gap: 6,
+
+              background: "none",
+
+              border: "1px solid rgba(241,240,234,0.2)",
+
+              borderRadius: 6,
+
+              padding: "6px 12px",
+
+              color: "rgba(241,240,234,0.7)",
+
+              fontSize: 13,
+
+              fontWeight: 500,
+
+              cursor: "pointer",
+
+              marginBottom: 20,
+
               fontFamily: "inherit",
             }}
             onMouseEnter={(e) =>
@@ -304,6 +401,15 @@ export default function QRScannerScreen({
               fontWeight: 600,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
+
+              fontSize: 12,
+
+              fontWeight: 600,
+
+              letterSpacing: "0.08em",
+
+              textTransform: "uppercase",
+
               marginBottom: 12,
             }}
           >
@@ -315,6 +421,13 @@ export default function QRScannerScreen({
               fontSize: 28,
               fontWeight: 700,
               lineHeight: 1.2,
+
+              fontSize: 28,
+
+              fontWeight: 700,
+
+              lineHeight: 1.2,
+
               marginBottom: 8,
             }}
           >
@@ -329,6 +442,13 @@ export default function QRScannerScreen({
           >
             Hold the worker&apos;s certificate or digital wallet up to your
             camera.
+
+              fontSize: 14,
+
+              lineHeight: 1.6,
+            }}
+          >
+            Hold the worker's certificate or digital wallet up to your camera.
           </p>
         </div>
       </div>
@@ -342,6 +462,15 @@ export default function QRScannerScreen({
             display: "grid",
             gridTemplateColumns: "1fr 300px",
             gap: 24,
+
+            margin: "0 auto",
+
+            display: "grid",
+
+            gridTemplateColumns: "1fr 300px",
+
+            gap: 24,
+
             alignItems: "stretch",
           }}
         >
@@ -353,6 +482,15 @@ export default function QRScannerScreen({
               borderRadius: 8,
               overflow: "hidden",
               display: "flex",
+
+              border: "1px solid #D6D3C6",
+
+              borderRadius: 8,
+
+              overflow: "hidden",
+
+              display: "flex",
+
               flexDirection: "column",
             }}
           >
@@ -370,6 +508,18 @@ export default function QRScannerScreen({
                     justifyContent: "center",
                     gap: 16,
                     padding: 24,
+
+                    flex: 1,
+
+                    display: "flex",
+
+                    flexDirection: "column",
+
+                    alignItems: "center",
+
+                    justifyContent: "center",
+
+                    gap: 16,
                   }}
                 >
                   <div
@@ -380,6 +530,17 @@ export default function QRScannerScreen({
                       border: "2px solid rgba(176,141,70,0.4)",
                       display: "flex",
                       alignItems: "center",
+
+                      height: 72,
+
+                      borderRadius: "50%",
+
+                      border: "2px solid rgba(176,141,70,0.4)",
+
+                      display: "flex",
+
+                      alignItems: "center",
+
                       justifyContent: "center",
                     }}
                   >
@@ -411,6 +572,18 @@ export default function QRScannerScreen({
                   >
                     Camera access is needed to scan the worker&apos;s credential
                     QR code
+                      color: "rgba(241,240,234,0.5)",
+
+                      fontSize: 14,
+
+                      textAlign: "center",
+
+                      maxWidth: 260,
+
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    Camera access is needed to scan the QR code
                   </p>
                 </div>
                 <div
@@ -437,6 +610,23 @@ export default function QRScannerScreen({
                     </BtnSecondary>
                     <BtnSecondary onClick={onManualEntry}>
                       Enter ID manually
+
+                      color: "#5C5A50",
+
+                      lineHeight: 1.6,
+
+                      marginBottom: 20,
+                    }}
+                  >
+                    Allow camera access to scan QR codes. Your camera feed is
+                    never stored or transmitted.
+                  </p>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <BtnPrimary onClick={() => setScanState("scanning")}>
+                      Allow camera access
+                    </BtnPrimary>
+                    <BtnSecondary onClick={() => setDenied(true)}>
+                      Cancel
                     </BtnSecondary>
                   </div>
                 </div>
@@ -460,6 +650,15 @@ export default function QRScannerScreen({
                     fontSize: 18,
                     fontWeight: 700,
                     color: "#24302E",
+              <div style={{ padding: "24px", borderLeft: "3px solid #A6453D" }}>
+                <p
+                  style={{
+                    fontSize: 15,
+
+                    fontWeight: 700,
+
+                    color: "#24302E",
+
                     marginBottom: 8,
                   }}
                 >
@@ -484,6 +683,27 @@ export default function QRScannerScreen({
                   <BtnSecondary onClick={() => fileInputRef.current?.click()}>
                     Upload QR image
                   </BtnSecondary>
+
+                    color: "#5C5A50",
+
+                    lineHeight: 1.6,
+
+                    marginBottom: 20,
+                  }}
+                >
+                  Camera permission was not granted. You can allow it in your
+                  browser settings, or use a Credential ID instead.
+                </p>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <BtnPrimary
+                    onClick={() => {
+                      setDenied(false)
+
+                      setScanState("permission")
+                    }}
+                  >
+                    Try again
+                  </BtnPrimary>
                   <BtnSecondary onClick={onManualEntry}>
                     Enter Credential ID instead
                   </BtnSecondary>
@@ -499,10 +719,13 @@ export default function QRScannerScreen({
                     background: "#18201F",
                     flex: 1,
                     minHeight: 380,
+                    background: "#24302E",
+                    flex: 1,
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
+                    gap: 16,
                     position: "relative",
                     overflow: "hidden",
                   }}
@@ -530,6 +753,51 @@ export default function QRScannerScreen({
                       height: 220,
                       zIndex: 2,
                     }}
+                  <video
+                    ref={videoRef}
+                    playsInline
+                    muted
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      opacity: streamActive ? 1 : 0,
+                      transition: "opacity 0.3s ease",
+                      zIndex: 1,
+                    }}
+                  />
+                  {streamActive && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 12,
+                        left: 12,
+                        zIndex: 10,
+                        background: "rgba(0,0,0,0.65)",
+                        color: "#5DCAA5",
+                        fontSize: 11,
+                        padding: "3px 8px",
+                        borderRadius: 4,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: "#5DCAA5",
+                        }}
+                      />
+                      Live Camera
+                    </div>
+                  )}
+                  <div
+                    style={{ position: "relative", width: 220, height: 220 }}
                   >
                     {[
                       {
@@ -554,6 +822,41 @@ export default function QRScannerScreen({
                         bottom: 0,
                         right: 0,
                         borderBottom: "3px solid #B08D46",
+
+                        left: 0,
+
+                        borderTop: "3px solid #B08D46",
+
+                        borderLeft: "3px solid #B08D46",
+                      },
+
+                      {
+                        top: 0,
+
+                        right: 0,
+
+                        borderTop: "3px solid #B08D46",
+
+                        borderRight: "3px solid #B08D46",
+                      },
+
+                      {
+                        bottom: 0,
+
+                        left: 0,
+
+                        borderBottom: "3px solid #B08D46",
+
+                        borderLeft: "3px solid #B08D46",
+                      },
+
+                      {
+                        bottom: 0,
+
+                        right: 0,
+
+                        borderBottom: "3px solid #B08D46",
+
                         borderRight: "3px solid #B08D46",
                       },
                     ].map((s, i) => (
@@ -564,6 +867,11 @@ export default function QRScannerScreen({
                             position: "absolute",
                             width: 28,
                             height: 28,
+
+                            width: 28,
+
+                            height: 28,
+
                             ...s,
                           } as React.CSSProperties
                         }
@@ -625,6 +933,91 @@ export default function QRScannerScreen({
                     <BtnSecondary onClick={onManualEntry}>
                       Enter ID manually
                     </BtnSecondary>
+
+                        left: 4,
+
+                        right: 4,
+
+                        height: 2,
+
+                        background: "#B08D46",
+
+                        animation: "scanline 1.8s ease-in-out infinite",
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+
+                        inset: 24,
+
+                        display: "grid",
+
+                        gridTemplateColumns: "repeat(5,1fr)",
+
+                        gap: 3,
+
+                        opacity: 0.08,
+                      }}
+                    >
+                      {Array.from({ length: 25 }).map((_, i) => (
+                        <div
+                          key={i}
+                          style={{ background: "white", borderRadius: 1 }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <p
+                    style={{
+                      color: "rgba(241,240,234,0.6)",
+
+                      fontSize: 13,
+
+                      fontWeight: 500,
+                    }}
+                  >
+                    Position the QR code inside the frame
+                  </p>
+                </div>
+                <div
+                  style={{
+                    padding: "20px 24px",
+
+                    display: "flex",
+
+                    alignItems: "center",
+
+                    justifyContent: "space-between",
+
+                    flexWrap: "wrap",
+
+                    gap: 12,
+
+                    borderTop: "1px solid #D6D3C6",
+                  }}
+                >
+                  <BtnSecondary onClick={() => setScanState("permission")}>
+                    Cancel
+                  </BtnSecondary>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <BtnSecondary
+                      onClick={() => setScanState("error-notdetected")}
+                    >
+                      Simulate error
+                    </BtnSecondary>
+                    <BtnSecondary onClick={() => onScanSuccess("NSP-004821")}>
+                      Scan Legacy ID
+                    </BtnSecondary>
+                    <BtnPrimary
+                      onClick={() =>
+                        onScanSuccess(
+                          "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
+                        )
+                      }
+                    >
+                      Scan Guide #5 URN
+                    </BtnPrimary>
                   </div>
                 </div>
               </>
@@ -644,6 +1037,18 @@ export default function QRScannerScreen({
                     justifyContent: "center",
                     gap: 12,
                     padding: 24,
+
+                    flex: 1,
+
+                    display: "flex",
+
+                    flexDirection: "column",
+
+                    alignItems: "center",
+
+                    justifyContent: "center",
+
+                    gap: 12,
                   }}
                 >
                   <div
@@ -654,6 +1059,17 @@ export default function QRScannerScreen({
                       border: "2px solid rgba(176,141,70,0.4)",
                       display: "flex",
                       alignItems: "center",
+
+                      height: 56,
+
+                      borderRadius: "50%",
+
+                      border: "2px solid rgba(176,141,70,0.4)",
+
+                      display: "flex",
+
+                      alignItems: "center",
+
                       justifyContent: "center",
                     }}
                   >
@@ -667,6 +1083,7 @@ export default function QRScannerScreen({
                     </svg>
                   </div>
                   <p style={{ color: "rgba(241,240,234,0.7)", fontSize: 14 }}>
+                  <p style={{ color: "rgba(241,240,234,0.5)", fontSize: 13 }}>
                     QR code could not be detected
                   </p>
                 </div>
@@ -678,6 +1095,11 @@ export default function QRScannerScreen({
                       fontSize: 15,
                       fontWeight: 700,
                       color: "#24302E",
+
+                      fontWeight: 700,
+
+                      color: "#24302E",
+
                       marginBottom: 8,
                     }}
                   >
@@ -702,6 +1124,27 @@ export default function QRScannerScreen({
                     <BtnSecondary onClick={onManualEntry}>
                       Enter Credential ID instead
                     </BtnSecondary>
+
+                      color: "#5C5A50",
+
+                      lineHeight: 1.6,
+
+                      marginBottom: 20,
+                    }}
+                  >
+                    Make sure the QR code is well-lit, fully visible, and
+                    centred within the frame.
+                  </p>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <BtnPrimary onClick={() => setScanState("scanning")}>
+                      Try again
+                    </BtnPrimary>
+                    <BtnSecondary onClick={onManualEntry}>
+                      Enter Credential ID instead
+                    </BtnSecondary>
+                    <BtnSecondary onClick={onBack}>
+                      Back to landing
+                    </BtnSecondary>
                   </div>
                 </div>
               </>
@@ -721,6 +1164,18 @@ export default function QRScannerScreen({
                     justifyContent: "center",
                     gap: 12,
                     padding: 24,
+
+                    flex: 1,
+
+                    display: "flex",
+
+                    flexDirection: "column",
+
+                    alignItems: "center",
+
+                    justifyContent: "center",
+
+                    gap: 12,
                   }}
                 >
                   <div
@@ -731,6 +1186,17 @@ export default function QRScannerScreen({
                       border: "2px solid rgba(166,69,61,0.4)",
                       display: "flex",
                       alignItems: "center",
+
+                      height: 56,
+
+                      borderRadius: "50%",
+
+                      border: "2px solid rgba(166,69,61,0.4)",
+
+                      display: "flex",
+
+                      alignItems: "center",
+
                       justifyContent: "center",
                     }}
                   >
@@ -745,6 +1211,8 @@ export default function QRScannerScreen({
                   </div>
                   <p style={{ color: "rgba(241,240,234,0.7)", fontSize: 14 }}>
                     Invalid QR code format
+                  <p style={{ color: "rgba(241,240,234,0.5)", fontSize: 13 }}>
+                    Invalid QR format
                   </p>
                 </div>
                 <div
@@ -753,8 +1221,11 @@ export default function QRScannerScreen({
                   <p
                     style={{
                       fontSize: 15,
+
                       fontWeight: 700,
+
                       color: "#24302E",
+
                       marginBottom: 8,
                     }}
                   >
@@ -763,24 +1234,26 @@ export default function QRScannerScreen({
                   <p
                     style={{
                       fontSize: 14,
+
                       color: "#5C5A50",
+
                       lineHeight: 1.6,
+
                       marginBottom: 20,
                     }}
                   >
-                    The scanned QR code does not contain a recognized National
-                    Skills Passport credential identifier. Please ensure you are
-                    scanning an official NSP certificate or digital wallet code.
+                    The scanned QR code is not a valid NSP credential. Make sure
+                    you are scanning the correct document.
                   </p>
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <BtnPrimary onClick={startCamera}>
-                      Scan another QR code
+                    <BtnPrimary onClick={() => setScanState("scanning")}>
+                      Try again
                     </BtnPrimary>
-                    <BtnSecondary onClick={() => fileInputRef.current?.click()}>
-                      Upload QR image
-                    </BtnSecondary>
                     <BtnSecondary onClick={onManualEntry}>
                       Enter Credential ID instead
+                    </BtnSecondary>
+                    <BtnSecondary onClick={onBack}>
+                      Back to landing
                     </BtnSecondary>
                   </div>
                 </div>
@@ -837,32 +1310,44 @@ export default function QRScannerScreen({
           <div
             style={{
               display: "flex",
+
               flexDirection: "column",
+
               gap: 16,
+
               alignSelf: "stretch",
             }}
           >
             <div
               style={{
                 background: "#FFFFFF",
+
                 border: "1px solid #D6D3C6",
+
                 borderRadius: 8,
+
                 overflow: "hidden",
               }}
             >
               <div
                 style={{
                   padding: "12px 20px",
+
                   borderBottom: "1px solid #D6D3C6",
+
                   background: "#F1F0EA",
                 }}
               >
                 <span
                   style={{
                     fontSize: 12,
+
                     fontWeight: 700,
+
                     color: "#8C897C",
+
                     letterSpacing: "0.06em",
+
                     textTransform: "uppercase",
                   }}
                 >
@@ -874,33 +1359,51 @@ export default function QRScannerScreen({
                   padding: "20px",
                   display: "flex",
                   flexDirection: "column",
+
+                  display: "flex",
+
+                  flexDirection: "column",
+
                   gap: 12,
                 }}
               >
                 {[
                   "Ensure the QR code is fully visible and not damaged",
+
                   "Hold steady, 15–20cm from the code",
+
                   "Avoid glare or shadows across the QR code",
-                  "If camera is unavailable, use file upload or manual entry",
+
+                  "If scanning fails, use the Credential ID instead",
                 ].map((t) => (
                   <div
                     key={t}
                     style={{
                       display: "flex",
+
                       gap: 10,
+
                       alignItems: "flex-start",
                     }}
                   >
                     <div
                       style={{
                         width: 18,
+
                         height: 18,
+
                         borderRadius: "50%",
+
                         background: "#B08D46",
+
                         display: "flex",
+
                         alignItems: "center",
+
                         justifyContent: "center",
+
                         flexShrink: 0,
+
                         marginTop: 1,
                       }}
                     >
@@ -917,7 +1420,9 @@ export default function QRScannerScreen({
                     <span
                       style={{
                         fontSize: 13,
+
                         color: "#5C5A50",
+
                         lineHeight: 1.55,
                       }}
                     >
@@ -947,24 +1452,33 @@ export default function QRScannerScreen({
             <div
               style={{
                 background: "#FFFFFF",
+
                 border: "1px solid #D6D3C6",
+
                 borderRadius: 8,
+
                 overflow: "hidden",
               }}
             >
               <div
                 style={{
                   padding: "12px 20px",
+
                   borderBottom: "1px solid #D6D3C6",
+
                   background: "#F1F0EA",
                 }}
               >
                 <span
                   style={{
                     fontSize: 12,
+
                     fontWeight: 700,
+
                     color: "#8C897C",
+
                     letterSpacing: "0.06em",
+
                     textTransform: "uppercase",
                   }}
                 >
@@ -974,34 +1488,49 @@ export default function QRScannerScreen({
               <div
                 style={{
                   padding: "20px",
+
                   display: "flex",
+
                   flexDirection: "column",
+
                   gap: 12,
                 }}
               >
                 {[
-                  "Your camera stream is processed locally inside your browser.",
-                  "No video or frame captures are stored or transmitted anywhere.",
-                  "Camera access can be revoked anytime in your browser settings.",
+                  "Your camera feed is processed locally on your device.",
+
+                  "No images or video are stored or transmitted.",
+
+                  "Camera access can be revoked at any time in your browser settings.",
                 ].map((t) => (
                   <div
                     key={t}
                     style={{
                       display: "flex",
+
                       gap: 10,
+
                       alignItems: "flex-start",
                     }}
                   >
                     <div
                       style={{
                         width: 18,
+
                         height: 18,
+
                         borderRadius: "50%",
+
                         background: "#B08D46",
+
                         display: "flex",
+
                         alignItems: "center",
+
                         justifyContent: "center",
+
                         flexShrink: 0,
+
                         marginTop: 1,
                       }}
                     >
@@ -1018,7 +1547,9 @@ export default function QRScannerScreen({
                     <span
                       style={{
                         fontSize: 13,
+
                         color: "#5C5A50",
+
                         lineHeight: 1.55,
                       }}
                     >
