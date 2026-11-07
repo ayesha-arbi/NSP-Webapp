@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Utilities for extracting and normalizing credential IDs from QR code text or user input.
  * Supports URNs (urn:uuid:...), raw UUIDs, NSP certificate IDs (NSP-...),
  * verification URLs, and JSON-encoded Verifiable Credentials.

@@ -1,4 +1,4 @@
-// Auth Store with refresh token support and logout revocation
+﻿// Auth Store with refresh token support and logout revocation
 import { User, setApiAuthToken, onAuthExpired, api } from "./api"
 
 export type AppRole = "trade-tester" | "center-superintendent" | "super-admin"
@@ -91,14 +91,24 @@ export const authStore = {
   },
 
   // Called after login or MFA verification
-  setSession(user: User, accessToken?: string | null, refreshToken?: string | null) {
+  setSession(
+    user: User,
+    accessToken?: string | null,
+    refreshToken?: string | null,
+  ) {
     if (!accessToken || !refreshToken) {
       throw new Error("A complete token pair is required")
     }
     const token = accessToken
     const rToken = refreshToken
     const role = mapServerRoleToAppRole(user.role)
-    currentState = { user, accessToken: token, refreshToken: rToken, role, isAuthenticated: true }
+    currentState = {
+      user,
+      accessToken: token,
+      refreshToken: rToken,
+      role,
+      isAuthenticated: true,
+    }
     setApiAuthToken(token)
     try {
       if (typeof sessionStorage !== "undefined") {
@@ -127,6 +137,10 @@ export const authStore = {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
     } catch {}
     notify()
+  },
+
+  clear() {
+    this.clearSession()
   },
 
   clearSession() {

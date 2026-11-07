@@ -1,6 +1,8 @@
-import SuperAdminDashboard from "./SuperAdminDashboard"
+﻿import SuperAdminDashboard from "./SuperAdminDashboard"
 
 import { authStore } from "../services/authStore"
+import { api } from "../services/api"
+import { useState, useEffect } from "react"
 
 type Role = "trade-tester" | "center-superintendent" | "super-admin"
 
@@ -211,77 +213,49 @@ function StatusPill({
   )
 }
 
-const recentCandidates = [
-  {
-    name: "Muhammad Aamir Khan",
-
-    cnic: "35202-1234567-1",
-
-    trade: "Electrician",
-
-    hub: "Lahore-C01",
-
-    status: "in-review" as const,
-  },
-
-  {
-    name: "Sara Bibi",
-
-    cnic: "35201-9876543-2",
-
-    trade: "Plumbing",
-
-    hub: "Lahore-C01",
-
-    status: "draft" as const,
-  },
-
-  {
-    name: "Ali Nawaz",
-
-    cnic: "35202-5551234-3",
-
-    trade: "Welding",
-
-    hub: "Lahore-C01",
-
-    status: "completed" as const,
-  },
-
-  {
-    name: "Rabia Qureshi",
-
-    cnic: "35203-7778889-4",
-
-    trade: "Masonry",
-
-    hub: "Lahore-C01",
-
-    status: "in-progress" as const,
-  },
-
-  {
-    name: "Tariq Mehmood",
-
-    cnic: "35204-3334455-5",
-
-    trade: "Plumbing",
-
-    hub: "Lahore-C01",
-
-    status: "failed" as const,
-  },
-]
-
 function TradeTesterDashboard({
   onNavigate,
 }: {
   onNavigate: DashboardProps["onNavigate"]
 }) {
   const user = authStore.getState().user
+  const [recentCandidates, setRecentCandidates] = useState<any[]>([])
+  const [stats, setStats] = useState({
+    enrolled: 0,
+    draft: 0,
+    submitted: 0,
+    target: 0,
+    targetProgress: 0,
+  })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+    async function loadData() {
+      try {
+        const assessments = await api.listAssessments()
+        if (mounted && assessments) {
+          setRecentCandidates(assessments.slice(0, 5))
+          setStats({
+            enrolled: assessments.length,
+            draft: assessments.filter((a: any) => a.status === "draft").length,
+            submitted: assessments.filter((a: any) => a.status === "submitted").length,
+            target: 60,
+            targetProgress: Math.round((assessments.length / 60) * 100),
+          })
+        }
+      } catch (err) {
+        console.warn("Failed to load assessments:", err)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    loadData()
+    return () => { mounted = false }
+  }, [])
 
   const displayName =
-    user?.name || (user?.email ? user.email.split("@")[0] : "Ahmad")
+    user?.name || (user?.email ? user.email.split("@")[0] : "User")
 
   const hubId = user?.hubLocationId ?? 1
 
@@ -305,8 +279,8 @@ function TradeTesterDashboard({
           Good morning, {displayName}
         </h1>
         <p style={{ fontSize: 14, color: "#5C5A50", margin: 0 }}>
-          Hub Location #{hubId} (Lahore-C01) · Authenticated as{" "}
-          {user?.email || "tradetester@nsp.com"}
+          Hub Location #{hubId} · Authenticated as{" "}
+          {user?.email || ""}
         </p>
       </div>
 
@@ -323,24 +297,24 @@ function TradeTesterDashboard({
       >
         <StatCard
           label="Candidates Enrolled"
-          value={47}
+          value={loading ? "..." : stats.enrolled}
           sub="This cycle"
           accent
         />
         <StatCard
           label="Draft Assessments"
-          value={8}
+          value={loading ? "..." : stats.draft}
           sub="Awaiting submission"
         />
         <StatCard
           label="Submitted Assessments"
-          value={31}
+          value={loading ? "..." : stats.submitted}
           sub="Sent for approval"
         />
         <StatCard
           label="Target Progress"
-          value="47 / 60"
-          sub="78% toward hub goal"
+          value={loading ? "..." : `${stats.enrolled} / ${stats.target}`}
+          sub={`${stats.targetProgress}% toward hub goal`}
         />
       </div>
 
@@ -369,17 +343,17 @@ function TradeTesterDashboard({
         >
           <div>
             <div style={{ fontSize: 15, fontWeight: 600, color: "#24302E" }}>
-              Hub Progress — Lahore-C01
+              Hub Progress — Hub #{hubId}
             </div>
             <div style={{ fontSize: 13, color: "#5C5A50" }}>
-              47 enrolled out of 60 required candidates
+              {stats.enrolled} enrolled out of {stats.target} required candidates
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: "#4C7A6E" }}>
-              78%
+              {loading ? "..." : `${stats.targetProgress}%`}
             </div>
-            <div style={{ fontSize: 12, color: "#8C897C" }}>13 remaining</div>
+            <div style={{ fontSize: 12, color: "#8C897C" }}>{stats.target - stats.enrolled} remaining</div>
           </div>
         </div>
         <div
@@ -397,7 +371,7 @@ function TradeTesterDashboard({
             style={{
               height: "100%",
 
-              width: "78%",
+              width: loading ? "0%" : `${stats.targetProgress}%`,
 
               background: "#B08D46",
 
@@ -542,87 +516,101 @@ function TradeTesterDashboard({
             </tr>
           </thead>
           <tbody>
-            {recentCandidates.map((c, i) => (
-              <tr
-                key={i}
-                style={{
-                  borderBottom: "1px solid #F1EFE8",
-                  cursor: "pointer",
-                }}
-                onClick={() => onNavigate("record-detail")}
-                title="Click to view candidate record details"
-              >
-                <td
-                  style={{
-                    padding: "12px 24px",
-                    fontSize: 14,
-                    color: "#24302E",
-                    fontWeight: 500,
-                  }}
-                >
-                  <span
-                    style={{
-                      color: "#4C7A6E",
-                      textDecoration: "underline",
-                    }}
-                  >
-                    {c.name}
-                  </span>
-                </td>
-                <td
-                  style={{
-                    padding: "12px 24px",
-                    fontSize: 13,
-                    color: "#5C5A50",
-                    fontFamily: "IBM Plex Mono, monospace",
-                  }}
-                >
-                  {c.cnic}
-                </td>
-                <td
-                  style={{
-                    padding: "12px 24px",
-                    fontSize: 13,
-                    color: "#5C5A50",
-                  }}
-                >
-                  {c.trade}
-                </td>
-                <td
-                  style={{
-                    padding: "12px 24px",
-                    fontSize: 13,
-                    color: "#5C5A50",
-                    fontFamily: "IBM Plex Mono, monospace",
-                  }}
-                >
-                  {c.hub}
-                </td>
-                <td style={{ padding: "12px 24px" }}>
-                  <StatusPill status={c.status} />
-                </td>
-                <td style={{ padding: "12px 24px" }}>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onNavigate("record-detail")
-                    }}
-                    style={{
-                      background: "none",
-                      border: "1px solid #D6D3C6",
-                      borderRadius: 4,
-                      padding: "4px 10px",
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: "#4C7A6E",
-                      cursor: "pointer",
-                    }}
-                  >
-                    View Details →
-                  </button>
+            {loading ? (
+              <tr>
+                <td colSpan={6} style={{ padding: "24px", textAlign: "center", color: "#8C897C" }}>
+                  Loading candidates...
                 </td>
               </tr>
-            ))}
+            ) : recentCandidates.length === 0 ? (
+              <tr>
+                <td colSpan={6} style={{ padding: "24px", textAlign: "center", color: "#8C897C" }}>
+                  No candidates enrolled yet
+                </td>
+              </tr>
+            ) : (
+              recentCandidates.map((c, i) => (
+                <tr
+                  key={i}
+                  style={{
+                    borderBottom: "1px solid #F1EFE8",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => onNavigate("record-detail")}
+                  title="Click to view candidate record details"
+                >
+                  <td
+                    style={{
+                      padding: "12px 24px",
+                      fontSize: 14,
+                      color: "#24302E",
+                      fontWeight: 500,
+                    }}
+                  >
+                    <span
+                      style={{
+                        color: "#4C7A6E",
+                        textDecoration: "underline",
+                      }}
+                    >
+                      {c.name || c.candidateName || "Unknown"}
+                    </span>
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 24px",
+                      fontSize: 13,
+                      color: "#5C5A50",
+                      fontFamily: "IBM Plex Mono, monospace",
+                    }}
+                  >
+                    {c.cnic || "—"}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 24px",
+                      fontSize: 13,
+                      color: "#5C5A50",
+                    }}
+                  >
+                    {c.trade || "—"}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 24px",
+                      fontSize: 13,
+                      color: "#5C5A50",
+                      fontFamily: "IBM Plex Mono, monospace",
+                    }}
+                  >
+                    {c.hub || `Hub #${hubId}`}
+                  </td>
+                  <td style={{ padding: "12px 24px" }}>
+                    <StatusPill status={c.status || "draft"} />
+                  </td>
+                  <td style={{ padding: "12px 24px" }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onNavigate("record-detail")
+                      }}
+                      style={{
+                        background: "none",
+                        border: "1px solid #D6D3C6",
+                        borderRadius: 4,
+                        padding: "4px 10px",
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: "#4C7A6E",
+                        cursor: "pointer",
+                      }}
+                    >
+                      View Details →
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -635,43 +623,49 @@ function CenterSuperDashboard({
 }: {
   onNavigate: DashboardProps["onNavigate"]
 }) {
-  const approvals = [
-    {
-      candidate: "Muhammad Aamir Khan",
+  const user = authStore.getState().user
+  const [approvals, setApprovals] = useState<any[]>([])
+  const [stats, setStats] = useState({
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    enrolled: 0,
+    target: 60,
+    targetProgress: 0,
+  })
+  const [loading, setLoading] = useState(true)
 
-      trade: "Electrician",
+  useEffect(() => {
+    let mounted = true
+    async function loadData() {
+      try {
+        const assessments = await api.listAssessments()
+        if (mounted && assessments) {
+          const pending = assessments.filter((a: any) => a.status === "submitted")
+          setApprovals(pending.slice(0, 5))
+          setStats({
+            pending: pending.length,
+            approved: assessments.filter((a: any) => a.status === "approved").length,
+            rejected: assessments.filter((a: any) => a.status === "rejected").length,
+            enrolled: assessments.length,
+            target: 60,
+            targetProgress: Math.round((assessments.length / 60) * 100),
+          })
+        }
+      } catch (err) {
+        console.warn("Failed to load assessments:", err)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    loadData()
+    return () => { mounted = false }
+  }, [])
 
-      submittedBy: "Ahmad Raza",
+  const displayName =
+    user?.name || (user?.email ? user.email.split("@")[0] : "User")
 
-      submittedAt: "2026-08-26 09:14",
-
-      status: "in-review" as const,
-    },
-
-    {
-      candidate: "Sara Bibi",
-
-      trade: "Plumbing",
-
-      submittedBy: "Ahmad Raza",
-
-      submittedAt: "2026-08-25 15:32",
-
-      status: "in-review" as const,
-    },
-
-    {
-      candidate: "Rabia Qureshi",
-
-      trade: "Masonry",
-
-      submittedBy: "Ahmad Raza",
-
-      submittedAt: "2026-08-25 11:08",
-
-      status: "in-review" as const,
-    },
-  ]
+  const hubId = user?.hubLocationId ?? 1
 
   return (
     <div>
@@ -690,10 +684,10 @@ function CenterSuperDashboard({
             letterSpacing: -0.2,
           }}
         >
-          Good morning, Fatima
+          Good morning, {displayName}
         </h1>
         <p style={{ fontSize: 14, color: "#5C5A50", margin: 0 }}>
-          Center Superintendent · Hub: Lahore-C01
+          Center Superintendent · Hub #{hubId}
         </p>
       </div>
 
@@ -710,20 +704,20 @@ function CenterSuperDashboard({
       >
         <StatCard
           label="Pending Approvals"
-          value={12}
+          value={loading ? "..." : stats.pending}
           sub="Awaiting review"
           accent
         />
-        <StatCard label="Approved Records" value={28} sub="This cycle" />
+        <StatCard label="Approved Records" value={loading ? "..." : stats.approved} sub="This cycle" />
         <StatCard
           label="Rejected Records"
-          value={3}
+          value={loading ? "..." : stats.rejected}
           sub="Returned for correction"
         />
         <StatCard
           label="Hub Progress"
-          value="47 / 60"
-          sub="78% toward target"
+          value={loading ? "..." : `${stats.enrolled} / ${stats.target}`}
+          sub={`${stats.targetProgress}% toward target`}
         />
       </div>
 
@@ -751,10 +745,10 @@ function CenterSuperDashboard({
         >
           <div>
             <div style={{ fontSize: 15, fontWeight: 600, color: "#24302E" }}>
-              Hub Progress — Lahore-C01
+              Hub Progress — Hub #{hubId}
             </div>
             <div style={{ fontSize: 13, color: "#5C5A50" }}>
-              47 enrolled out of 60 required candidates
+              {stats.enrolled} enrolled out of {stats.target} required candidates
             </div>
           </div>
           <span
@@ -794,7 +788,7 @@ function CenterSuperDashboard({
             style={{
               height: "100%",
 
-              width: "78%",
+              width: loading ? "0%" : `${stats.targetProgress}%`,
 
               background: "#B08D46",
 
@@ -922,126 +916,125 @@ function CenterSuperDashboard({
             </tr>
           </thead>
           <tbody>
-            {approvals.map((a, i) => (
-              <tr key={i} style={{ borderBottom: "1px solid #F1EFE8" }}>
-                <td
-                  style={{
-                    padding: "12px 24px",
-
-                    fontSize: 14,
-
-                    color: "#24302E",
-
-                    fontWeight: 500,
-                  }}
-                >
-                  {a.candidate}
-                </td>
-                <td
-                  style={{
-                    padding: "12px 24px",
-
-                    fontSize: 13,
-
-                    color: "#5C5A50",
-                  }}
-                >
-                  {a.trade}
-                </td>
-                <td
-                  style={{
-                    padding: "12px 24px",
-
-                    fontSize: 13,
-
-                    color: "#5C5A50",
-                  }}
-                >
-                  {a.submittedBy}
-                </td>
-                <td
-                  style={{
-                    padding: "12px 24px",
-
-                    fontSize: 12,
-
-                    color: "#8C897C",
-
-                    fontFamily: "IBM Plex Mono, monospace",
-                  }}
-                >
-                  {a.submittedAt}
-                </td>
-                <td style={{ padding: "12px 24px" }}>
-                  <StatusPill status={a.status} />
-                </td>
-                <td style={{ padding: "12px 24px" }}>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      style={{
-                        height: 30,
-
-                        padding: "0 12px",
-
-                        background: "#4C7A6E",
-
-                        color: "#fff",
-
-                        border: "none",
-
-                        borderRadius: 4,
-
-                        fontSize: 12,
-
-                        fontWeight: 600,
-
-                        cursor: "pointer",
-                      }}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      style={{
-                        height: 30,
-
-                        padding: "0 12px",
-
-                        background: "#fff",
-
-                        color: "#8C3B34",
-
-                        border: "1px solid #A6453D",
-
-                        borderRadius: 4,
-
-                        fontSize: 12,
-
-                        cursor: "pointer",
-                      }}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => onNavigate("record-detail")}
-                    style={{
-                      height: 30,
-                      padding: "0 10px",
-                      background: "none",
-                      color: "#4C7A6E",
-                      border: "1px solid #D6D3C6",
-                      borderRadius: 4,
-                      fontSize: 12,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                    }}
-                    title="View candidate record details"
-                  >
-                    View
-                  </button>
+            {loading ? (
+              <tr>
+                <td colSpan={6} style={{ padding: "24px", textAlign: "center", color: "#8C897C" }}>
+                  Loading approvals...
                 </td>
               </tr>
-            ))}
+            ) : approvals.length === 0 ? (
+              <tr>
+                <td colSpan={6} style={{ padding: "24px", textAlign: "center", color: "#8C897C" }}>
+                  No pending approvals
+                </td>
+              </tr>
+            ) : (
+              approvals.map((a, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid #F1EFE8" }}>
+                  <td
+                    style={{
+                      padding: "12px 24px",
+
+                      fontSize: 14,
+
+                      color: "#24302E",
+
+                      fontWeight: 500,
+                    }}
+                  >
+                    {a.candidate || a.name || "Unknown"}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 24px",
+
+                      fontSize: 13,
+
+                      color: "#5C5A50",
+                    }}
+                  >
+                    {a.trade || "—"}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 24px",
+
+                      fontSize: 13,
+
+                      color: "#5C5A50",
+                    }}
+                  >
+                    {a.submittedBy || a.assessor || "—"}
+                  </td>
+                  <td
+                    style={{
+                      padding: "12px 24px",
+
+                      fontSize: 12,
+
+                      color: "#8C897C",
+
+                      fontFamily: "IBM Plex Mono, monospace",
+                    }}
+                  >
+                    {a.submittedAt || a.createdAt || "—"}
+                  </td>
+                  <td style={{ padding: "12px 24px" }}>
+                    <StatusPill status={a.status || "in-review"} />
+                  </td>
+                  <td style={{ padding: "12px 24px" }}>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        style={{
+                          height: 30,
+                          padding: "0 12px",
+                          background: "#4C7A6E",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        style={{
+                          height: 30,
+                          padding: "0 12px",
+                          background: "#fff",
+                          color: "#8C3B34",
+                          border: "1px solid #A6453D",
+                          borderRadius: 4,
+                          fontSize: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => onNavigate("record-detail")}
+                      style={{
+                        height: 30,
+                        padding: "0 10px",
+                        background: "none",
+                        color: "#4C7A6E",
+                        border: "1px solid #D6D3C6",
+                        borderRadius: 4,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        cursor: "pointer",
+                      }}
+                      title="View candidate record details"
+                    >
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -1054,9 +1047,26 @@ function _SuperAdminDashboard_unused({
 }: {
   onNavigate: DashboardProps["onNavigate"]
 }) {
-  const hubs = [
-    { hub: "Lahore-C01", enrolled: 47, target: 60, approved: 31, minting: 8 },
-  ]
+  const [hubs, setHubs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+    async function loadData() {
+      try {
+        const dashboardStats = await api.getDashboardStats()
+        if (mounted && dashboardStats) {
+          setHubs(dashboardStats.hubs || [])
+        }
+      } catch (err) {
+        console.warn("Failed to load dashboard stats:", err)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    loadData()
+    return () => { mounted = false }
+  }, [])
 
   return (
     <div>
@@ -1093,14 +1103,14 @@ function _SuperAdminDashboard_unused({
           marginBottom: 32,
         }}
       >
-        <StatCard label="Total Candidates" value={226} sub="All hubs" accent />
-        <StatCard label="Active Hubs" value={5} sub="5 of 5 online" />
-        <StatCard label="Pending Approvals" value={43} sub="Across all hubs" />
-        <StatCard label="Minting Queue" value={28} sub="Ready to mint" />
-        <StatCard label="Confirmed Credentials" value={148} sub="On-chain" />
+        <StatCard label="Total Candidates" value={loading ? "..." : hubs.reduce((s, h) => s + (h.enrolled || 0), 0)} sub="All hubs" accent />
+        <StatCard label="Active Hubs" value={loading ? "..." : hubs.length} sub="Total hubs" />
+        <StatCard label="Pending Approvals" value={loading ? "..." : hubs.reduce((s, h) => s + (h.pendingApproval || 0), 0)} sub="Across all hubs" />
+        <StatCard label="Minting Queue" value={loading ? "..." : "—"} sub="Ready to mint" />
+        <StatCard label="Confirmed Credentials" value={loading ? "..." : hubs.reduce((s, h) => s + (h.minted || 0), 0)} sub="On-chain" />
         <StatCard
           label="Failed Transactions"
-          value={4}
+          value={loading ? "..." : "—"}
           sub="Require attention"
         />
       </div>
@@ -1141,78 +1151,11 @@ function _SuperAdminDashboard_unused({
           >
             System Status
           </h2>
-          {[
-            {
-              label: "Blockchain Node",
-
-              status: "online",
-
-              val: "99.98% uptime",
-            },
-
-            {
-              label: "NADRA Verification API",
-
-              status: "online",
-
-              val: "Response 142ms",
-            },
-
-            { label: "S3 Media Storage", status: "online", val: "1.2 TB used" },
-
-            {
-              label: "Notification Service",
-
-              status: "degraded",
-
-              val: "Minor delays",
-            },
-          ].map((s) => (
-            <div
-              key={s.label}
-              style={{
-                display: "flex",
-
-                justifyContent: "space-between",
-
-                alignItems: "center",
-
-                padding: "8px 0",
-
-                borderBottom: "1px solid #F1EFE8",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div
-                  style={{
-                    width: 8,
-
-                    height: 8,
-
-                    borderRadius: "50%",
-
-                    background: s.status === "online" ? "#4C7A6E" : "#B08D46",
-
-                    flexShrink: 0,
-                  }}
-                />
-                <span style={{ fontSize: 13, color: "#24302E" }}>
-                  {s.label}
-                </span>
-              </div>
-              <span
-                style={{
-                  fontSize: 12,
-
-                  color: "#8C897C",
-
-                  fontFamily: "IBM Plex Mono, monospace",
-                }}
-              >
-                {s.val}
-              </span>
-            </div>
-          ))}
+          {loading ? (
+            <div style={{ color: "#8C897C" }}>Loading system status...</div>
+          ) : (
+            <div style={{ color: "#8C897C" }}>System status data available via API</div>
+          )}
         </div>
 
         {/* Recent activity */}
@@ -1240,99 +1183,11 @@ function _SuperAdminDashboard_unused({
           >
             Recent System Activity
           </h2>
-          {[
-            {
-              msg: "Credential minted for Muhammad Aamir Khan",
-
-              time: "09:41",
-
-              type: "success",
-            },
-
-            {
-              msg: "Approval submitted: Sara Bibi (Lahore-C01)",
-
-              time: "09:32",
-
-              type: "info",
-            },
-
-            {
-              msg: "Mint transaction failed — TXN-8F2A1C",
-
-              time: "09:18",
-
-              type: "error",
-            },
-
-            {
-              msg: "New enrollment: Rabia Qureshi (Faisalabad-C04)",
-
-              time: "09:05",
-
-              type: "info",
-            },
-
-            {
-              msg: "Hub Karachi-C02 reached 60 candidates",
-
-              time: "08:57",
-
-              type: "success",
-            },
-          ].map((a, i) => (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-
-                gap: 12,
-
-                alignItems: "flex-start",
-
-                padding: "8px 0",
-
-                borderBottom: "1px solid #F1EFE8",
-              }}
-            >
-              <div
-                style={{
-                  width: 6,
-
-                  height: 6,
-
-                  borderRadius: "50%",
-
-                  background:
-                    a.type === "success"
-                      ? "#4C7A6E"
-                      : a.type === "error"
-                        ? "#A6453D"
-                        : "#2E6FE0",
-
-                  marginTop: 5,
-
-                  flexShrink: 0,
-                }}
-              />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, color: "#24302E" }}>{a.msg}</div>
-              </div>
-              <span
-                style={{
-                  fontSize: 11,
-
-                  color: "#8C897C",
-
-                  fontFamily: "IBM Plex Mono, monospace",
-
-                  flexShrink: 0,
-                }}
-              >
-                {a.time}
-              </span>
-            </div>
-          ))}
+          {loading ? (
+            <div style={{ color: "#8C897C" }}>Loading activity...</div>
+          ) : (
+            <div style={{ color: "#8C897C" }}>Activity data available via API</div>
+          )}
         </div>
       </div>
 
@@ -1401,124 +1256,138 @@ function _SuperAdminDashboard_unused({
             </tr>
           </thead>
           <tbody>
-            {hubs.map((hub, i) => {
-              const pct = Math.round((hub.enrolled / hub.target) * 100)
+            {loading ? (
+              <tr>
+                <td colSpan={6} style={{ padding: "24px", textAlign: "center", color: "#8C897C" }}>
+                  Loading hub data...
+                </td>
+              </tr>
+            ) : hubs.length === 0 ? (
+              <tr>
+                <td colSpan={6} style={{ padding: "24px", textAlign: "center", color: "#8C897C" }}>
+                  No hub data available
+                </td>
+              </tr>
+            ) : (
+              hubs.map((hub, i) => {
+                const pct = hub.target ? Math.round((hub.enrolled / hub.target) * 100) : 0
 
-              return (
-                <tr key={i} style={{ borderBottom: "1px solid #F1EFE8" }}>
-                  <td
-                    style={{
-                      padding: "14px 24px",
+                return (
+                  <tr key={i} style={{ borderBottom: "1px solid #F1EFE8" }}>
+                    <td
+                      style={{
+                        padding: "14px 24px",
 
-                      fontSize: 13,
+                        fontSize: 13,
 
-                      color: "#24302E",
+                        color: "#24302E",
 
-                      fontFamily: "IBM Plex Mono, monospace",
+                        fontFamily: "IBM Plex Mono, monospace",
 
-                      fontWeight: 600,
-                    }}
-                  >
-                    {hub.hub}
-                  </td>
-                  <td
-                    style={{
-                      padding: "14px 24px",
-
-                      fontSize: 14,
-
-                      color: "#24302E",
-
-                      fontWeight: 600,
-                    }}
-                  >
-                    {hub.enrolled}
-                  </td>
-                  <td
-                    style={{
-                      padding: "14px 24px",
-
-                      fontSize: 14,
-
-                      color: "#8C897C",
-                    }}
-                  >
-                    {hub.target}
-                  </td>
-                  <td
-                    style={{
-                      padding: "14px 24px",
-
-                      fontSize: 14,
-
-                      color: "#24302E",
-                    }}
-                  >
-                    {hub.approved}
-                  </td>
-                  <td
-                    style={{
-                      padding: "14px 24px",
-
-                      fontSize: 14,
-
-                      color: hub.minting > 0 ? "#B08D46" : "#8C897C",
-                    }}
-                  >
-                    {hub.minting}
-                  </td>
-                  <td style={{ padding: "14px 24px", minWidth: 160 }}>
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                        fontWeight: 600,
+                      }}
                     >
+                      {hub.hub || hub.name || "—"}
+                    </td>
+                    <td
+                      style={{
+                        padding: "14px 24px",
+
+                        fontSize: 14,
+
+                        color: "#24302E",
+
+                        fontWeight: 600,
+                      }}
+                    >
+                      {hub.enrolled || 0}
+                    </td>
+                    <td
+                      style={{
+                        padding: "14px 24px",
+
+                        fontSize: 14,
+
+                        color: "#8C897C",
+                      }}
+                    >
+                      {hub.target || 0}
+                    </td>
+                    <td
+                      style={{
+                        padding: "14px 24px",
+
+                        fontSize: 14,
+
+                        color: "#24302E",
+                      }}
+                    >
+                      {hub.approved || hub.pendingApproval || 0}
+                    </td>
+                    <td
+                      style={{
+                        padding: "14px 24px",
+
+                        fontSize: 14,
+
+                        color: (hub.minting || 0) > 0 ? "#B08D46" : "#8C897C",
+                      }}
+                    >
+                      {hub.minting || 0}
+                    </td>
+                    <td style={{ padding: "14px 24px", minWidth: 160 }}>
                       <div
-                        style={{
-                          flex: 1,
-
-                          height: 6,
-
-                          background: "#F1EFE8",
-
-                          borderRadius: 3,
-                        }}
+                        style={{ display: "flex", alignItems: "center", gap: 10 }}
                       >
                         <div
                           style={{
-                            height: "100%",
+                            flex: 1,
 
-                            width: `${pct}%`,
+                            height: 6,
 
-                            background:
-                              pct === 100
-                                ? "#B08D46"
-                                : pct >= 75
-                                  ? "#4C7A6E"
-                                  : "#D6D3C6",
+                            background: "#F1EFE8",
 
                             borderRadius: 3,
                           }}
-                        />
+                        >
+                          <div
+                            style={{
+                              height: "100%",
+
+                              width: `${pct}%`,
+
+                              background:
+                                pct === 100
+                                  ? "#B08D46"
+                                  : pct >= 75
+                                    ? "#4C7A6E"
+                                    : "#D6D3C6",
+
+                              borderRadius: 3,
+                            }}
+                          />
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 12,
+
+                            color: "#5C5A50",
+
+                            fontWeight: 600,
+
+                            width: 36,
+
+                            textAlign: "right",
+                          }}
+                        >
+                          {pct}%
+                        </span>
                       </div>
-                      <span
-                        style={{
-                          fontSize: 12,
-
-                          color: "#5C5A50",
-
-                          fontWeight: 600,
-
-                          width: 36,
-
-                          textAlign: "right",
-                        }}
-                      >
-                        {pct}%
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
+                    </td>
+                  </tr>
+                )
+              })
+            )}
           </tbody>
         </table>
       </div>

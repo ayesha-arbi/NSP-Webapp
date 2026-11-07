@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+﻿import { useState, useEffect, useRef } from "react"
 import { api } from "../services/api"
 
 type CredentialStatus = "pending" | "queued" | "minting" | "confirmed" | "failed"
@@ -18,64 +18,13 @@ interface Credential {
   blockHeight?: number
 }
 
-const CREDENTIALS: Credential[] = [
-  {
-    id: "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
-    candidate: "Tariq Mehmood",
-    cnic: "35204-3334455-5",
-    trade: "Electrical Installation & Maintenance",
-    hub: "Lahore-C01",
-    approvedAt: "2026-10-18 10:12",
-    txnId: "0x89abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678",
-    mintedAt: "2026-10-18 10:18",
-    status: "confirmed",
-    blockHeight: 4821034,
-  },
-  {
-    id: "urn:uuid:8b1e4420-1283-4a6f-9810-bb2a41289df1",
-    candidate: "Ali Nawaz",
-    cnic: "35202-5551234-3",
-    trade: "Welding & Fabrication",
-    hub: "Lahore-C01",
-    approvedAt: "2026-10-18 14:20",
-    txnId: "0x5a1f8c2b7e9d4013fa67823e590bd71a48c6913e2bf45091c7830de45681ab34",
-    mintedAt: "2026-10-18 14:22",
-    status: "confirmed",
-    blockHeight: 4820918,
-  },
-  {
-    id: "urn:uuid:3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    candidate: "Amna Siddiqui",
-    cnic: "35206-2223334-7",
-    trade: "HVAC Technician",
-    hub: "Karachi-C02",
-    approvedAt: "2026-10-19 08:45",
-    status: "queued",
-  },
-  {
-    id: "urn:uuid:4bc91234-6789-40ab-cdef-1234567890ab",
-    candidate: "Imran Gul",
-    cnic: "35207-5556667-8",
-    trade: "Auto Mechanic",
-    hub: "Islamabad-C03",
-    approvedAt: "2026-10-19 08:31",
-    status: "minting",
-  },
-  {
-    id: "urn:uuid:5cd02345-789a-41bc-def0-2345678901bc",
-    candidate: "Nadia Hassan",
-    cnic: "35208-1112223-9",
-    trade: "Electrician",
-    hub: "Faisalabad-C04",
-    approvedAt: "2026-10-18 16:00",
-    status: "failed",
-    errorMsg:
-      "Gas price spike — transaction reverted on Polygon. Retry approval resets queue.",
-  },
-]
-
 function StatusPill({ status }: { status: CredentialStatus }) {
-  const map: Record<CredentialStatus, { bg: string; text: string; label: string; svg: React.ReactNode }> = {
+  const map: Record<CredentialStatus, {
+    bg: string
+    text: string
+    label: string
+    svg: React.ReactNode
+  }> = {
     pending: {
       bg: "#FEF3C7",
       text: "#92400E",
@@ -83,7 +32,12 @@ function StatusPill({ status }: { status: CredentialStatus }) {
       svg: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <circle cx="10" cy="10" r="7" stroke="#92400E" strokeWidth="1.5" />
-          <path d="M10 6v4l2.5 2.5" stroke="#92400E" strokeWidth="1.5" strokeLinecap="round" />
+          <path
+            d="M10 6v4l2.5 2.5"
+            stroke="#92400E"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
         </svg>
       ),
     },
@@ -93,7 +47,14 @@ function StatusPill({ status }: { status: CredentialStatus }) {
       label: "Queued for Blockchain",
       svg: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="10" r="7" stroke="#1A4DB8" strokeWidth="1.5" strokeDasharray="3 3" />
+          <circle
+            cx="10"
+            cy="10"
+            r="7"
+            stroke="#1A4DB8"
+            strokeWidth="1.5"
+            strokeDasharray="3 3"
+          />
         </svg>
       ),
     },
@@ -199,14 +160,14 @@ function ModalOverlay({ children }: { children: React.ReactNode }) {
 }
 
 export default function CredentialsScreen() {
-  const [creds, setCreds] = useState<Credential[]>(CREDENTIALS)
+  const [creds, setCreds] = useState<Credential[]>([])
   const [tab, setTab] = useState<"queue" | "confirmed" | "failed">("queue")
   const [selected, setSelected] = useState<Credential | null>(null)
   const [modal, setModal] = useState<ModalType>("none")
   const [revokeReason, setRevokeReason] = useState("")
   const [toast, setToast] = useState<string | null>(null)
 
-  const pollTimers = useRef<Record<string, { timer: any; elapsed: number }>>({})
+  const pollTimers = useRef<Record<string, { timer: any elapsed: number }>>({})
 
   useEffect(() => {
     return () => {
@@ -233,9 +194,7 @@ export default function CredentialsScreen() {
           if (mStatus === "MINTED") {
             delete pollTimers.current[credentialId]
             setToast("Credential anchored on Polygon blockchain!")
-            const tx =
-              res.data.tx_hash ||
-              "0x89abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+            const tx = res.data.tx_hash
             setCreds((cs) =>
               cs.map((c) =>
                 c.id === credentialId
@@ -255,8 +214,7 @@ export default function CredentialsScreen() {
                   ...prev,
                   status: "confirmed",
                   txnId: tx,
-                  mintedAt:
-                    res.data.approved_at || new Date().toLocaleString(),
+                  mintedAt: res.data.approved_at || new Date().toLocaleString(),
                 }
               }
               return prev
@@ -311,7 +269,9 @@ export default function CredentialsScreen() {
 
   async function handleMint(id: string) {
     setCreds((cs) =>
-      cs.map((c) => (c.id === id ? { ...c, status: "queued", errorMsg: undefined } : c)),
+      cs.map((c) =>
+        c.id === id ? { ...c, status: "queued", errorMsg: undefined } : c,
+      ),
     )
     setModal("none")
     setToast("Approval submitted: Credential queued for Polygon minting.")
@@ -347,7 +307,10 @@ export default function CredentialsScreen() {
     try {
       await api.approveCredential(id)
     } catch (err: any) {
-      console.warn("Ledger retry approve note in CredentialsScreen:", err?.message)
+      console.warn(
+        "Ledger retry approve note in CredentialsScreen:",
+        err?.message,
+      )
     }
     startPollingCredential(id)
   }

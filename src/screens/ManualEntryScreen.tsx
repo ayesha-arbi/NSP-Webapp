@@ -73,11 +73,7 @@ export default function ManualEntryScreen({
       } else {
         clearInterval(iv)
 
-        if (trimmed.toUpperCase().startsWith("NSP-X")) {
-          setState("error-notfound")
-        } else {
-          onVerify(trimmed)
-        }
+        onVerify(trimmed)
       }
     }, 320)
   }
@@ -732,80 +728,6 @@ export default function ManualEntryScreen({
                     </div>
                   ))}
                 </div>
-              </div>
-
-              <div
-                style={{
-                  background: "#24302E",
-                  borderRadius: 8,
-                  padding: "20px",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#B08D46",
-                    letterSpacing: "0.07em",
-                    textTransform: "uppercase",
-                    marginBottom: 12,
-                  }}
-                >
-                  Test Credentials (Click to Fill)
-                </p>
-                {[
-                  {
-                    id: "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
-                    label: "Guide #5 Canonical URN",
-                  },
-                  { id: "NSP-004821", label: "Verified (Legacy)" },
-                  { id: "NSP-T001", label: "Tampered" },
-                  { id: "NSP-R001", label: "Revoked" },
-                  { id: "NSP-X001", label: "Not found" },
-                ].map((d) => (
-                  <div
-                    key={d.id}
-                    onClick={() => {
-                      setValue(d.id)
-                      setState("idle")
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 8,
-                      padding: "8px 0",
-                      borderBottom: "1px solid rgba(241,240,234,0.07)",
-                      cursor: "pointer",
-                    }}
-                    title={`Click to fill ${d.id}`}
-                  >
-                    <code
-                      style={{
-                        fontFamily: "'IBM Plex Mono', monospace",
-                        fontSize: 11,
-                        fontWeight: 500,
-                        color: "rgba(241,240,234,0.85)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        maxWidth: 160,
-                      }}
-                    >
-                      {d.id}
-                    </code>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: "#B08D46",
-                        fontWeight: 600,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {d.label}
-                    </span>
-                  </div>
-                ))}
               </div>
             </div>
           )}

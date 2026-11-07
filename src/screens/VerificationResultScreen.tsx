@@ -50,15 +50,13 @@ export default function VerificationResultScreen({
   result,
   onVerifyAnother,
 }: Props) {
-  const [active, setActive] = useState<VerificationStatus>(result.status)
-
   const [copied, setCopied] = useState(false)
 
   const [shared, setShared] = useState(false)
 
-  const cfg = CFG[active]
+  const cfg = CFG[result.status]
 
-  const isVerified = active === "verified"
+  const isVerified = result.status === "verified"
 
   const reportLines = [
     "NSP VERIFICATION REPORT",
@@ -83,7 +81,7 @@ export default function VerificationResultScreen({
 
     "",
 
-    `Verification    : ${active.toUpperCase()}`,
+    `Verification    : ${result.status.toUpperCase()}`,
 
     `Verified At     : ${result.timestamp}`,
 
@@ -183,57 +181,6 @@ export default function VerificationResultScreen({
 
       <div style={{ background: "#24302E", padding: "40px 32px 48px" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          {/* Demo state switcher */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 32,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: "rgba(241,240,234,0.3)",
-                letterSpacing: "0.07em",
-                textTransform: "uppercase",
-                marginRight: 4,
-              }}
-            >
-              Preview:
-            </span>
-            {(["verified", "tampered", "revoked"] as VerificationStatus[]).map(
-              (s) => (
-                <button
-                  key={s}
-                  onClick={() => setActive(s)}
-                  style={{
-                    padding: "4px 12px",
-                    borderRadius: 6,
-                    border: "none",
-                    cursor: "pointer",
-
-                    fontSize: 12,
-                    fontWeight: 600,
-                    fontFamily: "inherit",
-
-                    background:
-                      active === s ? "#F1F0EA" : "rgba(241,240,234,0.08)",
-
-                    color: active === s ? "#24302E" : "rgba(241,240,234,0.45)",
-
-                    transition: "all 0.15s",
-                    textTransform: "capitalize",
-                  }}
-                >
-                  {s}
-                </button>
-              ),
-            )}
-          </div>
-
           <div style={{ display: "flex", alignItems: "flex-start", gap: 24 }}>
             <div
               style={{
@@ -262,7 +209,7 @@ export default function VerificationResultScreen({
                   />
                 </svg>
               )}
-              {active === "tampered" && (
+              {result.status === "tampered" && (
                 <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
                   <path
                     d="M14 9v8M14 21v1.5"
@@ -272,7 +219,7 @@ export default function VerificationResultScreen({
                   />
                 </svg>
               )}
-              {active === "revoked" && (
+              {result.status === "revoked" && (
                 <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
                   <path
                     d="M7 7l14 14M21 7L7 21"
@@ -298,7 +245,7 @@ export default function VerificationResultScreen({
                 NSP Credential Verification
               </p>
               <div style={{ marginBottom: 12 }}>
-                <StatusPill status={active} />
+                <StatusPill status={result.status} />
               </div>
               <h1
                 style={{
@@ -477,7 +424,7 @@ export default function VerificationResultScreen({
                     </TR>
                   </>
                 )}
-                {active === "tampered" && (
+                {result.status === "tampered" && (
                   <>
                     <TR label="Verification status">
                       <StatusPill status="tampered" />
@@ -496,7 +443,7 @@ export default function VerificationResultScreen({
                     </TR>
                   </>
                 )}
-                {active === "revoked" && (
+                {result.status === "revoked" && (
                   <>
                     <TR label="Credential status">
                       <StatusPill status="revoked" />

@@ -43,11 +43,13 @@ import WorkerWalletScreen from "./screens/WorkerWalletScreen"
 
 import { authStore, AppRole } from "./services/authStore"
 
-import { CandidateRecord, verifyNspCredential } from "./services/api"
+import { CandidateRecord, verifyNspCredential, api } from "./services/api"
 
 import { verifyCertificateOnChain } from "./services/contract"
 
 import { startQueueSync, flushQueue } from "./services/offlineQueue"
+import { startDeviceHeartbeat } from "./services/deviceCredential"
+import { getDeviceFingerprint } from "./services/fingerprint"
 
 // ============================================================
 
@@ -128,6 +130,15 @@ export default function App() {
   // Offline queue: replay on reconnect and at startup (safe via clientRequestId)
 
   useEffect(() => startQueueSync(), [])
+
+  // Device heartbeat: periodic background reporting if authorized hardware credential exists
+  useEffect(() => {
+    const stopHeartbeat = startDeviceHeartbeat(
+      (cred, fp) => api.sendDeviceHeartbeat(cred, fp),
+      getDeviceFingerprint,
+    )
+    return () => stopHeartbeat()
+  }, [])
 
   // Subscribe to authStore
 

@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react"
+﻿import { useState, useEffect } from "react"
 
 import { api, VerificationResult } from "../services/api"
 
 interface WorkerWalletProps {
   onVerifyInVerifier: (credentialId: string) => void
+  credentials?: WalletCredential[]
 }
 
 interface WalletCredential {
@@ -32,81 +33,70 @@ interface WalletCredential {
   totalScore: number
 }
 
-const WALLET_CREDENTIALS: WalletCredential[] = [
-  {
-    id: "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
-
-    skillName: "Electrical Installation & Maintenance",
-
-    awardLevel: "Level 2 (Skilled)",
-
-    issuer: "did:nsp:hub:lahore-01",
-
-    issuerHub: "NADRA Regional Testing Centre, Lahore",
-
-    issuedAt: "2026-10-18T10:15:30.123Z",
-
-    txHash:
-      "0x89abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678",
-
-    rootHash:
-      "0x5a1f8c2b7e9d4013fa67823e590bd71a48c6913e2bf45091c7830de45681ab34",
-
-    status: "MINTED",
-
-    practicalScore: 88.5,
-
-    theoryScore: 92.0,
-
-    totalScore: 90.25,
-  },
-
-  {
-    id: "urn:uuid:8b1e4420-1283-4a6f-9810-bb2a41289df1",
-
-    skillName: "Welding & Fabrication",
-
-    awardLevel: "Level 3 (Advanced)",
-
-    issuer: "did:nsp:hub:lahore-01",
-
-    issuerHub: "NADRA Regional Testing Centre, Lahore",
-
-    issuedAt: "2026-10-18T14:20:00.000Z",
-
-    txHash:
-      "0x5a1f8c2b7e9d4013fa67823e590bd71a48c6913e2bf45091c7830de45681ab34",
-
-    rootHash:
-      "0x3c8e1a4f7b2d9e6c0a5f8b3d7e1c4a9f24680ace13579bdf02468ace13579bdf",
-
-    status: "MINTED",
-
-    practicalScore: 94.0,
-
-    theoryScore: 89.5,
-
-    totalScore: 91.75,
-  },
-]
-
+/**
+ * WorkerWalletScreen - Digital wallet for worker credentials
+ *
+ * This component displays worker's skill credentials in a mobile wallet interface.
+ * Credentials can be provided via props or fetched from an API.
+ *
+ * INTEGRATION OPTIONS:
+ * 1. Pass credentials via props: <WorkerWalletScreen credentials={userCredentials} ... />
+ * 2. Implement API fetching in the useEffect below (marked with TODO)
+ * 3. Fetch from authentication context/store (userContext, authStore, etc.)
+ *
+ * @param onVerifyInVerifier - Callback to verify credential in verifier DApp
+ * @param credentials - Optional array of credentials (if not provided, will attempt to fetch)
+ */
 export default function WorkerWalletScreen({
   onVerifyInVerifier,
+  credentials: propCredentials,
 }: WorkerWalletProps) {
-  const [selectedCred, setSelectedCred] = useState<WalletCredential>(
-    WALLET_CREDENTIALS[0],
-  )
-
+  const [credentials, setCredentials] = useState<WalletCredential[]>(propCredentials || [])
+  const [selectedCred, setSelectedCred] = useState<WalletCredential | null>(null)
+  const [loadingCredentials, setLoadingCredentials] = useState(!propCredentials)
   const [copied, setCopied] = useState(false)
-
   const [viewMode, setViewMode] = useState<"card" | "qr" | "onchain">("card")
-
   const [liveVerification, setLiveVerification] =
     useState<VerificationResult | null>(null)
-
   const [verifying, setVerifying] = useState(false)
 
+  // Sync credentials from props
   useEffect(() => {
+    if (propCredentials) {
+      setCredentials(propCredentials)
+      setLoadingCredentials(false)
+    }
+  }, [propCredentials])
+
+  // Fetch user credentials from API or user context (if not provided via props)
+  useEffect(() => {
+    if (propCredentials) return // Skip if credentials provided via props
+
+    // TODO: Replace with actual API call to fetch worker credentials
+    // Example: api.getWorkerCredentials() or fetch from user context/store
+    // For now, initialize with empty array - credentials should be fetched from:
+    // - User authentication context
+    // - API endpoint like /api/worker/credentials
+    // - Or passed as props from parent component
+    setCredentials([])
+    setLoadingCredentials(false)
+  }, [propCredentials])
+
+  // Auto-select first credential when credentials are loaded
+  useEffect(() => {
+    if (!loadingCredentials && credentials.length > 0 && !selectedCred) {
+      setSelectedCred(credentials[0])
+    }
+  }, [credentials, loadingCredentials, selectedCred])
+
+  useEffect(() => {
+    // Only verify if a credential is selected
+    if (!selectedCred) {
+      setLiveVerification(null)
+      setVerifying(false)
+      return
+    }
+
     let isMounted = true
 
     setVerifying(true)
@@ -162,9 +152,10 @@ export default function WorkerWalletScreen({
     return () => {
       isMounted = false
     }
-  }, [selectedCred.id])
+  }, [selectedCred?.id])
 
   const handleCopyUrn = () => {
+    if (!selectedCred) return
     navigator.clipboard?.writeText(selectedCred.id)
 
     setCopied(true)
@@ -397,65 +388,91 @@ export default function WorkerWalletScreen({
             background: "rgba(0,0,0,0.15)",
           }}
         >
-          {WALLET_CREDENTIALS.map((cred) => {
-            const isSelected = cred.id === selectedCred.id
+          {loadingCredentials ? (
+            <div
+              style={{
+                width: "100%",
+                textAlign: "center",
+                fontSize: 12,
+                color: "rgba(241,240,234,0.5)",
+                padding: "8px 12px",
+              }}
+            >
+              Loading credentials...
+            </div>
+          ) : credentials.length === 0 ? (
+            <div
+              style={{
+                width: "100%",
+                textAlign: "center",
+                fontSize: 12,
+                color: "rgba(241,240,234,0.5)",
+                padding: "8px 12px",
+              }}
+            >
+              No credentials available
+            </div>
+          ) : (
+            credentials.map((cred) => {
+              const isSelected = selectedCred?.id === cred.id
 
-            return (
-              <button
-                key={cred.id}
-                onClick={() => setSelectedCred(cred)}
-                style={{
-                  flex: 1,
-
-                  padding: "8px 12px",
-
-                  borderRadius: 8,
-
-                  border: isSelected
-                    ? "1px solid #4C7A6E"
-                    : "1px solid rgba(255,255,255,0.06)",
-
-                  background: isSelected
-                    ? "rgba(76,122,110,0.25)"
-                    : "rgba(255,255,255,0.03)",
-
-                  color: isSelected ? "#fff" : "rgba(241,240,234,0.6)",
-
-                  fontSize: 12,
-
-                  fontWeight: 600,
-
-                  cursor: "pointer",
-
-                  textAlign: "left",
-
-                  transition: "all 0.15s",
-                }}
-              >
-                <div
+              return (
+                <button
+                  key={cred.id}
+                  onClick={() => setSelectedCred(cred)}
                   style={{
-                    fontSize: 11,
-                    color: isSelected ? "#5DCAA5" : "#8C897C",
+                    flex: 1,
+
+                    padding: "8px 12px",
+
+                    borderRadius: 8,
+
+                    border: isSelected
+                      ? "1px solid #4C7A6E"
+                      : "1px solid rgba(255,255,255,0.06)",
+
+                    background: isSelected
+                      ? "rgba(76,122,110,0.25)"
+                      : "rgba(255,255,255,0.03)",
+
+                    color: isSelected ? "#fff" : "rgba(241,240,234,0.6)",
+
+                    fontSize: 12,
+
+                    fontWeight: 600,
+
+                    cursor: "pointer",
+
+                    textAlign: "left",
+
+                    transition: "all 0.15s",
                   }}
                 >
-                  {cred.awardLevel.split(" ")[0]}
-                </div>
-                <div
-                  style={{
-                    overflow: "hidden",
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: isSelected ? "#5DCAA5" : "#8C897C",
+                    }}
+                  >
+                    {cred.awardLevel.split(" ")[0]}
+                  </div>
+                  <div
+                    style={{
+                      overflow: "hidden",
 
-                    textOverflow: "ellipsis",
+                      textOverflow: "ellipsis",
 
-                    whiteSpace: "nowrap",
+                      whiteSpace: "nowrap",
 
-                    fontWeight: 700,
-                  }}
-                >
-                  {cred.skillName}
-                </div>
-              </button>
-            )
-          })}
+                      fontWeight: 700,
+                    }}
+                  >
+                    {cred.skillName}
+                  </div>
+                </button>
+              )
+            })
+          )}
         </div>
 
         {/* View Mode Switcher: Digital Card | QR Code | Blockchain Proof */}
@@ -509,8 +526,23 @@ export default function WorkerWalletScreen({
 
         {/* Content Section */}
         <div style={{ padding: 20 }}>
-          {/* VIEW MODE 1: DIGITAL CREDENTIAL CARD */}
-          {viewMode === "card" && (
+          {!selectedCred ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "40px 20px",
+                color: "rgba(241,240,234,0.5)",
+                fontSize: 14,
+              }}
+            >
+              {loadingCredentials
+                ? "Loading credentials..."
+                : "Select a credential to view details"}
+            </div>
+          ) : (
+            <>
+              {/* VIEW MODE 1: DIGITAL CREDENTIAL CARD */}
+              {viewMode === "card" && (
             <div>
               {/* Certificate Passport Card */}
               <div
@@ -1237,10 +1269,10 @@ export default function WorkerWalletScreen({
                 <button
                   onClick={() => {
                     navigator.clipboard.writeText(
-                      `https://verifier.nsp.gov.pk/verify?id=${encodeURIComponent(selectedCred.id)}`
-                    );
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
+                      `https://verifier.nsp.gov.pk/verify?id=${encodeURIComponent(selectedCred.id)}`,
+                    )
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
                   }}
                   style={{
                     padding: "6px 12px",
@@ -1464,6 +1496,8 @@ export default function WorkerWalletScreen({
             </svg>
             Verify this Credential in Verifier DApp
           </button>
+            </>
+          )}
         </div>
       </div>
     </div>

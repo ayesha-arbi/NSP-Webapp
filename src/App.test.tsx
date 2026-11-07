@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"
+﻿import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import App from "./App"
@@ -33,21 +33,37 @@ describe("App authentication navigation", () => {
     })
     render(<App />)
 
+    await userEvent.type(
+      screen.getByPlaceholderText(/you@navttc/i),
+      user.email,
+    )
+    await userEvent.type(
+      screen.getByPlaceholderText(/enter your password/i),
+      "password123",
+    )
     await userEvent.click(screen.getByRole("button", { name: "Sign In" }))
-    expect(await screen.findByRole("heading", { name: "Verify your identity" })).toBeVisible()
+    expect(
+      await screen.findByRole("heading", { name: "Verify your identity" }),
+    ).toBeVisible()
 
     await userEvent.click(
       screen.getByRole("button", {
         name: /lost your authenticator device.*use a backup code/i,
       }),
     )
-    expect(await screen.findByRole("heading", { name: "Use a backup code" })).toBeVisible()
+    expect(
+      await screen.findByRole("heading", { name: "Use a backup code" }),
+    ).toBeVisible()
     expect(screen.getByText(user.email)).toBeVisible()
     expect(sessionStorage.getItem("password")).toBeNull()
     expect(localStorage.getItem("password")).toBeNull()
 
-    await userEvent.click(screen.getByRole("button", { name: "Back to authenticator" }))
-    expect(await screen.findByRole("heading", { name: "Verify your identity" })).toBeVisible()
+    await userEvent.click(
+      screen.getByRole("button", { name: "Back to authenticator" }),
+    )
+    expect(
+      await screen.findByRole("heading", { name: "Verify your identity" }),
+    ).toBeVisible()
 
     await userEvent.click(
       screen.getByRole("button", {
@@ -55,6 +71,8 @@ describe("App authentication navigation", () => {
       }),
     )
     await userEvent.click(screen.getByRole("button", { name: "Back to login" }))
-    expect(await screen.findByRole("heading", { name: "Sign in to Issuer Portal" })).toBeVisible()
+    expect(
+      await screen.findByRole("heading", { name: "Sign in to Issuer Portal" }),
+    ).toBeVisible()
   })
 })

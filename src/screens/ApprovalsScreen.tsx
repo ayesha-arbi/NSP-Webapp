@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react"
 
 import Select from "@/components/Select"
+import StepUpModal from "@/components/StepUpModal"
 
 import { api, ApiError, Assessment } from "../services/api"
 
@@ -151,14 +152,21 @@ interface Submission {
 }
 
 // Guide 5: Stable canonical URN generator for records without server-assigned credentialId yet
-function getStableCredentialId(assessmentId: string, candidateId?: string): string {
-  const seed = (assessmentId + (candidateId || "")).replace(/[^0-9a-f]/gi, "").padEnd(12, "0").slice(0, 12)
+function getStableCredentialId(
+  assessmentId: string,
+  candidateId?: string,
+): string {
+  const seed = (assessmentId + (candidateId || ""))
+    .replace(/[^0-9a-f]/gi, "")
+    .padEnd(12, "0")
+    .slice(0, 12)
   return `urn:uuid:7c9e6679-7425-40de-944b-${seed}`
 }
 
 // Guide 5: Includes canonical URN credentialId, ledger mint status, and transaction hash.
 function toSubmission(a: Assessment): Submission {
-  const credId = a.credentialId || getStableCredentialId(a.assessmentId, a.candidateId)
+  const credId =
+    a.credentialId || getStableCredentialId(a.assessmentId, a.candidateId)
   let mStatus: MintingStatus | undefined = undefined
   if (a.mintingStatus) {
     const raw = a.mintingStatus.toLowerCase()
@@ -191,7 +199,10 @@ function toSubmission(a: Assessment): Submission {
 
     grade: a.grade,
 
-    status: a.status === "APPROVED" || a.status === "MINTED" ? "approved" : "submitted",
+    status:
+      a.status === "APPROVED" || a.status === "MINTED"
+        ? "approved"
+        : "submitted",
 
     credentialId: credId,
 
@@ -285,7 +296,14 @@ function MintingPill({ status }: { status: MintingStatus }) {
       label: "Queued for Minting",
       svg: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="10" cy="10" r="7" stroke="#1A4DB8" strokeWidth="1.5" strokeDasharray="3 3" />
+          <circle
+            cx="10"
+            cy="10"
+            r="7"
+            stroke="#1A4DB8"
+            strokeWidth="1.5"
+            strokeDasharray="3 3"
+          />
         </svg>
       ),
     },
@@ -424,67 +442,6 @@ function ModalOverlay({ children }: { children: React.ReactNode }) {
   )
 }
 
-const DEMO_SUBMISSIONS: Submission[] = [
-  {
-    id: "asm-demo-001",
-    candidate: "Tariq Mehmood",
-    cnic: "35201-1234567-1",
-    trade: "Industrial Electrician",
-    hub: "Testing Hub #1 (Lahore-C01)",
-    submittedBy: "usr-tt-01",
-    submittedAt: "2026-10-25 14:30",
-    score: 88,
-    maxScore: 100,
-    grade: "A",
-    status: "submitted",
-    credentialId: "urn:uuid:7c9e6679-7425-40de-944b-asm-demo-001",
-  },
-  {
-    id: "asm-demo-002",
-    candidate: "Zubair Ahmed",
-    cnic: "42101-7654321-3",
-    trade: "Pipe Welder (6G TIG)",
-    hub: "Testing Hub #1 (Lahore-C01)",
-    submittedBy: "usr-tt-01",
-    submittedAt: "2026-10-25 13:15",
-    score: 92,
-    maxScore: 100,
-    grade: "A+",
-    status: "submitted",
-    credentialId: "urn:uuid:7c9e6679-7425-40de-944b-asm-demo-002",
-  },
-  {
-    id: "asm-demo-003",
-    candidate: "Hamza Siddiqui",
-    cnic: "61101-9876543-5",
-    trade: "Solar PV Technician",
-    hub: "Testing Hub #1 (Lahore-C01)",
-    submittedBy: "usr-tt-02",
-    submittedAt: "2026-10-25 11:45",
-    score: 79,
-    maxScore: 100,
-    grade: "B",
-    status: "submitted",
-    credentialId: "urn:uuid:7c9e6679-7425-40de-944b-asm-demo-003",
-  },
-  {
-    id: "asm-demo-004",
-    candidate: "Imran Khan",
-    cnic: "17301-3456789-7",
-    trade: "Automotive Diagnostic Technician",
-    hub: "Testing Hub #1 (Lahore-C01)",
-    submittedBy: "usr-tt-01",
-    submittedAt: "2026-10-24 16:20",
-    score: 84,
-    maxScore: 100,
-    grade: "A",
-    status: "approved",
-    mintingStatus: "confirmed",
-    credentialId: "urn:uuid:7c9e6679-7425-40de-944b-asm-demo-004",
-    txHash: "0x3a4b9c1d8e2f0a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b",
-  },
-]
-
 export default function ApprovalsScreen() {
   // Hub scoping is enforced by the server; the UI only labels it.
 
@@ -501,6 +458,10 @@ export default function ApprovalsScreen() {
   const [busy, setBusy] = useState(false)
 
   const [actionError, setActionError] = useState("")
+
+  const [stepUpOpen, setStepUpOpen] = useState(false)
+  const [stepUpLoading, setStepUpLoading] = useState(false)
+  const [stepUpError, setStepUpError] = useState("")
 
   const [toast, setToast] = useState("")
 
@@ -522,7 +483,7 @@ export default function ApprovalsScreen() {
 
   const [rejectionReason, setRejectionReason] = useState("")
 
-  const pollTimers = useRef<Record<string, { timer: any; elapsed: number }>>({})
+  const pollTimers = useRef<Record<string, { timer: any elapsed: number }>>({})
 
   useEffect(() => {
     return () => {
@@ -744,59 +705,88 @@ export default function ApprovalsScreen() {
 
   async function handleApprove() {
     if (!selected) return
+    setStepUpError("")
+    setStepUpOpen(true)
+  }
 
-    setBusy(true)
-
-    setActionError("")
+  async function handleStepUpSubmit(code: string, isBackupCode: boolean) {
+    if (!selected) return
+    setStepUpLoading(true)
+    setStepUpError("")
 
     try {
-      // 1. Submit legacy assessment approval if available
-      await api.approveAssessment(selected.id).catch(() => null)
+      // Feature B1: Step-Up MFA Authorization
+      const stepUpRes = await api.requestStepUp(
+        "APPROVE_ASSESSMENT",
+        isBackupCode ? undefined : code,
+        isBackupCode ? code : undefined,
+      )
+      const stepUpToken = stepUpRes.stepUpToken
 
-      // 2. Queue for blockchain minting via Guide #5 §3 POST /api/ledger/approve
-      const credId = selected.credentialId || `urn:uuid:${crypto.randomUUID()}`
-      let queueRes = null
+      setStepUpOpen(false)
+      setStepUpLoading(false)
+      setBusy(true)
+      setActionError("")
 
       try {
-        queueRes = await api.approveCredential(credId)
-      } catch (err: any) {
-        if (err instanceof ApiError && err.status === 409) {
-          setActionError("Revoked credentials cannot be approved.")
-          setBusy(false)
-          return
+        // 1. Submit assessment approval with step-up token header (B1)
+        await api.approveAssessment(selected.id, stepUpToken).catch(() => null)
+
+        // 2. Queue for blockchain minting via Guide #5 §3 POST /api/ledger/approve
+        const credId =
+          selected.credentialId || `urn:uuid:${crypto.randomUUID()}`
+        let queueRes = null
+
+        try {
+          queueRes = await api.approveCredential(credId)
+        } catch (err: any) {
+          if (err instanceof ApiError && err.status === 409) {
+            setActionError("Revoked credentials cannot be approved.")
+            setBusy(false)
+            return
+          }
+          console.warn("Ledger approve note:", err?.message)
         }
-        console.warn("Ledger approve note:", err?.message)
+
+        const assignedCredId = queueRes?.data?.credential_id || credId
+
+        setSubmissions((ss) =>
+          ss.map((s) =>
+            s.id === selected.id
+              ? {
+                  ...s,
+                  status: "approved",
+                  mintingStatus: "queued",
+                  credentialId: assignedCredId,
+                }
+              : s,
+          ),
+        )
+
+        setModal("none")
+        setPassphrase("")
+        setToast(
+          "Credential approved with Step-Up MFA and enqueued for blockchain anchoring (Relayer polling every 30s).",
+        )
+
+        // Start polling per Guide #5 §6
+        startPollingCredential(assignedCredId)
+      } catch (err) {
+        setActionError(explain(err))
+      } finally {
+        setBusy(false)
       }
-
-      const assignedCredId = queueRes?.data?.credential_id || credId
-
-      setSubmissions((ss) =>
-        ss.map((s) =>
-          s.id === selected.id
-            ? {
-                ...s,
-                status: "approved",
-                mintingStatus: "queued",
-                credentialId: assignedCredId,
-              }
-            : s,
-        ),
-      )
-
-      setModal("none")
-
-      setPassphrase("")
-
-      setToast(
-        "Credential approved and enqueued for blockchain anchoring (Relayer polling every 30s).",
-      )
-
-      // Start polling per Guide #5 §6
-      startPollingCredential(assignedCredId)
-    } catch (err) {
-      setActionError(explain(err))
-    } finally {
-      setBusy(false)
+    } catch (err: any) {
+      setStepUpLoading(false)
+      if (err?.status === 423) {
+        setStepUpError(
+          "Account temporarily locked due to too many failed MFA attempts. Try again in 15 minutes.",
+        )
+      } else if (err?.status === 401) {
+        setStepUpError("Invalid MFA code. Please try again.")
+      } else {
+        setStepUpError(err?.message || "Step-up verification failed.")
+      }
     }
   }
 
@@ -1742,8 +1732,9 @@ export default function ApprovalsScreen() {
               Approve & Queue for Minting
             </h2>
             <p style={{ fontSize: 14, color: "#5C5A50", margin: 0 }}>
-              You are approving the following credential. It will be added to the
-              blockchain minting queue and anchored on Polygon Amoy testnet by the automatic relayer.
+              You are approving the following credential. It will be added to
+              the blockchain minting queue and anchored on Polygon Amoy testnet
+              by the automatic relayer.
             </p>
           </div>
 
@@ -1845,7 +1836,8 @@ export default function ApprovalsScreen() {
               </span>
             </label>
             <p style={{ fontSize: 13, color: "#5C5A50", marginBottom: 12 }}>
-              Enter your passphrase to digitally authorize this ledger approval and enqueue the credential for on-chain minting.
+              Enter your passphrase to digitally authorize this ledger approval
+              and enqueue the credential for on-chain minting.
             </p>
             <input
               type="password"
@@ -2083,6 +2075,20 @@ export default function ApprovalsScreen() {
           </div>
         </ModalOverlay>
       )}
+
+      {/* Step-Up MFA Challenge Modal (Capstone B1) */}
+      <StepUpModal
+        open={stepUpOpen}
+        scopeLabel="Approve Assessment (Scope: APPROVE_ASSESSMENT)"
+        actionDescription={`Approving assessment for ${selected?.candidate || "the candidate"}. This will issue a verifiable credential and queue it for Polygon Amoy blockchain anchoring.`}
+        loading={stepUpLoading}
+        error={stepUpError}
+        onSubmit={handleStepUpSubmit}
+        onCancel={() => {
+          setStepUpOpen(false)
+          setStepUpError("")
+        }}
+      />
     </div>
   )
 }

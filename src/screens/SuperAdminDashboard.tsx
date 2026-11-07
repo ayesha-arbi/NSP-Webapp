@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react"
+﻿import { useState, useMemo, useEffect } from "react"
 import Select from "@/components/Select"
 import { api, DashboardStats, ActiveSession } from "../services/api"
 import { superAdminApi } from "../services/superAdmin"
@@ -76,1047 +76,7 @@ interface FullAuditEntry {
   metadata?: Record<string, string>
 }
 
-/* ── Static data ── */
-const HUBS: Hub[] = [
-  {
-    id: "LAH-C01",
-    name: "Lahore-C01",
-    enrolled: 47,
-    target: 60,
-    submitted: 38,
-    pendingApproval: 9,
-    minted: 31,
-    status: "on-track",
-  },
-  {
-    id: "KHI-C02",
-    name: "Karachi-C02",
-    enrolled: 53,
-    target: 60,
-    submitted: 48,
-    pendingApproval: 5,
-    minted: 45,
-    status: "on-track",
-  },
-  {
-    id: "ISB-C03",
-    name: "Islamabad-C03",
-    enrolled: 29,
-    target: 60,
-    submitted: 22,
-    pendingApproval: 7,
-    minted: 18,
-    status: "behind",
-  },
-  {
-    id: "PSH-C04",
-    name: "Peshawar-C04",
-    enrolled: 12,
-    target: 60,
-    submitted: 8,
-    pendingApproval: 4,
-    minted: 6,
-    status: "critical",
-  },
-  {
-    id: "QTA-C05",
-    name: "Quetta-C05",
-    enrolled: 38,
-    target: 60,
-    submitted: 31,
-    pendingApproval: 7,
-    minted: 28,
-    status: "on-track",
-  },
-]
-
-const INIT_MINT_TXS: MintTx[] = [
-  {
-    id: "Q1",
-    credId: "CRED-2026-00094",
-    assessId: "ASS-2026-00501",
-    candidate: "Nadia Arshad",
-    hub: "Karachi-C02",
-    status: "queued",
-    retryCount: 0,
-    lastUpdated: "10:52",
-    submittedAt: "10:51",
-  },
-  {
-    id: "Q2",
-    credId: "CRED-2026-00093",
-    assessId: "ASS-2026-00500",
-    candidate: "Bilal Chaudhry",
-    hub: "Lahore-C01",
-    status: "queued",
-    retryCount: 0,
-    lastUpdated: "10:48",
-    submittedAt: "10:47",
-  },
-  {
-    id: "M1",
-    credId: "CRED-2026-00092",
-    assessId: "ASS-2026-00499",
-    candidate: "Ayesha Tariq",
-    hub: "Quetta-C05",
-    status: "minting",
-    retryCount: 0,
-    lastUpdated: "10:50",
-    submittedAt: "10:46",
-  },
-  {
-    id: "M2",
-    credId: "CRED-2026-00091",
-    assessId: "ASS-2026-00498",
-    candidate: "Usman Qureshi",
-    hub: "Karachi-C02",
-    status: "minting",
-    retryCount: 0,
-    lastUpdated: "10:49",
-    submittedAt: "10:45",
-  },
-  {
-    id: "C1",
-    credId: "CRED-2026-00090",
-    assessId: "ASS-2026-00497",
-    candidate: "Sadia Malik",
-    hub: "Lahore-C01",
-    status: "confirmed",
-    retryCount: 0,
-    txHash: "0x8f2a1c4e6b0d3f9a2c7e5b1d4f8a0c3e",
-    lastUpdated: "09:41",
-    submittedAt: "09:38",
-  },
-  {
-    id: "C2",
-    credId: "CRED-2026-00089",
-    assessId: "ASS-2026-00496",
-    candidate: "Tariq Mehmood",
-    hub: "Lahore-C01",
-    status: "confirmed",
-    retryCount: 0,
-    txHash: "0x1a3c5e7b9d0f2a4c6e8b0d2f4a6c8e0a",
-    lastUpdated: "09:22",
-    submittedAt: "09:19",
-  },
-  {
-    id: "C3",
-    credId: "CRED-2026-00088",
-    assessId: "ASS-2026-00495",
-    candidate: "Rabia Qureshi",
-    hub: "Islamabad-C03",
-    status: "confirmed",
-    retryCount: 0,
-    txHash: "0x4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a",
-    lastUpdated: "08:55",
-    submittedAt: "08:53",
-  },
-  {
-    id: "F1",
-    credId: "CRED-2026-00087",
-    assessId: "ASS-2026-00494",
-    candidate: "Imran Gul",
-    hub: "Peshawar-C04",
-    status: "failed",
-    retryCount: 3,
-    failReason: "Node timeout — smart contract call failed after 3 retries.",
-    lastUpdated: "07:18",
-    submittedAt: "06:50",
-  },
-  {
-    id: "F2",
-    credId: "CRED-2026-00086",
-    assessId: "ASS-2026-00493",
-    candidate: "Amna Siddiqui",
-    hub: "Karachi-C02",
-    status: "failed",
-    retryCount: 2,
-    failReason: "Gas estimation failed — network congestion.",
-    lastUpdated: "07:05",
-    submittedAt: "06:40",
-  },
-  {
-    id: "F3",
-    credId: "CRED-2026-00085",
-    assessId: "ASS-2026-00492",
-    candidate: "Zafar Iqbal",
-    hub: "Quetta-C05",
-    status: "failed",
-    retryCount: 1,
-    failReason: "Smart contract revert: invalid CID format.",
-    lastUpdated: "06:44",
-    submittedAt: "06:20",
-  },
-  {
-    id: "F4",
-    credId: "CRED-2026-00084",
-    assessId: "ASS-2026-00491",
-    candidate: "Usman Bhatti",
-    hub: "Islamabad-C03",
-    status: "failed",
-    retryCount: 0,
-    failReason: "Insufficient gas limit — transaction dropped from mempool.",
-    lastUpdated: "05:30",
-    submittedAt: "05:28",
-  },
-]
-
-const DEVICES: DeviceHub[] = [
-  {
-    hubId: "LAH-C01",
-    hubName: "Lahore-C01",
-    deviceStatus: "online",
-    connectivity: "4G LTE",
-    lastConnected: "Active now",
-    deviceHealth: "good",
-    edrStatus: "active",
-    lastSync: "5 min ago",
-    offlineRecords: 0,
-  },
-  {
-    hubId: "KHI-C02",
-    hubName: "Karachi-C02",
-    deviceStatus: "online",
-    connectivity: "WiFi",
-    lastConnected: "Active now",
-    deviceHealth: "good",
-    edrStatus: "active",
-    lastSync: "12 min ago",
-    offlineRecords: 2,
-  },
-  {
-    hubId: "ISB-C03",
-    hubName: "Islamabad-C03",
-    deviceStatus: "online",
-    connectivity: "4G LTE",
-    lastConnected: "Active now",
-    deviceHealth: "good",
-    edrStatus: "active",
-    lastSync: "1 hr ago",
-    offlineRecords: 0,
-  },
-  {
-    hubId: "PSH-C04",
-    hubName: "Peshawar-C04",
-    deviceStatus: "offline",
-    connectivity: "None",
-    lastConnected: "3 hrs ago",
-    deviceHealth: "critical",
-    edrStatus: "inactive",
-    lastSync: "4 hrs ago",
-    offlineRecords: 7,
-  },
-  {
-    hubId: "QTA-C05",
-    hubName: "Quetta-C05",
-    deviceStatus: "degraded",
-    connectivity: "3G",
-    lastConnected: "2 min ago",
-    deviceHealth: "degraded",
-    edrStatus: "warning",
-    lastSync: "2 hrs ago",
-    offlineRecords: 0,
-  },
-]
-
-const AUDIT_LOG: AuditEntry[] = [
-  {
-    id: "a01",
-    action: "Manual mint retry initiated",
-    user: "Zara Khan",
-    hub: "Peshawar-C04",
-    timestamp: "2026-08-27 10:44",
-    result: "success",
-    category: "mint",
-    detail: "CRED-2026-00087 queued for retry",
-  },
-  {
-    id: "a02",
-    action: "Credential revoked",
-    user: "Zara Khan",
-    hub: "Karachi-C02",
-    timestamp: "2026-08-27 10:31",
-    result: "success",
-    category: "credential",
-    detail: "CRED-2026-00072 — trade mismatch",
-  },
-  {
-    id: "a03",
-    action: "MFA step-up verified",
-    user: "Zara Khan",
-    hub: "—",
-    timestamp: "2026-08-27 10:30",
-    result: "success",
-    category: "auth",
-    detail: "Action: Credential revocation",
-  },
-  {
-    id: "a04",
-    action: "Login — Super Admin",
-    user: "Zara Khan",
-    hub: "—",
-    timestamp: "2026-08-27 09:58",
-    result: "success",
-    category: "auth",
-    detail: "Chrome 126 · 203.128.22.14",
-  },
-  {
-    id: "a05",
-    action: "Assessment approved",
-    user: "Fatima Malik",
-    hub: "Lahore-C01",
-    timestamp: "2026-08-27 09:41",
-    result: "success",
-    category: "approval",
-    detail: "ASS-2026-00497 · Score 91",
-  },
-  {
-    id: "a06",
-    action: "Mint transaction failed",
-    user: "System",
-    hub: "Islamabad-C03",
-    timestamp: "2026-08-27 09:18",
-    result: "failure",
-    category: "mint",
-    detail: "CRED-2026-00084 · Retry #0",
-  },
-  {
-    id: "a07",
-    action: "Assessment rejected",
-    user: "Fatima Malik",
-    hub: "Lahore-C01",
-    timestamp: "2026-08-27 08:55",
-    result: "warning",
-    category: "approval",
-    detail: "ASS-2026-00492 — below threshold",
-  },
-  {
-    id: "a08",
-    action: "Device went offline",
-    user: "System",
-    hub: "Peshawar-C04",
-    timestamp: "2026-08-27 07:55",
-    result: "failure",
-    category: "device",
-    detail: "No connectivity for 3+ hrs",
-  },
-  {
-    id: "a09",
-    action: "Credential minted",
-    user: "System",
-    hub: "Lahore-C01",
-    timestamp: "2026-08-27 07:41",
-    result: "success",
-    category: "mint",
-    detail: "CRED-2026-00090 · Block #4821203",
-  },
-  {
-    id: "a10",
-    action: "Session revoked",
-    user: "Zara Khan",
-    hub: "—",
-    timestamp: "2026-08-26 18:22",
-    result: "success",
-    category: "auth",
-    detail: "Ahmad Raza · Safari iOS",
-  },
-  {
-    id: "a11",
-    action: "Login failed — wrong password",
-    user: "Ahmad Raza",
-    hub: "Lahore-C01",
-    timestamp: "2026-08-26 17:44",
-    result: "failure",
-    category: "auth",
-    detail: "Attempt 2/5 · 203.128.22.14",
-  },
-  {
-    id: "a12",
-    action: "Offline records synced",
-    user: "System",
-    hub: "Karachi-C02",
-    timestamp: "2026-08-26 17:30",
-    result: "success",
-    category: "device",
-    detail: "3 enrollment records uploaded",
-  },
-  {
-    id: "a13",
-    action: "Assessment approved",
-    user: "Ali Hassan",
-    hub: "Karachi-C02",
-    timestamp: "2026-08-26 16:58",
-    result: "success",
-    category: "approval",
-    detail: "ASS-2026-00488 · Score 78",
-  },
-  {
-    id: "a14",
-    action: "Credential minted",
-    user: "System",
-    hub: "Karachi-C02",
-    timestamp: "2026-08-26 16:45",
-    result: "success",
-    category: "mint",
-    detail: "CRED-2026-00083 · Block #4821101",
-  },
-  {
-    id: "a15",
-    action: "MFA step-up failed",
-    user: "Zara Khan",
-    hub: "—",
-    timestamp: "2026-08-26 15:10",
-    result: "failure",
-    category: "auth",
-    detail: "Wrong OTP — retry allowed",
-  },
-]
-
-const FULL_AUDIT_LOG: FullAuditEntry[] = [
-  /* ── Auth ── */
-  {
-    id: "f01",
-    timestamp: "2026-08-27 10:44:18",
-    eventType: "Login — Success",
-    category: "auth",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "—",
-    ip: "203.128.22.20",
-    device: "Chrome 126 · Windows 11",
-    result: "success",
-    detail: "Super Admin authenticated successfully",
-    metadata: { "Session ID": "sess_zk_8820", "MFA Method": "TOTP" },
-  },
-  {
-    id: "f02",
-    timestamp: "2026-08-27 10:30:11",
-    eventType: "MFA Step-Up Challenge",
-    category: "auth",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "—",
-    ip: "203.128.22.20",
-    device: "Chrome 126 · Windows 11",
-    result: "success",
-    detail: "Step-up MFA verified for credential revocation",
-    metadata: { Action: "Credential Revocation", Target: "CRED-2026-00072" },
-  },
-  {
-    id: "f03",
-    timestamp: "2026-08-27 09:58:12",
-    eventType: "Login — Success",
-    category: "auth",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "—",
-    ip: "203.128.22.20",
-    device: "Chrome 126 · Windows 11",
-    result: "success",
-    detail: "Session established",
-    metadata: { "Session ID": "sess_zk_8815", "MFA Method": "TOTP" },
-  },
-  {
-    id: "f04",
-    timestamp: "2026-08-27 09:55:33",
-    eventType: "Login — Success",
-    category: "auth",
-    user: "Ahmad Raza",
-    userRole: "trade-tester",
-    hub: "Lahore-C01",
-    ip: "203.128.22.14",
-    device: "Chrome 126 · Windows 11",
-    result: "success",
-    detail: "Trade Tester authenticated",
-    metadata: { "Session ID": "sess_ar_4401", "MFA Method": "TOTP" },
-  },
-  {
-    id: "f05",
-    timestamp: "2026-08-27 08:30:04",
-    eventType: "Login — Success",
-    category: "auth",
-    user: "Fatima Malik",
-    userRole: "center-superintendent",
-    hub: "Lahore-C01",
-    ip: "203.128.22.15",
-    device: "Edge 126 · Windows 10",
-    result: "success",
-    detail: "Center Superintendent authenticated",
-    metadata: { "Session ID": "sess_fm_3302", "MFA Method": "TOTP" },
-  },
-  {
-    id: "f06",
-    timestamp: "2026-08-27 07:30:18",
-    eventType: "Login — Success",
-    category: "auth",
-    user: "Bilal Ahmed",
-    userRole: "trade-tester",
-    hub: "Karachi-C02",
-    ip: "42.201.64.88",
-    device: "Chrome 126 · macOS",
-    result: "success",
-    detail: "Trade Tester authenticated",
-    metadata: { "Session ID": "sess_ba_2211" },
-  },
-  {
-    id: "f07",
-    timestamp: "2026-08-27 07:15:40",
-    eventType: "Login — MFA Failed",
-    category: "auth",
-    user: "Sana Malik",
-    userRole: "trade-tester",
-    hub: "Islamabad-C03",
-    ip: "119.155.30.44",
-    device: "Firefox 128 · Ubuntu",
-    result: "failure",
-    detail: "Wrong OTP entered — 1 attempt remaining",
-    metadata: { "Failed Attempt": "4/5", "Lockout Threshold": "5" },
-  },
-  {
-    id: "f08",
-    timestamp: "2026-08-26 18:22:00",
-    eventType: "Session Force-Revoked",
-    category: "auth",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "—",
-    ip: "203.128.22.20",
-    device: "Chrome 126 · Windows 11",
-    result: "success",
-    detail: "Ahmad Raza's session invalidated by administrator",
-    targetId: "sess_ar_4395",
-    targetType: "session",
-    metadata: {
-      "Revoked Session": "sess_ar_4395",
-      Device: "Safari · iOS 17",
-      Reason: "Suspicious activity reported",
-    },
-  },
-  {
-    id: "f09",
-    timestamp: "2026-08-26 17:44:02",
-    eventType: "Login — Wrong Password",
-    category: "auth",
-    user: "Ahmad Raza",
-    userRole: "trade-tester",
-    hub: "Lahore-C01",
-    ip: "203.128.22.14",
-    device: "Chrome 126 · Windows 11",
-    result: "failure",
-    detail: "Failed login attempt 2 of 5",
-    metadata: { Attempt: "2/5", "Account Status": "Active" },
-  },
-  {
-    id: "f10",
-    timestamp: "2026-08-26 15:10:05",
-    eventType: "MFA Step-Up Failed",
-    category: "auth",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "—",
-    ip: "203.128.22.20",
-    device: "Chrome 126 · Windows 11",
-    result: "failure",
-    detail: "Wrong OTP entered — retry allowed",
-    metadata: {
-      "Action Attempted": "Credential Revocation",
-      "Retry Remaining": "Yes",
-    },
-  },
-  {
-    id: "f11",
-    timestamp: "2026-08-25 14:10:33",
-    eventType: "Login — Wrong Password",
-    category: "auth",
-    user: "Khalid Mehmood",
-    userRole: "trade-tester",
-    hub: "Peshawar-C04",
-    ip: "103.22.88.7",
-    device: "Chrome 126 · Windows 10",
-    result: "failure",
-    detail: "Failed login attempt 5 of 5 — account locked",
-    metadata: { Attempt: "5/5", "Account Status": "Locked" },
-  },
-  {
-    id: "f12",
-    timestamp: "2026-08-20 11:45:00",
-    eventType: "MFA Reset — Assisted",
-    category: "auth",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "—",
-    ip: "203.128.22.20",
-    device: "Chrome 126 · Windows 11",
-    result: "success",
-    detail: "MFA cleared for Ali Hassan — must re-enroll on next login",
-    targetId: "ali.hassan@navttc.gov.pk",
-    targetType: "user",
-    metadata: {
-      "Affected User": "Ali Hassan",
-      Reason: "Lost access to authenticator app",
-      "Out-of-Band Verified": "Yes",
-    },
-  },
-
-  /* ── Admin ── */
-  {
-    id: "f13",
-    timestamp: "2026-08-25 14:15:00",
-    eventType: "Account Locked — Auto",
-    category: "admin",
-    user: "System",
-    userRole: "system",
-    hub: "Peshawar-C04",
-    result: "success",
-    detail: "Account locked after 5 consecutive failed login attempts",
-    targetId: "khalid.mehmood@navttc.gov.pk",
-    targetType: "user",
-    metadata: {
-      "Affected User": "Khalid Mehmood",
-      "Failed Attempts": "5",
-      "Lock Trigger": "Automatic (policy)",
-    },
-  },
-  {
-    id: "f14",
-    timestamp: "2026-08-24 09:30:00",
-    eventType: "Account Locked — Manual",
-    category: "admin",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "—",
-    ip: "203.128.22.20",
-    device: "Chrome 126 · Windows 11",
-    result: "success",
-    detail: "Raheela Qasim locked pending identity re-verification",
-    targetId: "raheela.qasim@navttc.gov.pk",
-    targetType: "user",
-    metadata: {
-      "Affected User": "Raheela Qasim",
-      Reason: "Pending identity re-verification",
-    },
-  },
-  {
-    id: "f15",
-    timestamp: "2026-08-19 09:15:00",
-    eventType: "Account Unlocked",
-    category: "admin",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "—",
-    ip: "203.128.22.20",
-    device: "Chrome 126 · Windows 11",
-    result: "success",
-    detail: "Account re-enabled after successful identity verification",
-    targetId: "usman.tariq@navttc.gov.pk",
-    targetType: "user",
-    metadata: { "Affected User": "Usman Tariq", "Previous Lock By": "System" },
-  },
-  {
-    id: "f16",
-    timestamp: "2026-03-01 11:00:00",
-    eventType: "User Account Created",
-    category: "admin",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "—",
-    ip: "203.128.22.20",
-    device: "Chrome 124 · Windows 11",
-    result: "success",
-    detail: "New Trade Tester account provisioned for Quetta-C05",
-    targetId: "raheela.qasim@navttc.gov.pk",
-    targetType: "user",
-    metadata: {
-      "New User": "Raheela Qasim",
-      "Role Assigned": "Trade Tester",
-      Hub: "Quetta-C05",
-      "MFA Required": "Yes",
-    },
-  },
-  {
-    id: "f17",
-    timestamp: "2026-02-14 10:00:00",
-    eventType: "User Account Created",
-    category: "admin",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "—",
-    ip: "203.128.22.20",
-    device: "Chrome 122 · Windows 11",
-    result: "success",
-    detail: "New Trade Tester account provisioned for Quetta-C05",
-    targetId: "nadia.hussain@navttc.gov.pk",
-    targetType: "user",
-    metadata: {
-      "New User": "Nadia Hussain",
-      "Role Assigned": "Trade Tester",
-      Hub: "Quetta-C05",
-      "MFA Required": "Yes",
-    },
-  },
-  {
-    id: "f18",
-    timestamp: "2026-02-10 14:30:00",
-    eventType: "User Role Changed",
-    category: "admin",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "—",
-    ip: "203.128.22.20",
-    device: "Chrome 122 · Windows 11",
-    result: "success",
-    detail: "Khalid Mehmood hub assignment updated",
-    targetId: "khalid.mehmood@navttc.gov.pk",
-    targetType: "user",
-    metadata: {
-      "Affected User": "Khalid Mehmood",
-      "Previous Hub": "Lahore-C01",
-      "New Hub": "Peshawar-C04",
-      Role: "Trade Tester",
-    },
-  },
-
-  /* ── Assessment ── */
-  {
-    id: "f19",
-    timestamp: "2026-08-27 10:30:00",
-    eventType: "Assessment Submitted",
-    category: "assessment",
-    user: "Ahmad Raza",
-    userRole: "trade-tester",
-    hub: "Lahore-C01",
-    ip: "203.128.22.14",
-    device: "Chrome 126 · Windows 11",
-    result: "success",
-    detail: "Assessment scores submitted for candidate Nadia Arshad",
-    targetId: "ASS-2026-00501",
-    targetType: "assessment",
-    metadata: {
-      Candidate: "Nadia Arshad",
-      Trade: "Electrical Wiring",
-      Score: "88",
-      "Offline Mode": "No",
-    },
-  },
-  {
-    id: "f20",
-    timestamp: "2026-08-27 10:25:00",
-    eventType: "Assessment Submitted",
-    category: "assessment",
-    user: "Bilal Ahmed",
-    userRole: "trade-tester",
-    hub: "Karachi-C02",
-    ip: "42.201.64.88",
-    device: "Chrome 126 · macOS",
-    result: "success",
-    detail: "Assessment scores submitted for candidate Bilal Chaudhry",
-    targetId: "ASS-2026-00500",
-    targetType: "assessment",
-    metadata: {
-      Candidate: "Bilal Chaudhry",
-      Trade: "Plumbing",
-      Score: "74",
-      "Offline Mode": "No",
-    },
-  },
-  {
-    id: "f21",
-    timestamp: "2026-08-27 09:55:00",
-    eventType: "Assessment Submitted",
-    category: "assessment",
-    user: "Sana Malik",
-    userRole: "trade-tester",
-    hub: "Islamabad-C03",
-    ip: "119.155.30.44",
-    device: "Firefox 128 · Ubuntu",
-    result: "success",
-    detail: "Assessment scores submitted — offline sync on connect",
-    targetId: "ASS-2026-00499",
-    targetType: "assessment",
-    metadata: {
-      Candidate: "Ayesha Tariq",
-      Trade: "Masonry",
-      Score: "95",
-      "Offline Mode": "Yes",
-    },
-  },
-
-  /* ── Approval ── */
-  {
-    id: "f22",
-    timestamp: "2026-08-27 09:41:00",
-    eventType: "Assessment Approved",
-    category: "approval",
-    user: "Fatima Malik",
-    userRole: "center-superintendent",
-    hub: "Lahore-C01",
-    ip: "203.128.22.15",
-    device: "Edge 126 · Windows 10",
-    result: "success",
-    detail: "Assessment approved and queued for minting",
-    targetId: "ASS-2026-00497",
-    targetType: "assessment",
-    metadata: {
-      Candidate: "Sadia Malik",
-      Score: "91",
-      Grade: "Distinction",
-      "Mint Status": "Queued",
-    },
-  },
-  {
-    id: "f23",
-    timestamp: "2026-08-27 08:55:00",
-    eventType: "Assessment Rejected",
-    category: "approval",
-    user: "Fatima Malik",
-    userRole: "center-superintendent",
-    hub: "Lahore-C01",
-    ip: "203.128.22.15",
-    device: "Edge 126 · Windows 10",
-    result: "warning",
-    detail: "Score below passing threshold — assessment rejected",
-    targetId: "ASS-2026-00492",
-    targetType: "assessment",
-    metadata: {
-      Candidate: "Zafar Iqbal",
-      Score: "41",
-      Threshold: "50",
-      Reason: "Below passing threshold",
-    },
-  },
-  {
-    id: "f24",
-    timestamp: "2026-08-26 16:58:00",
-    eventType: "Assessment Approved",
-    category: "approval",
-    user: "Ali Hassan",
-    userRole: "center-superintendent",
-    hub: "Karachi-C02",
-    ip: "42.201.64.90",
-    device: "Chrome 126 · Windows 10",
-    result: "success",
-    detail: "Assessment approved and queued for minting",
-    targetId: "ASS-2026-00488",
-    targetType: "assessment",
-    metadata: {
-      Candidate: "Amna Siddiqui",
-      Score: "78",
-      Grade: "Pass",
-      "Mint Status": "Queued",
-    },
-  },
-  {
-    id: "f25",
-    timestamp: "2026-08-26 14:20:00",
-    eventType: "Assessment Approved",
-    category: "approval",
-    user: "Usman Tariq",
-    userRole: "center-superintendent",
-    hub: "Islamabad-C03",
-    ip: "119.155.30.50",
-    device: "Chrome 126 · Windows 10",
-    result: "success",
-    detail: "Assessment approved and queued for minting",
-    targetId: "ASS-2026-00495",
-    targetType: "assessment",
-    metadata: {
-      Candidate: "Rabia Qureshi",
-      Score: "85",
-      Grade: "Pass",
-      "Mint Status": "Queued",
-    },
-  },
-
-  /* ── Minting ── */
-  {
-    id: "f26",
-    timestamp: "2026-08-27 10:44:00",
-    eventType: "Mint Retry Initiated",
-    category: "mint",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "Peshawar-C04",
-    ip: "203.128.22.20",
-    device: "Chrome 126 · Windows 11",
-    result: "success",
-    detail: "Failed transaction re-queued after step-up MFA",
-    targetId: "CRED-2026-00087",
-    targetType: "credential",
-    metadata: {
-      "Previous Retries": "3",
-      "Failure Reason": "Node timeout — smart contract call failed",
-      "Queue Position": "3",
-    },
-  },
-  {
-    id: "f27",
-    timestamp: "2026-08-27 09:18:00",
-    eventType: "Mint Transaction Failed",
-    category: "mint",
-    user: "System",
-    userRole: "system",
-    hub: "Islamabad-C03",
-    result: "failure",
-    detail: "Insufficient gas — transaction dropped from mempool",
-    targetId: "CRED-2026-00084",
-    targetType: "credential",
-    metadata: {
-      "Retry Count": "0",
-      Error: "Insufficient gas limit — transaction dropped from mempool",
-      "Tx Hash": "Not available",
-    },
-  },
-  {
-    id: "f28",
-    timestamp: "2026-08-27 07:18:00",
-    eventType: "Mint Transaction Failed",
-    category: "mint",
-    user: "System",
-    userRole: "system",
-    hub: "Peshawar-C04",
-    result: "failure",
-    detail: "Node timeout after 3 retries — manual intervention required",
-    targetId: "CRED-2026-00087",
-    targetType: "credential",
-    metadata: {
-      "Retry Count": "3",
-      Error: "Node timeout — smart contract call failed",
-      "Escalation Status": "Pending",
-    },
-  },
-  {
-    id: "f29",
-    timestamp: "2026-08-27 07:41:00",
-    eventType: "Credential Minted",
-    category: "mint",
-    user: "System",
-    userRole: "system",
-    hub: "Lahore-C01",
-    result: "success",
-    detail: "Credential confirmed on-chain",
-    targetId: "CRED-2026-00090",
-    targetType: "credential",
-    metadata: {
-      "Block Number": "4821203",
-      "Tx Hash": "0x8f2a1c4e6b0d3f9a2c7e5b1d4f8a0c3e",
-      "Gas Used": "142,400",
-      Candidate: "Sadia Malik",
-    },
-  },
-  {
-    id: "f30",
-    timestamp: "2026-08-26 16:45:00",
-    eventType: "Credential Minted",
-    category: "mint",
-    user: "System",
-    userRole: "system",
-    hub: "Karachi-C02",
-    result: "success",
-    detail: "Credential confirmed on-chain",
-    targetId: "CRED-2026-00083",
-    targetType: "credential",
-    metadata: {
-      "Block Number": "4821101",
-      "Tx Hash": "0x1a3c5e7b9d0f2a4c6e8b0d2f4a6c8e0a",
-      "Gas Used": "138,700",
-      Candidate: "Tariq Mehmood",
-    },
-  },
-  {
-    id: "f31",
-    timestamp: "2026-08-26 07:05:00",
-    eventType: "Mint Transaction Failed",
-    category: "mint",
-    user: "System",
-    userRole: "system",
-    hub: "Karachi-C02",
-    result: "failure",
-    detail: "Gas estimation failed due to network congestion",
-    targetId: "CRED-2026-00086",
-    targetType: "credential",
-    metadata: {
-      "Retry Count": "2",
-      Error: "Gas estimation failed — network congestion",
-      Candidate: "Amna Siddiqui",
-    },
-  },
-
-  /* ── Credential ── */
-  {
-    id: "f32",
-    timestamp: "2026-08-27 10:31:00",
-    eventType: "Credential Revoked",
-    category: "credential",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "Karachi-C02",
-    ip: "203.128.22.20",
-    device: "Chrome 126 · Windows 11",
-    result: "success",
-    detail: "Credential revoked — incorrect trade classification",
-    targetId: "CRED-2026-00072",
-    targetType: "credential",
-    metadata: {
-      Candidate: "Faisal Akhtar",
-      Reason: "Incorrect trade classification recorded at time of assessment",
-      "Revocation Block": "4821289",
-    },
-  },
-  {
-    id: "f33",
-    timestamp: "2026-08-15 14:20:00",
-    eventType: "Credential Revoked",
-    category: "credential",
-    user: "Zara Khan",
-    userRole: "super-admin",
-    hub: "Islamabad-C03",
-    ip: "203.128.22.20",
-    device: "Chrome 126 · Windows 11",
-    result: "success",
-    detail: "Credential revoked — test fraud investigation",
-    targetId: "CRED-2026-00055",
-    targetType: "credential",
-    metadata: {
-      Candidate: "Tariq Bhatti",
-      Reason: "Test fraud — unauthorized materials found during assessment",
-      "Case Reference": "FRAUD-2026-003",
-    },
-  },
-
-  /* ── Device ── */
-  {
-    id: "f34",
-    timestamp: "2026-08-27 07:55:00",
-    eventType: "Device Went Offline",
-    category: "device",
-    user: "System",
-    userRole: "system",
-    hub: "Peshawar-C04",
-    result: "failure",
-    detail: "Hub device lost connectivity — 7 offline records pending sync",
-    metadata: {
-      "Last Connected": "3 hrs ago",
-      "Offline Records": "7",
-      "EDR Status": "Inactive",
-    },
-  },
-  {
-    id: "f35",
-    timestamp: "2026-08-26 17:30:00",
-    eventType: "Offline Records Synced",
-    category: "device",
-    user: "System",
-    userRole: "system",
-    hub: "Karachi-C02",
-    result: "success",
-    detail: "3 enrollment records uploaded after reconnection",
-    metadata: {
-      "Records Synced": "3",
-      "Sync Duration": "2.1s",
-      Conflicts: "None",
-    },
-  },
-]
+/* ── Static data removed - now loaded from API ── */
 
 /* ── Helpers ── */
 function hubStatusColor(s: HubStatus) {
@@ -1424,76 +384,21 @@ function ModalOverlay({ children }: { children: React.ReactNode }) {
   )
 }
 
-
-const INITIAL_ACTIVE_SESSIONS: ActiveSession[] = [
-  {
-    sessionId: "sess_ahmad_01",
-    userId: "u1",
-    email: "ahmad.raza@navttc.gov.pk",
-    role: "TRADE_TESTER",
-    hubLocationId: 1,
-    ipAddress: "203.128.22.14",
-    deviceFingerprint: "fp_w11_chrome_c01a9",
-    createdAt: "2026-08-27T08:00:00Z",
-    expiresAt: "2026-08-27T16:00:00Z",
-  },
-  {
-    sessionId: "sess_fatima_02",
-    userId: "u2",
-    email: "fatima.malik@navttc.gov.pk",
-    role: "CENTER_SUPERINTENDENT",
-    hubLocationId: 1,
-    ipAddress: "203.128.22.15",
-    deviceFingerprint: "fp_w10_edge_789f2",
-    createdAt: "2026-08-27T07:30:00Z",
-    expiresAt: "2026-08-27T15:30:00Z",
-  },
-  {
-    sessionId: "sess_bilal_03",
-    userId: "u3",
-    email: "bilal.ahmed@navttc.gov.pk",
-    role: "TRADE_TESTER",
-    hubLocationId: 2,
-    ipAddress: "42.201.64.88",
-    deviceFingerprint: "fp_macos_chrome_334d",
-    createdAt: "2026-08-27T09:12:00Z",
-    expiresAt: "2026-08-27T17:12:00Z",
-  },
-  {
-    sessionId: "sess_nadia_08",
-    userId: "u8",
-    email: "nadia.hussain@navttc.gov.pk",
-    role: "TRADE_TESTER",
-    hubLocationId: 5,
-    ipAddress: "103.55.68.22",
-    deviceFingerprint: "fp_and_chrome_991ba",
-    createdAt: "2026-08-27T06:45:00Z",
-    expiresAt: "2026-08-27T14:45:00Z",
-  },
-  {
-    sessionId: "sess_zara_10",
-    userId: "u10",
-    email: "zara.khan@navttc.gov.pk",
-    role: "SUPER_ADMIN",
-    hubLocationId: 3,
-    ipAddress: "203.128.22.20",
-    deviceFingerprint: "fp_w11_admin_ff012",
-    createdAt: "2026-08-27T09:50:00Z",
-    expiresAt: "2026-08-27T17:50:00Z",
-  },
-]
-
 /* ── Main component ── */
 export default function SuperAdminDashboard() {
   const [tab, setTab] = useState<Tab>("overview")
-  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>(INITIAL_ACTIVE_SESSIONS)
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([])
   const [dashStats, setDashStats] = useState<DashboardStats | null>(null)
-  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null)
-  const [sessionRevokeSuccess, setSessionRevokeSuccess] = useState<string | null>(null)
+  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(
+    null,
+  )
+  const [sessionRevokeSuccess, setSessionRevokeSuccess] =
+    useState<string | null>(null)
 
   useEffect(() => {
     let isMounted = true
-    superAdminApi.getDashboard()
+    superAdminApi
+      .getDashboard()
       .then((stats) => {
         if (isMounted && stats) setDashStats(stats)
       })
@@ -1501,9 +406,15 @@ export default function SuperAdminDashboard() {
         console.warn("superAdminApi.getDashboard offline note:", err?.message)
       })
 
-    superAdminApi.getSessions()
+    superAdminApi
+      .getSessions()
       .then((sessions) => {
-        if (isMounted && sessions && Array.isArray(sessions) && sessions.length > 0) {
+        if (
+          isMounted &&
+          sessions &&
+          Array.isArray(sessions) &&
+          sessions.length > 0
+        ) {
           setActiveSessions(sessions)
         }
       })
@@ -1525,10 +436,12 @@ export default function SuperAdminDashboard() {
     }
     setActiveSessions((prev) => prev.filter((s) => s.sessionId !== sessionId))
     setRevokingSessionId(null)
-    setSessionRevokeSuccess(`Session ${sessionId} successfully revoked. Token invalidation broadcast completed.`)
+    setSessionRevokeSuccess(
+      `Session ${sessionId} successfully revoked. Token invalidation broadcast completed.`,
+    )
     setTimeout(() => setSessionRevokeSuccess(null), 5000)
   }
-  const [txs, setTxs] = useState<MintTx[]>(INIT_MINT_TXS)
+  const [txs, setTxs] = useState<MintTx[]>([])
   const [selectedTx, setSelectedTx] = useState<MintTx | null>(null)
   const [modal, setModal] = useState<"none" | "intervene" | "mfa">("none")
   const [mfaCode, setMfaCode] = useState("")
@@ -1554,10 +467,16 @@ export default function SuperAdminDashboard() {
   const [selectedAuditEntry, setSelectedAuditEntry] =
     useState<FullAuditEntry | null>(null)
 
-  const totalEnrolled = HUBS.reduce((s, h) => s + h.enrolled, 0)
-  const totalSubmitted = HUBS.reduce((s, h) => s + h.submitted, 0)
-  const totalApproved = HUBS.reduce((s, h) => s + h.pendingApproval, 0)
-  const totalMinted = HUBS.reduce((s, h) => s + h.minted, 0)
+  /* ── State for data loaded from API ── */
+  const [hubs, setHubs] = useState<Hub[]>([])
+  const [devices, setDevices] = useState<DeviceHub[]>([])
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
+  const [fullAuditLog, setFullAuditLog] = useState<FullAuditEntry[]>([])
+
+  const totalEnrolled = hubs.reduce((s, h) => s + h.enrolled, 0)
+  const totalSubmitted = hubs.reduce((s, h) => s + h.submitted, 0)
+  const totalApproved = hubs.reduce((s, h) => s + h.pendingApproval, 0)
+  const totalMinted = hubs.reduce((s, h) => s + h.minted, 0)
   const failed = txs.filter((t) => t.status === "failed")
   const failedCount = failed.length
   const confirmed = txs.filter((t) => t.status === "confirmed").length
@@ -1623,24 +542,24 @@ export default function SuperAdminDashboard() {
     setMfaCode("")
   }
 
-  const TABS: { key: Tab; label: string; alert?: number }[] = [
+  const TABS: { key: Tab label: string alert?: number }[] = [
     { key: "overview", label: "Overview" },
     {
       key: "hubs",
       label: "Hub Progress",
-      alert: HUBS.filter((h) => h.status !== "on-track").length,
+      alert: hubs.filter((h) => h.status !== "on-track").length,
     },
     { key: "minting", label: "Minting Queue", alert: failedCount },
     {
       key: "devices",
       label: "Device Health",
-      alert: DEVICES.filter((d) => d.deviceStatus !== "online").length,
+      alert: devices.filter((d) => d.deviceStatus !== "online").length,
     },
     { key: "sessions", label: "Active Sessions", alert: activeSessions.length },
     { key: "audit", label: "Audit Log" },
   ]
 
-  const visibleAudit = AUDIT_LOG.filter(
+  const visibleAudit = auditLog.filter(
     (e) => auditFilter === "all" || e.category === auditFilter,
   )
 
@@ -1664,7 +583,7 @@ export default function SuperAdminDashboard() {
   const filteredFullAudit = useMemo(() => {
     const today = "2026-08-27"
     const weekStart = "2026-08-21"
-    return FULL_AUDIT_LOG.filter((e) => {
+    return fullAuditLog.filter((e) => {
       const q = auditSearch.trim().toLowerCase()
       if (q) {
         const hay = [
@@ -1821,19 +740,67 @@ export default function SuperAdminDashboard() {
               marginBottom: 20,
             }}
           >
-            <div style={{ background: "#F7F6F2", border: "1px solid #D6D3C6", borderRadius: 8, padding: "12px 16px" }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#5C5A50", textTransform: "uppercase" }}>Staff Provisioned</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "#24302E", marginTop: 4 }}>
+            <div
+              style={{
+                background: "#F7F6F2",
+                border: "1px solid #D6D3C6",
+                borderRadius: 8,
+                padding: "12px 16px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#5C5A50",
+                  textTransform: "uppercase",
+                }}
+              >
+                Staff Provisioned
+              </div>
+              <div
+                style={{
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: "#24302E",
+                  marginTop: 4,
+                }}
+              >
                 {dashStats?.users?.total ?? 10} Users
               </div>
               <div style={{ fontSize: 11, color: "#8C897C", marginTop: 2 }}>
-                {dashStats?.users?.tradeTesters ?? 6} Testers · {dashStats?.users?.centerSuperintendents ?? 3} Ctr Supts · {dashStats?.users?.superAdmins ?? 1} Admin
+                {dashStats?.users?.tradeTesters ?? 6} Testers ·{" "}
+                {dashStats?.users?.centerSuperintendents ?? 3} Ctr Supts ·{" "}
+                {dashStats?.users?.superAdmins ?? 1} Admin
               </div>
             </div>
 
-            <div style={{ background: "#F7F6F2", border: "1px solid #D6D3C6", borderRadius: 8, padding: "12px 16px" }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#5C5A50", textTransform: "uppercase" }}>Active Sessions</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "#24302E", marginTop: 4 }}>
+            <div
+              style={{
+                background: "#F7F6F2",
+                border: "1px solid #D6D3C6",
+                borderRadius: 8,
+                padding: "12px 16px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#5C5A50",
+                  textTransform: "uppercase",
+                }}
+              >
+                Active Sessions
+              </div>
+              <div
+                style={{
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: "#24302E",
+                  marginTop: 4,
+                }}
+              >
                 {dashStats?.sessions?.activeCount ?? activeSessions.length} Live
               </div>
               <div style={{ fontSize: 11, color: "#8C897C", marginTop: 2 }}>
@@ -1841,19 +808,69 @@ export default function SuperAdminDashboard() {
               </div>
             </div>
 
-            <div style={{ background: "#F7F6F2", border: "1px solid #D6D3C6", borderRadius: 8, padding: "12px 16px" }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#5C5A50", textTransform: "uppercase" }}>MFA Protection</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: "#2D6A4F", marginTop: 4 }}>
+            <div
+              style={{
+                background: "#F7F6F2",
+                border: "1px solid #D6D3C6",
+                borderRadius: 8,
+                padding: "12px 16px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#5C5A50",
+                  textTransform: "uppercase",
+                }}
+              >
+                MFA Protection
+              </div>
+              <div
+                style={{
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: "#2D6A4F",
+                  marginTop: 4,
+                }}
+              >
                 {dashStats?.users?.activeMfa ?? 8} Enrolled
               </div>
               <div style={{ fontSize: 11, color: "#8C897C", marginTop: 2 }}>
-                {dashStats?.users?.pendingMfa ?? 2} pending setup · TOTP enforced
+                {dashStats?.users?.pendingMfa ?? 2} pending setup · TOTP
+                enforced
               </div>
             </div>
 
-            <div style={{ background: "#F7F6F2", border: "1px solid #D6D3C6", borderRadius: 8, padding: "12px 16px" }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#5C5A50", textTransform: "uppercase" }}>Security Lockouts</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: (dashStats?.users?.adminLocked ?? 1) > 0 ? "#A6453D" : "#24302E", marginTop: 4 }}>
+            <div
+              style={{
+                background: "#F7F6F2",
+                border: "1px solid #D6D3C6",
+                borderRadius: 8,
+                padding: "12px 16px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "#5C5A50",
+                  textTransform: "uppercase",
+                }}
+              >
+                Security Lockouts
+              </div>
+              <div
+                style={{
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color:
+                    (dashStats?.users?.adminLocked ?? 1) > 0
+                      ? "#A6453D"
+                      : "#24302E",
+                  marginTop: 4,
+                }}
+              >
                 {dashStats?.users?.adminLocked ?? 1} Locked
               </div>
               <div style={{ fontSize: 11, color: "#8C897C", marginTop: 2 }}>
@@ -2051,7 +1068,7 @@ export default function SuperAdminDashboard() {
               }
             >
               <div style={{ padding: "4px 0" }}>
-                {HUBS.map((hub) => {
+                {hubs.map((hub) => {
                   const pct = Math.round((hub.enrolled / hub.target) * 100)
                   return (
                     <div
@@ -2135,7 +1152,7 @@ export default function SuperAdminDashboard() {
             }
           >
             <div style={{ padding: "4px 0" }}>
-              {AUDIT_LOG.slice(0, 8).map((e) => (
+              {auditLog.slice(0, 8).map((e) => (
                 <div
                   key={e.id}
                   style={{
@@ -2234,7 +1251,7 @@ export default function SuperAdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {HUBS.map((hub) => {
+              {hubs.map((hub) => {
                 const pct = Math.round((hub.enrolled / hub.target) * 100)
                 const isBehind = hub.status !== "on-track"
                 return (
@@ -2404,7 +1421,7 @@ export default function SuperAdminDashboard() {
                     fontFamily: "IBM Plex Mono, monospace",
                   }}
                 >
-                  {HUBS.reduce((s, h) => s + h.enrolled, 0)}
+                  {hubs.reduce((s, h) => s + h.enrolled, 0)}
                   <span style={{ fontWeight: 400, color: "#8C897C" }}>
                     /300
                   </span>
@@ -2416,7 +1433,7 @@ export default function SuperAdminDashboard() {
                     color: "#24302E",
                   }}
                 >
-                  {HUBS.reduce((s, h) => s + h.submitted, 0)}
+                  {hubs.reduce((s, h) => s + h.submitted, 0)}
                 </td>
                 <td
                   style={{
@@ -2426,7 +1443,7 @@ export default function SuperAdminDashboard() {
                     fontWeight: 600,
                   }}
                 >
-                  {HUBS.reduce((s, h) => s + h.pendingApproval, 0)}
+                  {hubs.reduce((s, h) => s + h.pendingApproval, 0)}
                 </td>
                 <td
                   style={{
@@ -2435,7 +1452,7 @@ export default function SuperAdminDashboard() {
                     color: "#24302E",
                   }}
                 >
-                  {HUBS.reduce((s, h) => s + h.minted, 0)}
+                  {hubs.reduce((s, h) => s + h.minted, 0)}
                 </td>
                 <td style={{ padding: "12px 20px" }}>
                   <div
@@ -2452,7 +1469,7 @@ export default function SuperAdminDashboard() {
                       <div
                         style={{
                           height: "100%",
-                          width: `${Math.round((HUBS.reduce((s, h) => s + h.enrolled, 0) / 300) * 100)}%`,
+                          width: `${Math.round((hubs.reduce((s, h) => s + h.enrolled, 0) / 300) * 100)}%`,
                           background: "#B08D46",
                           borderRadius: 3,
                         }}
@@ -2469,7 +1486,7 @@ export default function SuperAdminDashboard() {
                       }}
                     >
                       {Math.round(
-                        (HUBS.reduce((s, h) => s + h.enrolled, 0) / 300) * 100,
+                        (hubs.reduce((s, h) => s + h.enrolled, 0) / 300) * 100,
                       )}
                       %
                     </span>
@@ -2852,7 +1869,7 @@ export default function SuperAdminDashboard() {
       {/* ══ DEVICE HEALTH ══ */}
       {tab === "devices" && (
         <div>
-          {DEVICES.filter((d) => d.deviceStatus !== "online").length > 0 && (
+          {devices.filter((d) => d.deviceStatus !== "online").length > 0 && (
             <div
               style={{
                 background: "#FFFBF5",
@@ -2881,8 +1898,8 @@ export default function SuperAdminDashboard() {
                 <line x1="12" y1="9" x2="12" y2="13" />
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
-              {DEVICES.filter((d) => d.deviceStatus !== "online").length} hub
-              {DEVICES.filter((d) => d.deviceStatus !== "online").length !== 1
+              {devices.filter((d) => d.deviceStatus !== "online").length} hub
+              {devices.filter((d) => d.deviceStatus !== "online").length !== 1
                 ? "s"
                 : ""}{" "}
               require attention — check offline and degraded devices below.
@@ -2892,7 +1909,7 @@ export default function SuperAdminDashboard() {
           <div
             style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
           >
-            {DEVICES.map((dev) => {
+            {devices.map((dev) => {
               const deviceStatusColor = (status: string) =>
                 status === "online"
                   ? "#4C7A6E"
@@ -3067,185 +2084,322 @@ export default function SuperAdminDashboard() {
         </div>
       )}
 
-        {/* ══ ACTIVE SESSIONS MONITORING (Guide #7) ══ */}
-        {tab === "sessions" && (
-          <div>
-            {sessionRevokeSuccess && (
+      {/* ══ ACTIVE SESSIONS MONITORING (Guide #7) ══ */}
+      {tab === "sessions" && (
+        <div>
+          {sessionRevokeSuccess && (
+            <div
+              style={{
+                background: "#EAF3DE",
+                border: "1px solid #4C7A6E",
+                borderRadius: 6,
+                padding: "10px 16px",
+                marginBottom: 16,
+                fontSize: 13,
+                color: "#173404",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14">
+                <circle cx="7" cy="7" r="7" fill="#4C7A6E" />
+                <polyline
+                  points="3.5,7 5.5,9.5 10.5,4"
+                  stroke="white"
+                  strokeWidth="1.5"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {sessionRevokeSuccess}
+            </div>
+          )}
+
+          <div
+            style={{
+              background: "#F7F6F2",
+              border: "1px solid #D6D3C6",
+              borderRadius: 8,
+              padding: "16px 20px",
+              marginBottom: 20,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <div>
               <div
                 style={{
-                  background: "#EAF3DE",
-                  border: "1px solid #4C7A6E",
-                  borderRadius: 6,
-                  padding: "10px 16px",
-                  marginBottom: 16,
-                  fontSize: 13,
-                  color: "#173404",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: "#24302E",
+                  marginBottom: 4,
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 14 14">
-                  <circle cx="7" cy="7" r="7" fill="#4C7A6E" />
-                  <polyline
-                    points="3.5,7 5.5,9.5 10.5,4"
-                    stroke="white"
-                    strokeWidth="1.5"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                {sessionRevokeSuccess}
+                Active Session Monitoring & Remote Revocation
               </div>
-            )}
-
-            <div
-              style={{
-                background: "#F7F6F2",
-                border: "1px solid #D6D3C6",
-                borderRadius: 8,
-                padding: "16px 20px",
-                marginBottom: 20,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#24302E", marginBottom: 4 }}>
-                  Active Session Monitoring & Remote Revocation
-                </div>
-                <div style={{ fontSize: 13, color: "#5C5A50" }}>
-                  Super Admin real-time session explorer. Immediate token invalidation via <code>token_version</code> increment.
-                </div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span
-                  style={{
-                    background: "#4C7A6E",
-                    color: "#fff",
-                    padding: "4px 12px",
-                    borderRadius: 999,
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                >
-                  {activeSessions.length} Active Sessions
-                </span>
+              <div style={{ fontSize: 13, color: "#5C5A50" }}>
+                Super Admin real-time session explorer. Immediate token
+                invalidation via <code>token_version</code> increment.
               </div>
             </div>
-
-            <div
-              style={{
-                background: "#fff",
-                border: "1px solid #D6D3C6",
-                borderRadius: 8,
-                overflow: "hidden",
-              }}
-            >
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: "#F7F6F2", borderBottom: "1px solid #D6D3C6", textAlign: "left" }}>
-                    <th style={{ padding: "12px 16px", fontWeight: 600, color: "#5C5A50" }}>Session ID</th>
-                    <th style={{ padding: "12px 16px", fontWeight: 600, color: "#5C5A50" }}>User / Email</th>
-                    <th style={{ padding: "12px 16px", fontWeight: 600, color: "#5C5A50" }}>Role</th>
-                    <th style={{ padding: "12px 16px", fontWeight: 600, color: "#5C5A50" }}>Hub Location</th>
-                    <th style={{ padding: "12px 16px", fontWeight: 600, color: "#5C5A50" }}>IP Address</th>
-                    <th style={{ padding: "12px 16px", fontWeight: 600, color: "#5C5A50" }}>Device Fingerprint</th>
-                    <th style={{ padding: "12px 16px", fontWeight: 600, color: "#5C5A50" }}>Created</th>
-                    <th style={{ padding: "12px 16px", fontWeight: 600, color: "#5C5A50", textAlign: "right" }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeSessions.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} style={{ padding: "32px 16px", textAlign: "center", color: "#8C897C" }}>
-                        No active sessions found.
-                      </td>
-                    </tr>
-                  ) : (
-                    activeSessions.map((s, idx) => (
-                      <tr
-                        key={s.sessionId}
-                        style={{
-                          borderBottom: idx < activeSessions.length - 1 ? "1px solid #E4E2D9" : "none",
-                          background: idx % 2 === 1 ? "#FAF9F6" : "#fff",
-                        }}
-                      >
-                        <td style={{ padding: "12px 16px", fontFamily: "monospace", fontSize: 12, color: "#5C5A50" }}>
-                          {s.sessionId}
-                        </td>
-                        <td style={{ padding: "12px 16px" }}>
-                          <div style={{ fontWeight: 600, color: "#24302E" }}>{s.email}</div>
-                          <div style={{ fontSize: 11, color: "#8C897C" }}>ID: {s.userId}</div>
-                        </td>
-                        <td style={{ padding: "12px 16px" }}>
-                          <span
-                            style={{
-                              padding: "2px 8px",
-                              borderRadius: 4,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              background: s.role === "SUPER_ADMIN" ? "#F5EEFA" : s.role === "CENTER_SUPERINTENDENT" ? "#EAF3DE" : "#EEF2FA",
-                              color: s.role === "SUPER_ADMIN" ? "#6B21A8" : s.role === "CENTER_SUPERINTENDENT" ? "#2D6A4F" : "#1E40AF",
-                            }}
-                          >
-                            {s.role}
-                          </span>
-                        </td>
-                        <td style={{ padding: "12px 16px", color: "#24302E" }}>
-                          {HUBS[s.hubLocationId - 1]?.name || `Hub-${s.hubLocationId}`}
-                        </td>
-                        <td style={{ padding: "12px 16px", fontFamily: "monospace", fontSize: 12, color: "#5C5A50" }}>
-                          {s.ipAddress || "127.0.0.1"}
-                        </td>
-                        <td style={{ padding: "12px 16px" }}>
-                          <span
-                            title={s.deviceFingerprint}
-                            style={{
-                              fontFamily: "monospace",
-                              fontSize: 11,
-                              background: "#E4E2D9",
-                              padding: "2px 6px",
-                              borderRadius: 4,
-                              color: "#24302E",
-                            }}
-                          >
-                            {(s.deviceFingerprint || "unknown").slice(0, 14)}...
-                          </span>
-                        </td>
-                        <td style={{ padding: "12px 16px", fontSize: 12, color: "#8C897C" }}>
-                          {s.createdAt ? new Date(s.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "Active"}
-                        </td>
-                        <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                          <button
-                            type="button"
-                            onClick={() => handleRevokeSession(s.sessionId)}
-                            disabled={revokingSessionId === s.sessionId}
-                            style={{
-                              background: "#fff",
-                              color: "#A6453D",
-                              border: "1px solid #A6453D",
-                              borderRadius: 4,
-                              padding: "5px 10px",
-                              fontSize: 11.5,
-                              fontWeight: 600,
-                              cursor: "pointer",
-                              transition: "all 0.15s ease",
-                            }}
-                          >
-                            {revokingSessionId === s.sessionId ? "Revoking..." : "Revoke Session"}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span
+                style={{
+                  background: "#4C7A6E",
+                  color: "#fff",
+                  padding: "4px 12px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                {activeSessions.length} Active Sessions
+              </span>
             </div>
           </div>
-        )}
+
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #D6D3C6",
+              borderRadius: 8,
+              overflow: "hidden",
+            }}
+          >
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: 13,
+              }}
+            >
+              <thead>
+                <tr
+                  style={{
+                    background: "#F7F6F2",
+                    borderBottom: "1px solid #D6D3C6",
+                    textAlign: "left",
+                  }}
+                >
+                  <th
+                    style={{
+                      padding: "12px 16px",
+                      fontWeight: 600,
+                      color: "#5C5A50",
+                    }}
+                  >
+                    Session ID
+                  </th>
+                  <th
+                    style={{
+                      padding: "12px 16px",
+                      fontWeight: 600,
+                      color: "#5C5A50",
+                    }}
+                  >
+                    User / Email
+                  </th>
+                  <th
+                    style={{
+                      padding: "12px 16px",
+                      fontWeight: 600,
+                      color: "#5C5A50",
+                    }}
+                  >
+                    Role
+                  </th>
+                  <th
+                    style={{
+                      padding: "12px 16px",
+                      fontWeight: 600,
+                      color: "#5C5A50",
+                    }}
+                  >
+                    Hub Location
+                  </th>
+                  <th
+                    style={{
+                      padding: "12px 16px",
+                      fontWeight: 600,
+                      color: "#5C5A50",
+                    }}
+                  >
+                    IP Address
+                  </th>
+                  <th
+                    style={{
+                      padding: "12px 16px",
+                      fontWeight: 600,
+                      color: "#5C5A50",
+                    }}
+                  >
+                    Device Fingerprint
+                  </th>
+                  <th
+                    style={{
+                      padding: "12px 16px",
+                      fontWeight: 600,
+                      color: "#5C5A50",
+                    }}
+                  >
+                    Created
+                  </th>
+                  <th
+                    style={{
+                      padding: "12px 16px",
+                      fontWeight: 600,
+                      color: "#5C5A50",
+                      textAlign: "right",
+                    }}
+                  >
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeSessions.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      style={{
+                        padding: "32px 16px",
+                        textAlign: "center",
+                        color: "#8C897C",
+                      }}
+                    >
+                      No active sessions found.
+                    </td>
+                  </tr>
+                ) : (
+                  activeSessions.map((s, idx) => (
+                    <tr
+                      key={s.sessionId}
+                      style={{
+                        borderBottom:
+                          idx < activeSessions.length - 1
+                            ? "1px solid #E4E2D9"
+                            : "none",
+                        background: idx % 2 === 1 ? "#FAF9F6" : "#fff",
+                      }}
+                    >
+                      <td
+                        style={{
+                          padding: "12px 16px",
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                          color: "#5C5A50",
+                        }}
+                      >
+                        {s.sessionId}
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <div style={{ fontWeight: 600, color: "#24302E" }}>
+                          {s.email}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#8C897C" }}>
+                          ID: {s.userId}
+                        </div>
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <span
+                          style={{
+                            padding: "2px 8px",
+                            borderRadius: 4,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            background:
+                              s.role === "SUPER_ADMIN"
+                                ? "#F5EEFA"
+                                : s.role === "CENTER_SUPERINTENDENT"
+                                  ? "#EAF3DE"
+                                  : "#EEF2FA",
+                            color:
+                              s.role === "SUPER_ADMIN"
+                                ? "#6B21A8"
+                                : s.role === "CENTER_SUPERINTENDENT"
+                                  ? "#2D6A4F"
+                                  : "#1E40AF",
+                          }}
+                        >
+                          {s.role}
+                        </span>
+                      </td>
+                      <td style={{ padding: "12px 16px", color: "#24302E" }}>
+                        {hubs[s.hubLocationId - 1]?.name ||
+                          `Hub-${s.hubLocationId}`}
+                      </td>
+                      <td
+                        style={{
+                          padding: "12px 16px",
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                          color: "#5C5A50",
+                        }}
+                      >
+                        {s.ipAddress || "127.0.0.1"}
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <span
+                          title={s.deviceFingerprint}
+                          style={{
+                            fontFamily: "monospace",
+                            fontSize: 11,
+                            background: "#E4E2D9",
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                            color: "#24302E",
+                          }}
+                        >
+                          {(s.deviceFingerprint || "unknown").slice(0, 14)}...
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          padding: "12px 16px",
+                          fontSize: 12,
+                          color: "#8C897C",
+                        }}
+                      >
+                        {s.createdAt
+                          ? new Date(s.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "Active"}
+                      </td>
+                      <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                        <button
+                          type="button"
+                          onClick={() => handleRevokeSession(s.sessionId)}
+                          disabled={revokingSessionId === s.sessionId}
+                          style={{
+                            background: "#fff",
+                            color: "#A6453D",
+                            border: "1px solid #A6453D",
+                            borderRadius: 4,
+                            padding: "5px 10px",
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                        >
+                          {revokingSessionId === s.sessionId
+                            ? "Revoking..."
+                            : "Revoke Session"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ══ AUDIT LOG ══ */}
       {tab === "audit" && (
@@ -3434,7 +2588,7 @@ export default function SuperAdminDashboard() {
               >
                 {filteredFullAudit.length}
               </span>{" "}
-              of {FULL_AUDIT_LOG.length} events
+              of {fullAuditLog.length} events
             </div>
             <div
               style={{

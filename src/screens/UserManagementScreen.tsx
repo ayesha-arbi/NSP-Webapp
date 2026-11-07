@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react"
+﻿import { useState, useMemo, useEffect } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { superAdminApi } from "../services/superAdmin"
 import Select from "@/components/Select"
@@ -41,209 +41,6 @@ interface AuditEntry {
   timestamp: string
   result: "success" | "failure"
 }
-
-/* ── Initial data ── */
-const INITIAL_USERS: User[] = [
-  {
-    id: "u1",
-    name: "Ahmad Raza",
-    email: "ahmad.raza@navttc.gov.pk",
-    role: "trade-tester",
-    hub: "Lahore-C01",
-    status: "active",
-    mfa: "enabled",
-    lastLogin: "2026-08-27 09:58",
-    createdAt: "2026-01-15",
-    session: {
-      id: "s1",
-      device: "Chrome 126 · Windows 11",
-      ip: "203.128.22.14",
-      lastActive: "Active now",
-      location: "Lahore, Punjab",
-    },
-  },
-  {
-    id: "u2",
-    name: "Fatima Malik",
-    email: "fatima.malik@navttc.gov.pk",
-    role: "center-superintendent",
-    hub: "Lahore-C01",
-    status: "active",
-    mfa: "enabled",
-    lastLogin: "2026-08-27 08:30",
-    createdAt: "2026-01-15",
-    session: {
-      id: "s2",
-      device: "Edge 126 · Windows 10",
-      ip: "203.128.22.15",
-      lastActive: "2 hrs ago",
-      location: "Lahore, Punjab",
-    },
-  },
-  {
-    id: "u3",
-    name: "Bilal Ahmed",
-    email: "bilal.ahmed@navttc.gov.pk",
-    role: "trade-tester",
-    hub: "Karachi-C02",
-    status: "active",
-    mfa: "enabled",
-    lastLogin: "2026-08-27 10:12",
-    createdAt: "2026-01-20",
-    session: {
-      id: "s3",
-      device: "Chrome 126 · macOS",
-      ip: "42.201.64.88",
-      lastActive: "18 min ago",
-      location: "Karachi, Sindh",
-    },
-  },
-  {
-    id: "u4",
-    name: "Ali Hassan",
-    email: "ali.hassan@navttc.gov.pk",
-    role: "center-superintendent",
-    hub: "Karachi-C02",
-    status: "active",
-    mfa: "disabled",
-    lastLogin: "2026-08-26 17:45",
-    createdAt: "2026-01-20",
-  },
-  {
-    id: "u5",
-    name: "Sana Malik",
-    email: "sana.malik@navttc.gov.pk",
-    role: "trade-tester",
-    hub: "Islamabad-C03",
-    status: "active",
-    mfa: "disabled",
-    lastLogin: "2026-08-27 09:05",
-    createdAt: "2026-02-03",
-    session: {
-      id: "s5",
-      device: "Firefox 128 · Ubuntu",
-      ip: "119.155.30.44",
-      lastActive: "1 hr ago",
-      location: "Islamabad",
-    },
-  },
-  {
-    id: "u6",
-    name: "Usman Tariq",
-    email: "usman.tariq@navttc.gov.pk",
-    role: "center-superintendent",
-    hub: "Islamabad-C03",
-    status: "active",
-    mfa: "enabled",
-    lastLogin: "2026-08-26 15:20",
-    createdAt: "2026-02-03",
-  },
-  {
-    id: "u7",
-    name: "Khalid Mehmood",
-    email: "khalid.mehmood@navttc.gov.pk",
-    role: "trade-tester",
-    hub: "Peshawar-C04",
-    status: "locked",
-    mfa: "enabled",
-    lastLogin: "2026-08-25 14:10",
-    createdAt: "2026-02-10",
-    lockReason: "Automatic lock — 5 consecutive failed login attempts.",
-    lockedBy: "System",
-  },
-  {
-    id: "u8",
-    name: "Nadia Hussain",
-    email: "nadia.hussain@navttc.gov.pk",
-    role: "trade-tester",
-    hub: "Quetta-C05",
-    status: "active",
-    mfa: "enabled",
-    lastLogin: "2026-08-27 07:48",
-    createdAt: "2026-02-14",
-    session: {
-      id: "s8",
-      device: "Chrome 126 · Android",
-      ip: "103.55.68.22",
-      lastActive: "3 hrs ago",
-      location: "Quetta, Balochistan",
-    },
-  },
-  {
-    id: "u9",
-    name: "Raheela Qasim",
-    email: "raheela.qasim@navttc.gov.pk",
-    role: "trade-tester",
-    hub: "Quetta-C05",
-    status: "locked",
-    mfa: "pending-reset",
-    lastLogin: "2026-08-22 11:30",
-    createdAt: "2026-03-01",
-    lockReason: "Locked by administrator pending identity re-verification.",
-    lockedBy: "Zara Khan",
-  },
-  {
-    id: "u10",
-    name: "Zara Khan",
-    email: "zara.khan@navttc.gov.pk",
-    role: "super-admin",
-    hub: "—",
-    status: "active",
-    mfa: "enabled",
-    lastLogin: "2026-08-27 09:58",
-    createdAt: "2026-01-01",
-    session: {
-      id: "s10",
-      device: "Chrome 126 · Windows 11",
-      ip: "203.128.22.20",
-      lastActive: "Active now",
-      location: "Islamabad",
-    },
-  },
-]
-
-const INITIAL_AUDIT: AuditEntry[] = [
-  {
-    id: "a1",
-    action: "Account locked — 5 failed login attempts",
-    admin: "System",
-    affectedUser: "Khalid Mehmood",
-    timestamp: "2026-08-25 14:15",
-    result: "success",
-  },
-  {
-    id: "a2",
-    action: "Account locked by administrator",
-    admin: "Zara Khan",
-    affectedUser: "Raheela Qasim",
-    timestamp: "2026-08-24 09:30",
-    result: "success",
-  },
-  {
-    id: "a3",
-    action: "MFA reset initiated",
-    admin: "Zara Khan",
-    affectedUser: "Ali Hassan",
-    timestamp: "2026-08-20 11:45",
-    result: "success",
-  },
-  {
-    id: "a4",
-    action: "Session force-revoked",
-    admin: "Zara Khan",
-    affectedUser: "Sana Malik",
-    timestamp: "2026-08-18 16:00",
-    result: "success",
-  },
-  {
-    id: "a5",
-    action: "User created",
-    admin: "Zara Khan",
-    affectedUser: "Nadia Hussain",
-    timestamp: "2026-02-14 10:00",
-    result: "success",
-  },
-]
 
 /* ── Constants ── */
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -364,8 +161,8 @@ function ModalOverlay({
 
 /* ── Screen ── */
 export default function UserManagementScreen() {
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS)
-  const [audit, setAudit] = useState<AuditEntry[]>(INITIAL_AUDIT)
+  const [users, setUsers] = useState<User[]>([])
+  const [audit, setAudit] = useState<AuditEntry[]>([])
   const [tab, setTab] = useState<Tab>("users")
   const [search, setSearch] = useState("")
   const [roleF, setRoleF] = useState("All Roles")
@@ -397,22 +194,33 @@ export default function UserManagementScreen() {
 
   useEffect(() => {
     let mounted = true
-    superAdminApi.getUsers()
+    superAdminApi
+      .getUsers()
       .then((res) => {
         if (!mounted || !res || !res.users || res.users.length === 0) return
         const mapped: User[] = res.users.map((hu) => {
           let role: UserRole = "trade-tester"
-          if (hu.role === "CENTER_SUPERINTENDENT") role = "center-superintendent"
+          if (hu.role === "CENTER_SUPERINTENDENT")
+            role = "center-superintendent"
           else if (hu.role === "SUPER_ADMIN") role = "super-admin"
           return {
             id: hu.id || hu.userId,
             name: hu.name || hu.email.split("@")[0],
             email: hu.email,
             role,
-            hub: hu.hubName || (hu.hubLocationId ? `Hub-${hu.hubLocationId}` : "—"),
-            status: (hu.isLocked || hu.adminLocked) ? "locked" : "active",
-            mfa: (hu.mfaEnabled || hu.isMfaActive) ? "enabled" : (hu.mfaEnrollmentPending ? "pending-reset" : "disabled"),
-            lastLogin: hu.lastLoginAt ? new Date(hu.lastLoginAt).toLocaleString("sv").slice(0, 16) : "Never",
+            hub:
+              hu.hubName ||
+              (hu.hubLocationId ? `Hub-${hu.hubLocationId}` : "—"),
+            status: hu.isLocked || hu.adminLocked ? "locked" : "active",
+            mfa:
+              hu.mfaEnabled || hu.isMfaActive
+                ? "enabled"
+                : hu.mfaEnrollmentPending
+                  ? "pending-reset"
+                  : "disabled",
+            lastLogin: hu.lastLoginAt
+              ? new Date(hu.lastLoginAt).toLocaleString("sv").slice(0, 16)
+              : "Never",
             createdAt: hu.createdAt ? hu.createdAt.slice(0, 10) : "2026-01-01",
           }
         })
@@ -505,10 +313,16 @@ export default function UserManagementScreen() {
     }
     const now = new Date().toISOString().slice(0, 10)
     const hubIdx = HUBS.indexOf(form.hub)
-    const hubLocationId = form.role === "super-admin" ? undefined : (hubIdx >= 0 ? hubIdx + 1 : 1)
-    const apiRole = form.role === "trade-tester" ? "TRADE_TESTER" : form.role === "center-superintendent" ? "CENTER_SUPERINTENDENT" : "SUPER_ADMIN"
+    const hubLocationId =
+      form.role === "super-admin" ? undefined : hubIdx >= 0 ? hubIdx + 1 : 1
+    const apiRole =
+      form.role === "trade-tester"
+        ? "TRADE_TESTER"
+        : form.role === "center-superintendent"
+          ? "CENTER_SUPERINTENDENT"
+          : "SUPER_ADMIN"
 
-    let mfaEnroll: { secret: string; otpauthUrl: string } | undefined
+    let mfaEnroll: { secret: string otpauthUrl: string } | undefined
 
     try {
       const res = await superAdminApi.createUser({
@@ -625,7 +439,7 @@ export default function UserManagementScreen() {
 
   async function handleMfaReset() {
     if (!target || !mfaVerified || !mfaReason.trim()) return
-    let resetEnroll: { secret: string; otpauthUrl: string } | undefined
+    let resetEnroll: { secret: string otpauthUrl: string } | undefined
     try {
       const res = await superAdminApi.resetUserMfa(target.id, mfaReason.trim())
       if (res?.mfaEnrollment || res?.enrollment) {
@@ -658,7 +472,10 @@ export default function UserManagementScreen() {
     try {
       await superAdminApi.revokeSession(target.session.id)
     } catch (err: any) {
-      console.warn("superAdminApi.revokeSession offline fallback:", err?.message)
+      console.warn(
+        "superAdminApi.revokeSession offline fallback:",
+        err?.message,
+      )
     }
     setUsers((us) =>
       us.map((u) => (u.id === target.id ? { ...u, session: undefined } : u)),
@@ -2631,15 +2448,33 @@ export default function UserManagementScreen() {
                 marginBottom: 12,
               }}
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#2D6A4F"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
             </div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: "#24302E", margin: "0 0 6px" }}>
+            <h2
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                color: "#24302E",
+                margin: "0 0 6px",
+              }}
+            >
               MFA Enrollment Provisioned
             </h2>
             <p style={{ fontSize: 13, color: "#5C5A50", margin: 0 }}>
-              Authenticator setup details generated for <strong>{provisionMfaData.name}</strong> ({provisionMfaData.email})
+              Authenticator setup details generated for{" "}
+              <strong>{provisionMfaData.name}</strong> ({provisionMfaData.email}
+              )
             </p>
           </div>
 
@@ -2665,10 +2500,22 @@ export default function UserManagementScreen() {
                 marginBottom: 16,
               }}
             >
-              <QRCodeSVG value={provisionMfaData.otpauthUrl} size={180} level="M" />
+              <QRCodeSVG
+                value={provisionMfaData.otpauthUrl}
+                size={180}
+                level="M"
+              />
             </div>
-            <p style={{ fontSize: 12, color: "#5C5A50", margin: "0 0 8px", textAlign: "center" }}>
-              Scan this QR code using Google Authenticator, Microsoft Authenticator, or compatible TOTP app.
+            <p
+              style={{
+                fontSize: 12,
+                color: "#5C5A50",
+                margin: "0 0 8px",
+                textAlign: "center",
+              }}
+            >
+              Scan this QR code using Google Authenticator, Microsoft
+              Authenticator, or compatible TOTP app.
             </p>
             <div
               style={{
@@ -2686,8 +2533,25 @@ export default function UserManagementScreen() {
               }}
             >
               <div>
-                <div style={{ fontSize: 10, color: "#8C897C", fontWeight: 600, textTransform: "uppercase" }}>Manual Entry Key</div>
-                <div style={{ fontFamily: "monospace", fontSize: 13, fontWeight: 700, letterSpacing: 1, color: "#24302E" }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "#8C897C",
+                    fontWeight: 600,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Manual Entry Key
+                </div>
+                <div
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    letterSpacing: 1,
+                    color: "#24302E",
+                  }}
+                >
                   {provisionMfaData.secret}
                 </div>
               </div>
@@ -2726,7 +2590,9 @@ export default function UserManagementScreen() {
               lineHeight: 1.5,
             }}
           >
-            <strong>Super Admin Notice:</strong> Securely deliver this setup key or QR code to the staff member. They will be prompted to enter the 6-digit TOTP code upon their next login.
+            <strong>Super Admin Notice:</strong> Securely deliver this setup key
+            or QR code to the staff member. They will be prompted to enter the
+            6-digit TOTP code upon their next login.
           </div>
 
           <button

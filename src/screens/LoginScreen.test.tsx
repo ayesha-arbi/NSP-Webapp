@@ -5,6 +5,14 @@ import { api, ApiError } from "../services/api"
 import LoginScreen from "./LoginScreen"
 
 async function submitDefaultLogin() {
+  await userEvent.type(
+    screen.getByPlaceholderText(/you@navttc/i),
+    "test@example.com",
+  )
+  await userEvent.type(
+    screen.getByPlaceholderText(/enter your password/i),
+    "password123",
+  )
   await userEvent.click(screen.getByRole("button", { name: "Sign In" }))
 }
 
@@ -72,6 +80,5 @@ describe("LoginScreen", () => {
     await submitDefaultLogin()
 
     expect(onSuccess).not.toHaveBeenCalled()
-    expect(screen.queryByText(/Demo Quick Login/i)).not.toBeInTheDocument()
   })
 })

@@ -1,4 +1,4 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 
 type NotifCategory = "all" | "approval" | "enrollment" | "system" | "security"
 
@@ -12,93 +12,6 @@ interface Notification {
   actionLabel?: string
   actionScreen?: string
 }
-
-const INITIAL_NOTIFS: Notification[] = [
-  {
-    id: "1",
-    category: "approval",
-    title: "Assessment Approved",
-    body: "Muhammad Aamir Khan's assessment (Electrician) was approved by Fatima Malik.",
-    timestamp: "Today, 09:41",
-    read: false,
-    actionLabel: "View Record",
-  },
-  {
-    id: "2",
-    category: "security",
-    title: "New Device Sign-In",
-    body: "A new sign-in was detected from Chrome on Windows 11 (203.128.22.15). If this wasn't you, revoke the session immediately.",
-    timestamp: "Today, 08:12",
-    read: false,
-    actionLabel: "Review Sessions",
-  },
-  {
-    id: "3",
-    category: "approval",
-    title: "Assessment Rejected",
-    body: "Zainab Noor's assessment (Welding) was rejected by Fatima Malik. Reason: Score below passing threshold. Reassessment required.",
-    timestamp: "Today, 07:55",
-    read: false,
-    actionLabel: "View Record",
-  },
-  {
-    id: "4",
-    category: "enrollment",
-    title: "NADRA Verification Failed",
-    body: "CNIC 35202-0000000-0 could not be verified against NADRA records during enrollment.",
-    timestamp: "Yesterday, 16:30",
-    read: true,
-  },
-  {
-    id: "5",
-    category: "approval",
-    title: "Assessment Submitted for Review",
-    body: "Sara Bibi's assessment (Plumbing) has been submitted and is awaiting your review.",
-    timestamp: "Yesterday, 15:32",
-    read: true,
-    actionLabel: "Open Queue",
-  },
-  {
-    id: "6",
-    category: "system",
-    title: "Offline Records Synchronized",
-    body: "3 enrollment records that were queued locally have been successfully uploaded to the server.",
-    timestamp: "Yesterday, 09:00",
-    read: true,
-  },
-  {
-    id: "7",
-    category: "enrollment",
-    title: "Candidate Enrolled",
-    body: "New candidate Rabia Qureshi (Masonry) has been enrolled and is pending NADRA verification.",
-    timestamp: "2 days ago",
-    read: true,
-  },
-  {
-    id: "8",
-    category: "system",
-    title: "Hub Progress Update",
-    body: "Lahore-C01 has reached 78% of the 60-candidate target. 13 more enrollments are required this cycle.",
-    timestamp: "2 days ago",
-    read: true,
-  },
-  {
-    id: "9",
-    category: "security",
-    title: "Password Changed",
-    body: "Your account password was successfully updated. If you did not make this change, contact your administrator immediately.",
-    timestamp: "3 days ago",
-    read: true,
-  },
-  {
-    id: "10",
-    category: "approval",
-    title: "Assessment Approved",
-    body: "Tariq Mehmood's assessment (Plumbing) was approved. Score: 91/100 — Distinction.",
-    timestamp: "3 days ago",
-    read: true,
-  },
-]
 
 const categoryIcons: Record<NotifCategory | "all", React.ReactNode> = {
   all: null,
@@ -165,7 +78,7 @@ const categoryIcons: Record<NotifCategory | "all", React.ReactNode> = {
   ),
 }
 
-const categoryColors: Record<NotifCategory, { icon: string; bg: string }> = {
+const categoryColors: Record<NotifCategory, { icon: string bg: string }> = {
   all: { icon: "#8C897C", bg: "#F1EFE8" },
   approval: { icon: "#2E6FE0", bg: "#E4EEFC" },
   enrollment: { icon: "#4C7A6E", bg: "#EAF3DE" },
@@ -174,7 +87,7 @@ const categoryColors: Record<NotifCategory, { icon: string; bg: string }> = {
 }
 
 export default function NotificationsScreen() {
-  const [notifs, setNotifs] = useState<Notification[]>(INITIAL_NOTIFS)
+  const [notifs, setNotifs] = useState<Notification[]>([])
   const [filter, setFilter] = useState<NotifCategory | "all">("all")
 
   const unread = notifs.filter((n) => !n.read).length

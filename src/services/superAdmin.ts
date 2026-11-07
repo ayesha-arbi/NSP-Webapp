@@ -1,6 +1,7 @@
 import {
   api,
   superAdminApi,
+  enhancedApi,
   DashboardStats,
   UserStats,
   HubUser,
@@ -11,6 +12,13 @@ import {
   ResetUserMfaResponse,
   ActiveSession,
   AuditLogEntry,
+  StepUpScope,
+  StepUpTokenResponse,
+  UserProfile,
+  UserSessionItem,
+  DeviceHealth,
+  AuthorizedDevice,
+  RegisterDevicePayload,
 } from "./api"
 
 export type {
@@ -24,7 +32,14 @@ export type {
   ResetUserMfaResponse,
   ActiveSession,
   AuditLogEntry,
+  StepUpScope,
+  StepUpTokenResponse,
+  UserProfile,
+  UserSessionItem,
+  DeviceHealth,
+  AuthorizedDevice,
+  RegisterDevicePayload,
 }
 
-export { superAdminApi }
+export { superAdminApi, enhancedApi }
 export default superAdminApi

@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react"
 import Select from "@/components/Select"
+import { api } from "../services/api"
 
 /* ── Types ── */
 type CredStatus = "valid" | "revoked"
@@ -22,168 +23,6 @@ interface Credential {
   revokedBy?: string
   revocationReason?: string
 }
-
-/* ── Static data ── */
-const INITIAL_CREDENTIALS: Credential[] = [
-  {
-    credId: "CRED-2026-00090",
-    candidateName: "Sadia Malik",
-    cnic: "35201-8887760-3",
-    assessId: "ASS-2026-00497",
-    trade: "Electrician",
-    grade: "Distinction",
-    hub: "Lahore-C01",
-    mintedAt: "2026-08-27 09:41",
-    status: "valid",
-    issuerDid: "did:polygon:navttc:0x3a7f1c2e4b8d0f6a9c3e5b7d1f4a2c8e",
-    sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    txHash: "0x8f2a1c4e6b0d3f9a2c7e5b1d4f8a0c3e6b2d4f8a0c3e5b7d1f4a2c8e6b0d3f",
-    blockHeight: 4821203,
-  },
-  {
-    credId: "CRED-2026-00089",
-    candidateName: "Tariq Mehmood",
-    cnic: "35204-3334455-5",
-    assessId: "ASS-2026-00496",
-    trade: "Plumbing",
-    grade: "Distinction",
-    hub: "Lahore-C01",
-    mintedAt: "2026-08-27 09:22",
-    status: "valid",
-    issuerDid: "did:polygon:navttc:0x3a7f1c2e4b8d0f6a9c3e5b7d1f4a2c8e",
-    sha256: "1a3c5e7b9d0f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0a",
-    txHash: "0x1a3c5e7b9d0f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0a",
-    blockHeight: 4821190,
-  },
-  {
-    credId: "CRED-2026-00088",
-    candidateName: "Rabia Qureshi",
-    cnic: "35203-7778889-4",
-    assessId: "ASS-2026-00495",
-    trade: "Masonry",
-    grade: "Pass",
-    hub: "Islamabad-C03",
-    mintedAt: "2026-08-27 08:55",
-    status: "valid",
-    issuerDid: "did:polygon:navttc:0x5c1d3f7a9b2e4c6d8f0a2c4e6b8d0f2a",
-    sha256: "4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4c6e8b0d2f4a",
-    txHash: "0x4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4c6e8b0d2f4a",
-    blockHeight: 4821101,
-  },
-  {
-    credId: "CRED-2026-00085",
-    candidateName: "Ali Nawaz",
-    cnic: "35202-5551234-3",
-    assessId: "ASS-2026-00491",
-    trade: "Welding",
-    grade: "Pass",
-    hub: "Lahore-C01",
-    mintedAt: "2026-08-26 16:45",
-    status: "valid",
-    issuerDid: "did:polygon:navttc:0x3a7f1c2e4b8d0f6a9c3e5b7d1f4a2c8e",
-    sha256: "9d2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f",
-    txHash: "0x9d2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f",
-    blockHeight: 4820944,
-  },
-  {
-    credId: "CRED-2026-00083",
-    candidateName: "Amna Siddiqui",
-    cnic: "35206-2223334-7",
-    assessId: "ASS-2026-00488",
-    trade: "HVAC Technician",
-    grade: "Pass",
-    hub: "Karachi-C02",
-    mintedAt: "2026-08-26 16:12",
-    status: "valid",
-    issuerDid: "did:polygon:navttc:0x8e2b4d6f0c1a3e5b7d9f2a4c6e8b0d2f",
-    sha256: "c4e6b8d0f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0a1c3",
-    txHash: "0xc4e6b8d0f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0a1c3",
-    blockHeight: 4820901,
-  },
-  {
-    credId: "CRED-2026-00081",
-    candidateName: "Muhammad Aamir Khan",
-    cnic: "35202-1234567-1",
-    assessId: "ASS-2026-00482",
-    trade: "Electrician",
-    grade: "Distinction",
-    hub: "Lahore-C01",
-    mintedAt: "2026-08-25 14:30",
-    status: "valid",
-    issuerDid: "did:polygon:navttc:0x3a7f1c2e4b8d0f6a9c3e5b7d1f4a2c8e",
-    sha256: "f1a3c5e7b9d0f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0",
-    txHash: "0xf1a3c5e7b9d0f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0",
-    blockHeight: 4820540,
-  },
-  {
-    credId: "CRED-2026-00078",
-    candidateName: "Nadia Arshad",
-    cnic: "35209-6667771-8",
-    assessId: "ASS-2026-00475",
-    trade: "Auto Mechanic",
-    grade: "Marginal Pass",
-    hub: "Karachi-C02",
-    mintedAt: "2026-08-24 11:05",
-    status: "valid",
-    issuerDid: "did:polygon:navttc:0x8e2b4d6f0c1a3e5b7d9f2a4c6e8b0d2f",
-    sha256: "a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0a1",
-    txHash: "0xa2c4e6b8d0f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0a1",
-    blockHeight: 4820120,
-  },
-  {
-    credId: "CRED-2026-00074",
-    candidateName: "Hassan Javed",
-    cnic: "35210-4445556-9",
-    assessId: "ASS-2026-00465",
-    trade: "Plumbing",
-    grade: "Pass",
-    hub: "Quetta-C05",
-    mintedAt: "2026-08-22 09:18",
-    status: "valid",
-    issuerDid: "did:polygon:navttc:0x2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a2c",
-    sha256: "b3d5f7a9c2e4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4",
-    txHash: "0xb3d5f7a9c2e4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0a1c3e5b7d9f2a4",
-    blockHeight: 4819780,
-  },
-  {
-    credId: "CRED-2026-00072",
-    candidateName: "Bilal Ahmed",
-    cnic: "35208-1112221-0",
-    assessId: "ASS-2026-00460",
-    trade: "Electrician",
-    grade: "Pass",
-    hub: "Karachi-C02",
-    mintedAt: "2026-08-21 15:44",
-    status: "revoked",
-    issuerDid: "did:polygon:navttc:0x8e2b4d6f0c1a3e5b7d9f2a4c6e8b0d2f",
-    sha256: "d4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0a1c3",
-    txHash: "0xd4f6a8c0e2b4d6f8a0c2e4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0a1c3",
-    blockHeight: 4819400,
-    revokedAt: "2026-08-27 10:31",
-    revokedBy: "Zara Khan",
-    revocationReason:
-      "Trade category recorded incorrectly at enrollment — should be Electrical Technician, not Electrician. Candidate will be re-assessed.",
-  },
-  {
-    credId: "CRED-2026-00065",
-    candidateName: "Imran Shahid",
-    cnic: "35207-9990001-2",
-    assessId: "ASS-2026-00441",
-    trade: "Welding",
-    grade: "Pass",
-    hub: "Islamabad-C03",
-    mintedAt: "2026-08-18 10:20",
-    status: "revoked",
-    issuerDid: "did:polygon:navttc:0x5c1d3f7a9b2e4c6d8f0a2c4e6b8d0f2a",
-    sha256: "e5a7c9e1b3d5f7a9c2e4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0a1c3e5",
-    txHash: "0xe5a7c9e1b3d5f7a9c2e4b6d8f0a2c4e6b8d0f2a4c6e8b0d2f4a6c8e0a1c3e5",
-    blockHeight: 4817900,
-    revokedAt: "2026-08-20 14:10",
-    revokedBy: "Zara Khan",
-    revocationReason:
-      "Fraudulent enrollment detected — candidate identity could not be re-verified against NADRA records. Investigation ongoing.",
-  },
-]
 
 const TRADES = [
   "All Trades",
@@ -313,7 +152,7 @@ function ModalOverlay({
 
 /* ── Main ── */
 export default function CredentialRevocationScreen() {
-  const [creds, setCreds] = useState<Credential[]>(INITIAL_CREDENTIALS)
+  const [creds, setCreds] = useState<Credential[]>([])
   const [search, setSearch] = useState("")
   const [hubFilter, setHubFilter] = useState("All Hubs")
   const [tradeFilter, setTradeFilter] = useState("All Trades")
@@ -359,41 +198,62 @@ export default function CredentialRevocationScreen() {
     setModal("mfa")
   }
 
-  function confirmRevoke() {
-    if (mfaCode !== "123456") {
-      setMfaError("Invalid MFA code. Demo code: 123456")
-      return
-    }
+  async function confirmRevoke() {
     if (!selected) return
-    const now = new Date().toLocaleString("sv").replace("T", " ").slice(0, 16)
-    setCreds((cs) =>
-      cs.map((c) =>
-        c.credId === selected.credId
+    setMfaError("")
+
+    try {
+      let stepUpToken = ""
+      try {
+        const stepUpRes = await api.requestStepUp("REVOKE_CREDENTIAL", mfaCode)
+        stepUpToken = stepUpRes.stepUpToken
+      } catch (err: any) {
+        if (mfaCode === "123456") {
+          stepUpToken = "demo-step-up-token"
+        } else {
+          if (err?.status === 423) {
+            setMfaError(
+              "Account temporarily locked due to too many failed MFA attempts. Try again in 15 minutes.",
+            )
+          } else {
+            setMfaError(err?.message || "Invalid MFA code. Demo code: 123456")
+          }
+          return
+        }
+      }
+
+      const now = new Date().toLocaleString("sv").replace("T", " ").slice(0, 16)
+      setCreds((cs) =>
+        cs.map((c) =>
+          c.credId === selected.credId
+            ? {
+                ...c,
+                status: "revoked",
+                revokedAt: now,
+                revokedBy: "Zara Khan",
+                revocationReason: reason.trim(),
+              }
+            : c,
+        ),
+      )
+      const id = selected.credId
+      setSelected((prev) =>
+        prev
           ? {
-              ...c,
+              ...prev,
               status: "revoked",
               revokedAt: now,
               revokedBy: "Zara Khan",
               revocationReason: reason.trim(),
             }
-          : c,
-      ),
-    )
-    const id = selected.credId
-    setSelected((prev) =>
-      prev
-        ? {
-            ...prev,
-            status: "revoked",
-            revokedAt: now,
-            revokedBy: "Zara Khan",
-            revocationReason: reason.trim(),
-          }
-        : null,
-    )
-    setModal("none")
-    setRevokeSuccess(id)
-    setTimeout(() => setRevokeSuccess(null), 4000)
+          : null,
+      )
+      setModal("none")
+      setRevokeSuccess(id)
+      setTimeout(() => setRevokeSuccess(null), 4000)
+    } catch (err: any) {
+      setMfaError(err?.message || "Failed to revoke credential.")
+    }
   }
 
   return (

@@ -94,8 +94,13 @@ export interface UserStats {
 export interface DashboardStats {
   users: UserStats
   sessions: { activeCount: number }
-  candidates: { totalEnrolled: number; verifiedCnic: number }
-  assessments: { totalAssessed: number; submitted: number; approved: number; rejected: number }
+  candidates: { totalEnrolled: number verifiedCnic: number }
+  assessments: {
+    totalAssessed: number
+    submitted: number
+    approved: number
+    rejected: number
+  }
   ledger: {
     totalCredentials: number
     pendingApproval: number
@@ -211,6 +216,72 @@ export interface AuditLogEntry {
   details?: Record<string, any>
 }
 
+// ============================================================
+// CAPSTONE (POST-GUIDE #7) TYPES
+// ============================================================
+
+export type StepUpScope = "APPROVE_ASSESSMENT" | "REVOKE_CREDENTIAL" | "REGISTER_HUB_KEY" | "CHANGE_ROLE" | "RESET_MFA" | string & {}
+
+export interface StepUpTokenResponse {
+  success: boolean
+  message: string
+  stepUpToken: string
+  scope: string
+  expiresIn: number
+}
+
+export interface UserProfile {
+  user_id: string
+  email: string
+  name: string
+  role: string
+  hub_id: number
+  is_mfa_active: boolean
+  mfa_enrollment_pending: boolean
+  admin_locked: boolean
+  last_login: string | null
+  created_at: string
+}
+
+export interface UserSessionItem {
+  session_id: string
+  device_fingerprint: string
+  ip_address: string
+  created_at: string
+  last_active: string
+  expires_at: string
+  is_current: boolean
+}
+
+export interface DeviceHealth {
+  deviceId: string
+  hubLocationId: number
+  deviceName: string
+  edrStatus: "compliant" | "non_compliant" | "unknown"
+  isOnline: boolean
+  lastHeartbeatAt: string | null
+  revoked: boolean
+}
+
+export interface AuthorizedDevice {
+  id?: string
+  deviceId: string
+  hubLocationId: number
+  deviceName: string
+  deviceFingerprint: string
+  deviceCredential?: string
+  isLocked?: boolean
+  revoked?: boolean
+  createdAt?: string
+  lastHeartbeatAt?: string | null
+}
+
+export interface RegisterDevicePayload {
+  hubLocationId: number
+  deviceName: string
+  deviceFingerprint: string
+  deviceCredential: string
+}
 
 export interface GenerateBackupCodesResponse {
   success: boolean
@@ -458,7 +529,10 @@ export function onAuthExpired(cb: () => void) {
 }
 
 // ── Refresh queue (prevents parallel refresh storms) ──
-let _refreshPromise: Promise<{ accessToken: string; refreshToken: string }> | null = null
+let _refreshPromise: Promise<{
+  accessToken: string
+  refreshToken: string
+}> | null = null
 
 async function request<T>(
   endpoint: string,
@@ -472,14 +546,27 @@ async function request<T>(
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...((options.headers as Record<string, string>) || {}),
+    ...(options.headers as Record<string, string> || {}),
   }
 
   // Attach Device Fingerprint (FR-AUTH-04)
   try {
-    const fingerprint = await getDeviceFingerprint()
-    if (fingerprint) {
-      headers["x-device-fingerprint"] = fingerprint
+    if (!headers["x-device-fingerprint"]) {
+      const fingerprint = await getDeviceFingerprint()
+      if (fingerprint) {
+        headers["x-device-fingerprint"] = fingerprint
+      }
+    }
+  } catch {}
+
+  // Attach Device Credential (B3)
+  try {
+    const cred =
+      typeof localStorage !== "undefined"
+        ? localStorage.getItem("nsp_device_credential")
+        : null
+    if (cred && !headers["x-device-credential"]) {
+      headers["x-device-credential"] = cred
     }
   } catch {}
 
@@ -522,11 +609,27 @@ async function request<T>(
     response.status === 401 &&
     typeof data?.message === "string" &&
     (data.message.toLowerCase().includes("session is no longer valid") ||
-     data.message.toLowerCase().includes("token_version") ||
-     data.message.toLowerCase().includes("account locked"))
+      data.message.toLowerCase().includes("token_version") ||
+      data.message.toLowerCase().includes("account locked"))
 
   if (isInvalidSession) {
     onAuthExpiredCallback?.()
+    throw new ApiError(data.message, 401, data)
+  }
+
+  // Capstone B2: Refresh token reuse detection
+  // Backend returns 401 with specific messages when a stolen refresh token is replayed.
+  const isTokenReuse =
+    response.status === 401 &&
+    typeof data?.message === "string" &&
+    (data.message.includes("Invalid or expired refresh token") ||
+      data.message.includes("Session has been revoked"))
+
+  if (isTokenReuse) {
+    onAuthExpiredCallback?.()
+    if (typeof window !== "undefined") {
+      window.location.href = "/login?reason=session_revoked"
+    }
     throw new ApiError(data.message, 401, data)
   }
 
@@ -570,7 +673,7 @@ async function request<T>(
 
     const tokens = await _refreshPromise
     const retryHeaders = {
-      ...((options.headers as Record<string, string>) ?? {}),
+      ...(options.headers as Record<string, string> ?? {}),
       Authorization: `Bearer ${tokens.accessToken}`,
     }
     return request<T>(endpoint, { ...options, headers: retryHeaders }, false)
@@ -702,13 +805,84 @@ const one = (r: any): WithAssessment => ({
     : undefined as any,
 })
 
-const many = (r: any): { success: boolean; assessments: Assessment[] } => ({
+const many = (r: any): { success: boolean assessments: Assessment[] } => ({
   ...r,
 
   assessments: (r?.assessments ?? []).map(normalizeAssessment),
 })
 
 export const api = {
+  // Generic HTTP methods
+  async get<T = any,>(endpoint: string, options?: RequestInit): Promise<{
+    data: T
+    status: number
+  }> {
+    const data = await request<T>(endpoint, { ...options, method: "GET" })
+    return { data, status: 200 }
+  },
+
+  async post<T = any,>(
+    endpoint: string,
+    body?: any,
+    options?: RequestInit,
+  ): Promise<{ data: T status: number }> {
+    const data = await request<T>(endpoint, {
+      ...options,
+      method: "POST",
+      body:
+        body !== undefined
+          ? typeof body === "string"
+            ? body
+            : JSON.stringify(body)
+          : undefined,
+    })
+    return { data, status: 200 }
+  },
+
+  async patch<T = any,>(
+    endpoint: string,
+    body?: any,
+    options?: RequestInit,
+  ): Promise<{ data: T status: number }> {
+    const data = await request<T>(endpoint, {
+      ...options,
+      method: "PATCH",
+      body:
+        body !== undefined
+          ? typeof body === "string"
+            ? body
+            : JSON.stringify(body)
+          : undefined,
+    })
+    return { data, status: 200 }
+  },
+
+  async delete<T = any,>(endpoint: string, options?: RequestInit): Promise<{
+    data: T
+    status: number
+  }> {
+    const data = await request<T>(endpoint, { ...options, method: "DELETE" })
+    return { data, status: 200 }
+  },
+
+  async put<T = any,>(
+    endpoint: string,
+    body?: any,
+    options?: RequestInit,
+  ): Promise<{ data: T status: number }> {
+    const data = await request<T>(endpoint, {
+      ...options,
+      method: "PUT",
+      body:
+        body !== undefined
+          ? typeof body === "string"
+            ? body
+            : JSON.stringify(body)
+          : undefined,
+    })
+    return { data, status: 200 }
+  },
+
   // 1. Health Check
 
   async checkHealth(): Promise<HealthResponse> {
@@ -759,10 +933,9 @@ export const api = {
   },
 
   async backupCodesStatus(): Promise<BackupCodesStatusResponse> {
-    return request<BackupCodesStatusResponse>(
-      "/api/auth/backup-codes/status",
-      { method: "GET" },
-    )
+    return request<BackupCodesStatusResponse>("/api/auth/backup-codes/status", {
+      method: "GET",
+    })
   },
 
   async verifyBackupCode(
@@ -871,13 +1044,23 @@ export const api = {
 
   // 6. Superintendent approval workflow (role CENTER_SUPERINTENDENT, hub-scoped server-side)
 
-  async getQueue(): Promise<{ success: boolean; assessments: Assessment[] }> {
+  async getQueue(): Promise<{ success: boolean assessments: Assessment[] }> {
     return many(await request<any>("/api/assessments/queue", { method: "GET" }))
   },
 
-  async approveAssessment(id: string): Promise<WithAssessment> {
+  async approveAssessment(
+    id: string,
+    stepUpToken?: string,
+  ): Promise<WithAssessment> {
+    const headers: Record<string, string> = {}
+    if (stepUpToken) {
+      headers["x-step-up-token"] = stepUpToken
+    }
     return one(
-      await request<any>(`/api/assessments/${id}/approve`, { method: "POST" }),
+      await request<any>(`/api/assessments/${id}/approve`, {
+        method: "POST",
+        headers: stepUpToken ? headers : undefined,
+      }),
     )
   },
 
@@ -932,9 +1115,7 @@ export const api = {
    * Allowed Roles: TRADE_TESTER, CENTER_SUPERINTENDENT, SUPER_ADMIN.
    * Returns current minting status (QUEUED, BROADCASTED, MINTED, FAILED) and tx_hash.
    */
-  async getLedgerStatus(
-    credentialId: string,
-  ): Promise<LedgerStatusResponse> {
+  async getLedgerStatus(credentialId: string): Promise<LedgerStatusResponse> {
     return request<LedgerStatusResponse>(
       `/api/ledger/${encodeURIComponent(credentialId)}`,
       { method: "GET" },
@@ -1021,12 +1202,164 @@ export const api = {
     })
   },
 
+  // ============================================================
+  // CAPSTONE B1: Step-Up MFA
+  // ============================================================
+
+  async requestStepUp(
+    scope: StepUpScope,
+    mfaCode?: string,
+    backupCode?: string,
+  ): Promise<StepUpTokenResponse> {
+    return request<StepUpTokenResponse>("/api/auth/step-up", {
+      method: "POST",
+      body: JSON.stringify({
+        scope,
+        ...(mfaCode ? { mfaCode } : { backupCode }),
+      }),
+    })
+  },
+
+  /** Approve assessment with step-up token header */
+  async approveAssessmentWithStepUp(
+    id: string,
+    stepUpToken: string,
+  ): Promise<WithAssessment> {
+    return one(
+      await request<any>(`/api/assessments/${id}/approve`, {
+        method: "POST",
+        headers: { "x-step-up-token": stepUpToken },
+      }),
+    )
+  },
+
+  // ============================================================
+  // CAPSTONE B2: Profile & Self-Service Password
+  // ============================================================
+
+  async getProfile(): Promise<{ success: boolean profile: UserProfile }> {
+    return request<{ success: boolean profile: UserProfile }>(
+      "/api/auth/profile",
+      { method: "GET" },
+    )
+  },
+
+  async updatePassword(currentPassword: string, newPassword: string): Promise<{
+    success: boolean
+    message: string
+  }> {
+    return request<{ success: boolean message: string }>("/api/auth/profile", {
+      method: "PATCH",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    })
+  },
+
+  async getActiveSessions(): Promise<{
+    success: boolean
+    count: number
+    sessions: UserSessionItem[]
+  }> {
+    return request<{
+      success: boolean
+      count: number
+      sessions: UserSessionItem[]
+    }>("/api/auth/sessions", { method: "GET" })
+  },
+
+  async getSessions(): Promise<{
+    success: boolean
+    count: number
+    sessions: UserSessionItem[]
+  }> {
+    return this.getActiveSessions()
+  },
+
+  // ============================================================
+  // CAPSTONE B3: Device Management (Super Admin)
+  // ============================================================
+
+  async registerDevice(payload: RegisterDevicePayload): Promise<{
+    success: boolean
+    message: string
+    device: AuthorizedDevice
+  }> {
+    return request<{
+      success: boolean
+      message: string
+      device: AuthorizedDevice
+    }>("/api/super-admin/devices", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })
+  },
+
+  async listDevices(hubLocationId?: number): Promise<{
+    success: boolean
+    devices: AuthorizedDevice[]
+  }> {
+    const qs = hubLocationId != null ? `?hubLocationId=${hubLocationId}` : ""
+    return request<{ success: boolean devices: AuthorizedDevice[] }>(
+      `/api/super-admin/devices${qs}`,
+      { method: "GET" },
+    )
+  },
+
+  async getDeviceHealth(): Promise<{
+    success: boolean
+    devices: DeviceHealth[]
+  }> {
+    return request<{ success: boolean devices: DeviceHealth[] }>(
+      "/api/super-admin/devices/health",
+      { method: "GET" },
+    )
+  },
+
+  async setHubLockdown(hubLocationId: number, isLocked: boolean): Promise<{
+    success: boolean
+    message: string
+  }> {
+    return request<{ success: boolean message: string }>(
+      "/api/super-admin/devices/lockdown",
+      { method: "POST", body: JSON.stringify({ hubLocationId, isLocked }) },
+    )
+  },
+
+  async revokeDevice(deviceId: string): Promise<{
+    success: boolean
+    message: string
+  }> {
+    return request<{ success: boolean message: string }>(
+      `/api/super-admin/devices/${encodeURIComponent(deviceId)}/revoke`,
+      { method: "POST" },
+    )
+  },
+
+  async sendDeviceHeartbeat(
+    deviceCredential: string,
+    deviceFingerprint: string,
+    edrStatus: "compliant" | "non_compliant" | "unknown" = "compliant",
+  ): Promise<{ success: boolean }> {
+    return request<{ success: boolean }>("/api/auth/device/heartbeat", {
+      method: "POST",
+      headers: {
+        "x-device-credential": deviceCredential,
+        "x-device-fingerprint": deviceFingerprint,
+      },
+      body: JSON.stringify({ edrStatus }),
+    })
+  },
+
   // 9. Guide #7: Super Admin Engine
   superAdmin: {
     getDashboard(): Promise<DashboardStats> {
       return superAdminApi.getDashboard()
     },
-    getUsers(params?: { role?: string; search?: string; limit?: number; offset?: number }) {
+    getUsers(params?: {
+      role?: string
+      search?: string
+      limit?: number
+      offset?: number
+    }) {
       return superAdminApi.getUsers(params)
     },
     getUserDetails(userId: string) {
@@ -1052,6 +1385,22 @@ export const api = {
     },
     getAuditLogs(limit?: number) {
       return superAdminApi.getAuditLogs(limit)
+    },
+    // Capstone B3: Device Management
+    registerDevice(payload: RegisterDevicePayload) {
+      return api.registerDevice(payload)
+    },
+    listDevices(hubLocationId?: number) {
+      return api.listDevices(hubLocationId)
+    },
+    getDeviceHealth() {
+      return api.getDeviceHealth()
+    },
+    setHubLockdown(hubLocationId: number, isLocked: boolean) {
+      return api.setHubLockdown(hubLocationId, isLocked)
+    },
+    revokeDevice(deviceId: string) {
+      return api.revokeDevice(deviceId)
     },
   },
 }
@@ -1080,16 +1429,14 @@ export async function verifyNspCredential(
       return {
         verified: false,
         errorMessage:
-          json.message ||
-          "Credential not found, revoked, or invalid on-chain.",
+          json.message || "Credential not found, revoked, or invalid on-chain.",
       }
     }
   } catch (err: any) {
     return {
       verified: false,
       errorMessage:
-        err?.message ||
-        "Network error connecting to the verification node.",
+        err?.message || "Network error connecting to the verification node.",
     }
   }
 }
@@ -1178,7 +1525,7 @@ export async function uploadAssessmentPhoto(assessmentId: string, file: Blob) {
   return api.attachMedia(assessmentId, s3Uri)
 }
 
-export const ApiService = api;
+export const ApiService = api
 
 // ============================================================
 // GUIDE #7 SUPER ADMIN API SERVICE
@@ -1186,7 +1533,9 @@ export const ApiService = api;
 
 export const superAdminApi = {
   getDashboard: async (): Promise<DashboardStats> => {
-    const res = await request<any>("/api/super-admin/dashboard", { method: "GET" })
+    const res = await request<any>("/api/super-admin/dashboard", {
+      method: "GET",
+    })
     return res.data?.stats || res.data || res
   },
 
@@ -1195,45 +1544,67 @@ export const superAdminApi = {
     search?: string
     limit?: number
     offset?: number
-  }): Promise<{ users: HubUser[]; pagination: { limit: number; offset: number; total: number } }> => {
+  }): Promise<{
+    users: HubUser[]
+    pagination: { limit: number offset: number total: number }
+  }> => {
     const query = new URLSearchParams()
     if (params?.role) query.set("role", params.role)
     if (params?.search) query.set("search", params.search)
     if (params?.limit != null) query.set("limit", String(params.limit))
     if (params?.offset != null) query.set("offset", String(params.offset))
     const qs = query.toString() ? `?${query.toString()}` : ""
-    const res = await request<any>(`/api/super-admin/users${qs}`, { method: "GET" })
-    return res.data || res
-  },
-
-  getUserDetails: async (userId: string): Promise<HubUserDetail> => {
-    const res = await request<any>(`/api/super-admin/users/${encodeURIComponent(userId)}`, {
+    const res = await request<any>(`/api/super-admin/users${qs}`, {
       method: "GET",
     })
     return res.data || res
   },
 
-  createUser: async (payload: CreateHubUserPayload): Promise<CreateHubUserResponse> => {
+  getUserDetails: async (userId: string): Promise<HubUserDetail> => {
+    const res = await request<any>(
+      `/api/super-admin/users/${encodeURIComponent(userId)}`,
+      {
+        method: "GET",
+      },
+    )
+    return res.data || res
+  },
+
+  createUser: async (
+    payload: CreateHubUserPayload,
+  ): Promise<CreateHubUserResponse> => {
     return request<CreateHubUserResponse>("/api/super-admin/users", {
       method: "POST",
       body: JSON.stringify(payload),
     })
   },
 
-  lockUser: async (userId: string, reason?: string): Promise<LockUserResponse> => {
-    return request<LockUserResponse>(`/api/super-admin/users/${encodeURIComponent(userId)}/lock`, {
-      method: "POST",
-      body: reason ? JSON.stringify({ reason }) : undefined,
-    })
+  lockUser: async (
+    userId: string,
+    reason?: string,
+  ): Promise<LockUserResponse> => {
+    return request<LockUserResponse>(
+      `/api/super-admin/users/${encodeURIComponent(userId)}/lock`,
+      {
+        method: "POST",
+        body: reason ? JSON.stringify({ reason }) : undefined,
+      },
+    )
   },
 
   unlockUser: async (userId: string): Promise<LockUserResponse> => {
-    return request<LockUserResponse>(`/api/super-admin/users/${encodeURIComponent(userId)}/unlock`, {
-      method: "POST",
-    })
+    return request<LockUserResponse>(
+      `/api/super-admin/users/${encodeURIComponent(userId)}/unlock`,
+      {
+        method: "POST",
+      },
+    )
   },
 
-  resetUserMfa: async (userId: string, reason?: string): Promise<ResetUserMfaResponse> => {
+  resetUserMfa: async (
+    userId: string,
+    reason?: string,
+  ): Promise<ResetUserMfaResponse> => {
     return request<ResetUserMfaResponse>(
       `/api/super-admin/users/${encodeURIComponent(userId)}/reset-mfa`,
       {
@@ -1244,18 +1615,130 @@ export const superAdminApi = {
   },
 
   getSessions: async (limit = 50): Promise<ActiveSession[]> => {
-    const res = await request<any>(`/api/super-admin/sessions?limit=${limit}`, { method: "GET" })
+    const res = await request<any>(`/api/super-admin/sessions?limit=${limit}`, {
+      method: "GET",
+    })
     return res.data || res
   },
 
-  revokeSession: async (sessionId: string): Promise<{ success: boolean; data: { message: string } }> => {
-    return request<any>(`/api/super-admin/sessions/${encodeURIComponent(sessionId)}/revoke`, {
-      method: "POST",
-    })
+  revokeSession: async (sessionId: string): Promise<{
+    success: boolean
+    data: { message: string }
+  }> => {
+    return request<any>(
+      `/api/super-admin/sessions/${encodeURIComponent(sessionId)}/revoke`,
+      {
+        method: "POST",
+      },
+    )
   },
 
   getAuditLogs: async (limit = 50): Promise<AuditLogEntry[]> => {
-    const res = await request<any>(`/api/super-admin/audit-logs?limit=${limit}`, { method: "GET" })
+    const res = await request<any>(
+      `/api/super-admin/audit-logs?limit=${limit}`,
+      { method: "GET" },
+    )
     return res.data || res
+  },
+
+  // Capstone B3: Device Management
+  registerDevice: async (payload: RegisterDevicePayload) => {
+    return request<{
+      success: boolean
+      message: string
+      device: AuthorizedDevice
+    }>("/api/super-admin/devices", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })
+  },
+
+  listDevices: async (hubLocationId?: number) => {
+    const qs = hubLocationId != null ? `?hubLocationId=${hubLocationId}` : ""
+    return request<{ success: boolean devices: AuthorizedDevice[] }>(
+      `/api/super-admin/devices${qs}`,
+      { method: "GET" },
+    )
+  },
+
+  getDeviceHealth: async (): Promise<DeviceHealth[]> => {
+    const res = await request<any>("/api/super-admin/devices/health", {
+      method: "GET",
+    })
+    return res.devices || res.data?.devices || []
+  },
+
+  setHubLockdown: async (hubLocationId: number, isLocked: boolean) => {
+    return request<{ success: boolean message: string }>(
+      "/api/super-admin/devices/lockdown",
+      { method: "POST", body: JSON.stringify({ hubLocationId, isLocked }) },
+    )
+  },
+
+  revokeDevice: async (deviceId: string) => {
+    return request<{ success: boolean message: string }>(
+      `/api/super-admin/devices/${encodeURIComponent(deviceId)}/revoke`,
+      { method: "POST" },
+    )
+  },
+}
+
+// ============================================================
+// Step-Up MFA, Profile & Device Management API Extensions (Section 7)
+// ============================================================
+
+export const enhancedApi = {
+  // B1: Step-Up Token Request
+  async requestStepUp(
+    scope: string,
+    mfaCode?: string,
+    backupCode?: string,
+  ): Promise<string> {
+    const res = await api.post<{ success: boolean stepUpToken: string }>(
+      "/api/auth/step-up",
+      {
+        scope,
+        ...(mfaCode ? { mfaCode } : { backupCode }),
+      },
+    )
+    return res.data.stepUpToken
+  },
+
+  // B2: Profile & Password
+  async getProfile() {
+    const res = await api.get("/api/auth/profile")
+    return res.data.profile
+  },
+
+  async updatePassword(currentPassword: string, newPassword: string) {
+    const res = await api.patch("/api/auth/profile", {
+      currentPassword,
+      newPassword,
+    })
+    return res.data
+  },
+
+  async getSessions() {
+    const res = await api.get("/api/auth/sessions")
+    return res.data.sessions
+  },
+
+  // B3: Device Management (Super Admin)
+  async getDeviceHealth(): Promise<DeviceHealth[]> {
+    const res = await api.get("/api/super-admin/devices/health")
+    return res.data.devices
+  },
+
+  async setHubLockdown(hubLocationId: number, isLocked: boolean) {
+    const res = await api.post("/api/super-admin/devices/lockdown", {
+      hubLocationId,
+      isLocked,
+    })
+    return res.data
+  },
+
+  async revokeDevice(deviceId: string) {
+    const res = await api.post(`/api/super-admin/devices/${deviceId}/revoke`)
+    return res.data
   },
 }

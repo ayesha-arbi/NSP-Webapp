@@ -1,4 +1,4 @@
-import { useState } from "react"
+﻿import { useState } from "react"
 import { api, ApiError } from "../services/api"
 import { authStore } from "../services/authStore"
 
@@ -44,23 +44,26 @@ export default function BackupCodeScreen({
       onSuccess()
     } catch (err) {
       const apiError = err instanceof ApiError ? err : null
-      const message = err instanceof Error ? err.message : "Verification failed."
+      const message =
+        err instanceof Error ? err.message : "Verification failed."
       const normalized = message.toLowerCase()
 
       if (normalized.includes("account locked")) {
         setLocked(true)
-        setError(
-          `Account temporarily suspended for 15 minutes. ${message}`,
-        )
+        setError(`Account temporarily suspended for 15 minutes. ${message}`)
       } else if (
         normalized.includes("already-used") ||
         normalized.includes("already used")
       ) {
-        setError("This backup code is invalid or already used. Try another unused code.")
+        setError(
+          "This backup code is invalid or already used. Try another unused code.",
+        )
       } else if (apiError?.status === 429) {
         setError("Request cooldown active. Please wait before trying again.")
       } else if (apiError?.status === 0) {
-        setError("Cannot reach the server. Check your connection and try again.")
+        setError(
+          "Cannot reach the server. Check your connection and try again.",
+        )
       } else {
         setError(message)
       }
@@ -108,7 +111,9 @@ export default function BackupCodeScreen({
               National Skills Passport
             </span>
             <span style={{ color: "rgba(255,255,255,0.4)" }}> — </span>
-            <span style={{ color: "#B08D46", fontSize: 13 }}>Issuer Portal</span>
+            <span style={{ color: "#B08D46", fontSize: 13 }}>
+              Issuer Portal
+            </span>
           </div>
         </div>
         <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
@@ -178,7 +183,12 @@ export default function BackupCodeScreen({
 
           <label
             htmlFor="backup-code"
-            style={{ display: "block", fontSize: 13, fontWeight: 600, marginTop: 24 }}
+            style={{
+              display: "block",
+              fontSize: 13,
+              fontWeight: 600,
+              marginTop: 24,
+            }}
           >
             Backup code
           </label>
@@ -249,10 +259,20 @@ export default function BackupCodeScreen({
               paddingTop: 16,
             }}
           >
-            <button type="button" onClick={onBackToMfa} disabled={pending} style={linkStyle}>
+            <button
+              type="button"
+              onClick={onBackToMfa}
+              disabled={pending}
+              style={linkStyle}
+            >
               Back to authenticator
             </button>
-            <button type="button" onClick={onBackToLogin} disabled={pending} style={linkStyle}>
+            <button
+              type="button"
+              onClick={onBackToLogin}
+              disabled={pending}
+              style={linkStyle}
+            >
               Back to login
             </button>
           </div>

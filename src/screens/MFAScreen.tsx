@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react"
+﻿import { useState, useRef, useEffect } from "react"
 
 import { api, ApiError, User } from "../services/api"
 
@@ -17,7 +17,7 @@ interface MFAScreenProps {
 type MFAState = "default" | "loading" | "invalid" | "expired" | "too-many" | "success"
 
 export default function MFAScreen({
-  email = "tradetester@nsp.com",
+  email,
   onSuccess,
   onBack,
   onUseBackupCode,
@@ -117,7 +117,8 @@ export default function MFAScreen({
   }
 
   async function handleVerify() {
-    if (isSubmitting.current || state === "loading" || state === "success") return
+    if (isSubmitting.current || state === "loading" || state === "success")
+      return
 
     const code = digits.join("")
 
@@ -143,12 +144,7 @@ export default function MFAScreen({
       const refreshToken =
         (res as any).refreshToken || (res as any).data?.refreshToken
 
-      if (
-        res.success &&
-        user &&
-        accessToken &&
-        refreshToken
-      ) {
+      if (res.success && user && accessToken && refreshToken) {
         authStore.setSession(user, accessToken, refreshToken)
 
         setState("success")
@@ -175,55 +171,6 @@ export default function MFAScreen({
       const errMsg = err?.message?.toLowerCase() || ""
       if (errMsg.includes("expired")) {
         setState("expired")
-        return
-      }
-
-      // Offline simulation fallback for testing when backend server is not running
-      if (err instanceof ApiError && err.status === 0) {
-        const isDemo =
-          email === "tradetester@nsp.com" ||
-          email === "tester@hub.pk" ||
-          email === "cs@hub.pk" ||
-          email === "super@hub.pk"
-
-        // Accepted demo codes for local testing without backend
-        const isDemoCode =
-          code === "123456" ||
-          code === "012345" ||
-          code === "000000" ||
-          code === "654321"
-
-        if (isDemo && isDemoCode) {
-          const demoUser: User = {
-            id: "usr-tradetester-01",
-            email,
-            role:
-              email === "cs@hub.pk"
-                ? "CENTER_SUPERINTENDENT"
-                : email === "super@hub.pk"
-                  ? "SUPER_ADMIN"
-                  : "TRADE_TESTER",
-            hubLocationId: 1,
-            name: "Trade Tester",
-          }
-          authStore.setSession(
-            demoUser,
-            "demo-access-token-mfa",
-            "demo-refresh-token-mfa",
-          )
-          setState("success")
-          setTimeout(onSuccess, 600)
-          return
-        }
-
-        if (isDemo && !isDemoCode) {
-          setState("invalid")
-          setCustomError("Incorrect verification code. Please try again.")
-          return
-        }
-
-        setState("invalid")
-        setCustomError("Cannot reach the server. Check your connection and try again.")
         return
       }
 
@@ -272,7 +219,11 @@ export default function MFAScreen({
     setState("loading")
 
     try {
-      const res = await api.verifyBackupCode(email, backupPassword.trim(), backupCode.trim())
+      const res = await api.verifyBackupCode(
+        email,
+        backupPassword.trim(),
+        backupCode.trim(),
+      )
       if (res.success && res.user) {
         authStore.setSession(res.user, res.accessToken, res.refreshToken)
         setTimeout(onSuccess, 400)
@@ -282,9 +233,13 @@ export default function MFAScreen({
     } catch (err: any) {
       const msg = err?.message?.toLowerCase() || ""
       if (msg.includes("locked")) {
-        setBackupError("Account locked for 15 minutes due to too many failed attempts. Please try again later.")
+        setBackupError(
+          "Account locked for 15 minutes due to too many failed attempts. Please try again later.",
+        )
       } else if (msg.includes("already-used") || msg.includes("already used")) {
-        setBackupError("This backup code has already been used. Please try another unused code.")
+        setBackupError(
+          "This backup code has already been used. Please try another unused code.",
+        )
       } else {
         setBackupError(err?.message || "Invalid backup code.")
       }

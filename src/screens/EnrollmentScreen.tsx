@@ -8,6 +8,7 @@ import {
   ApiError,
   uploadCandidatePhoto,
 } from "../services/api"
+import { authStore } from "../services/authStore"
 
 interface EnrollmentScreenProps {
   onNavigateToAssessment?: (candidate: CandidateRecord) => void
@@ -63,13 +64,18 @@ function UploadIcon() {
 export default function EnrollmentScreen({
   onNavigateToAssessment,
 }: EnrollmentScreenProps) {
+  const userHubId = authStore.getState().user?.hubLocationId
+  const initialHub = userHubId != null && userHubId > 0 && userHubId <= HUBS.length
+    ? HUBS[userHubId - 1]
+    : ""
+
   const [form, setForm] = useState({
     fullName: "",
     fatherName: "",
-    dob: "1998-04-12",
+    dob: "",
     cnic: "",
-    trade: "Electrician",
-    hub: "Lahore-C01",
+    trade: "",
+    hub: initialHub,
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -167,6 +173,8 @@ export default function EnrollmentScreen({
 
     if (!form.trade) e.trade = "Trade category is required."
 
+    if (!form.hub) e.hub = "Hub assignment is required."
+
     setErrors(e)
 
     return Object.keys(e).length === 0
@@ -183,16 +191,8 @@ export default function EnrollmentScreen({
 
     await new Promise((r) => setTimeout(r, 1200))
 
-    if (form.cnic.trim() === "35202-0000000-0") {
-      setNadraStatus("failed")
-      setModal("nadra-fail")
-    } else if (form.cnic.trim() === "35202-1111111-1") {
-      setNadraStatus("failed")
-      setModal("duplicate")
-    } else {
-      setNadraStatus("verified")
-      setModal("nadra-success")
-    }
+    setNadraStatus("verified")
+    setModal("nadra-success")
   }
 
   // request pre-signed URL, PUT straight to S3, keep the s3Uri for enrolment.
@@ -285,8 +285,23 @@ export default function EnrollmentScreen({
     } catch (err: any) {
       if (err instanceof ApiError) {
         if (err.status === 409) {
-          setModal("duplicate")
-
+          // FR-CAND-01: Distinguish hub quota from duplicate CNIC
+          if (
+            err.message?.toLowerCase().includes("maximum enrolment limit") ||
+            err.message?.toLowerCase().includes("maximum enrollment limit") ||
+            err.data?.message
+              ?.toLowerCase()
+              .includes("maximum enrolment limit") ||
+            err.data?.message
+              ?.toLowerCase()
+              .includes("maximum enrollment limit")
+          ) {
+            setApiError(
+              "Hub Quota Reached: Maximum candidates have already enrolled in this hub.",
+            )
+          } else {
+            setModal("duplicate")
+          }
           return
         }
 
@@ -825,17 +840,6 @@ export default function EnrollmentScreen({
                   </button>
                 </div>
               </div>
-              <p style={{ fontSize: 12, color: "#8C897C", margin: "8px 0 0" }}>
-                Test: any CNIC passes ·{" "}
-                <code style={{ fontFamily: "IBM Plex Mono, monospace" }}>
-                  35202-0000000-0
-                </code>{" "}
-                = failure ·{" "}
-                <code style={{ fontFamily: "IBM Plex Mono, monospace" }}>
-                  35202-1111111-1
-                </code>{" "}
-                = duplicate
-              </p>
             </div>
           </div>
 
@@ -1039,11 +1043,16 @@ export default function EnrollmentScreen({
         <div style={{ display: "flex", gap: 12, marginTop: 32 }}>
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={
+              isSubmitting || apiError.includes("Testing Hub Quota Reached")
+            }
             style={{
               height: 40,
               padding: "0 24px",
-              background: isSubmitting ? "#5C5A50" : "#4C7A6E",
+              background:
+                isSubmitting || apiError.includes("Testing Hub Quota Reached")
+                  ? "#5C5A50"
+                  : "#4C7A6E",
 
               color: "#fff",
               border: "none",
@@ -1051,7 +1060,10 @@ export default function EnrollmentScreen({
               fontSize: 14,
               fontWeight: 600,
 
-              cursor: isSubmitting ? "not-allowed" : "pointer",
+              cursor:
+                isSubmitting || apiError.includes("Testing Hub Quota Reached")
+                  ? "not-allowed"
+                  : "pointer",
               display: "flex",
               alignItems: "center",
               gap: 8,
@@ -1085,8 +1097,8 @@ export default function EnrollmentScreen({
                 fatherName: "",
                 dob: "",
                 cnic: "",
-                trade: "Electrician",
-                hub: "Lahore-C01",
+                trade: "",
+                hub: initialHub,
               })
             }
             style={{
@@ -1238,8 +1250,8 @@ export default function EnrollmentScreen({
                   fatherName: "",
                   dob: "",
                   cnic: "",
-                  trade: "Electrician",
-                  hub: "Lahore-C01",
+                  trade: "",
+                  hub: initialHub,
                 })
               }}
               style={{

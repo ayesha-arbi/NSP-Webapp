@@ -1,4 +1,4 @@
-// Offline queue for assessment creation (+ optional evidence photo).
+﻿// Offline queue for assessment creation (+ optional evidence photo).
 
 // Requires: pnpm add idb-keyval or npm i idb-keyval
 
@@ -39,7 +39,7 @@ const load = async () => (await get<QueueItem[]>(KEY)) ?? []
 const save = (q: QueueItem[]) => set(KEY, q)
 
 export async function enqueueAssessment(
-  d: { candidateId: string; score: number; grade: string; photo?: Blob },
+  d: { candidateId: string score: number grade: string photo?: Blob },
 
   clientRequestId: string,
 ) {

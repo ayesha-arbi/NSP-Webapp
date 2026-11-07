@@ -1,5 +1,5 @@
-interface NavBarProps {
-  breadcrumbs?: { label: string; onClick?: () => void }[]
+﻿interface NavBarProps {
+  breadcrumbs?: { label: string onClick?: () => void }[]
 }
 
 export default function NavBar({ breadcrumbs }: NavBarProps) {

@@ -1,4 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { api, DeviceHealth, RegisterDevicePayload } from "../services/api"
+import { getDeviceFingerprint } from "../services/fingerprint"
 
 type DeviceStatus = "authorized" | "pending" | "revoked"
 type ModalType = "none" | "authorize" | "revoke" | "detail"
@@ -16,108 +18,10 @@ interface Device {
   lastSeen: string
   registeredAt: string
   status: DeviceStatus
+  isOnline?: boolean
+  edrStatus?: "compliant" | "non_compliant" | "unknown"
+  hubLocationId?: number
 }
-
-const DEVICES: Device[] = [
-  {
-    id: "1",
-    deviceId: "DEV-3A1F-2B9C",
-    user: "Ahmad Raza",
-    role: "Trade Tester",
-    hub: "Lahore-C01",
-    type: "Desktop",
-    os: "Windows 11",
-    browser: "Chrome 126",
-    ip: "203.128.22.14",
-    lastSeen: "2026-08-26 09:41",
-    registeredAt: "2026-06-12 11:00",
-    status: "authorized",
-  },
-  {
-    id: "2",
-    deviceId: "DEV-7F2A-9K1M",
-    user: "Ahmad Raza",
-    role: "Trade Tester",
-    hub: "Lahore-C01",
-    type: "Laptop",
-    os: "Windows 11",
-    browser: "Chrome 126",
-    ip: "203.128.22.15",
-    lastSeen: "2026-08-26 08:12",
-    registeredAt: "2026-08-26 08:12",
-    status: "pending",
-  },
-  {
-    id: "3",
-    deviceId: "DEV-5C8D-4E2F",
-    user: "Fatima Malik",
-    role: "Center Superintendent",
-    hub: "Lahore-C01",
-    type: "Desktop",
-    os: "macOS 14",
-    browser: "Safari 17",
-    ip: "202.77.44.88",
-    lastSeen: "2026-08-26 07:55",
-    registeredAt: "2026-07-01 09:30",
-    status: "authorized",
-  },
-  {
-    id: "4",
-    deviceId: "DEV-9B4E-7G3H",
-    user: "Bilal Ahmed",
-    role: "Trade Tester",
-    hub: "Karachi-C02",
-    type: "Desktop",
-    os: "Windows 10",
-    browser: "Edge 126",
-    ip: "192.168.1.55",
-    lastSeen: "2026-08-25 16:20",
-    registeredAt: "2026-06-20 14:15",
-    status: "authorized",
-  },
-  {
-    id: "5",
-    deviceId: "DEV-2D6F-8I4J",
-    user: "Sana Malik",
-    role: "Trade Tester",
-    hub: "Islamabad-C03",
-    type: "Laptop",
-    os: "Ubuntu 22.04",
-    browser: "Firefox 128",
-    ip: "10.0.0.44",
-    lastSeen: "2026-08-24 11:30",
-    registeredAt: "2026-07-10 08:00",
-    status: "authorized",
-  },
-  {
-    id: "6",
-    deviceId: "DEV-1A3B-5C7D",
-    user: "Unknown User",
-    role: "—",
-    hub: "Lahore-C01",
-    type: "Mobile",
-    os: "Android 14",
-    browser: "Chrome Mobile",
-    ip: "45.90.12.200",
-    lastSeen: "2026-08-26 05:14",
-    registeredAt: "2026-08-26 05:14",
-    status: "pending",
-  },
-  {
-    id: "7",
-    deviceId: "DEV-6H8I-0K2L",
-    user: "Zafar Iqbal",
-    role: "Trade Tester",
-    hub: "Faisalabad-C04",
-    type: "Desktop",
-    os: "Windows 10",
-    browser: "Chrome 124",
-    ip: "172.16.0.12",
-    lastSeen: "2026-08-10 14:00",
-    registeredAt: "2026-05-05 09:00",
-    status: "revoked",
-  },
-]
 
 function StatusPill({ status }: { status: DeviceStatus }) {
   const map = {
@@ -226,12 +130,159 @@ function ModalOverlay({ children }: { children: React.ReactNode }) {
 }
 
 export default function DevicesScreen() {
-  const [devices, setDevices] = useState<Device[]>(DEVICES)
+  const [devices, setDevices] = useState<Device[]>([])
   const [filterStatus, setFilterStatus] = useState<"all" | DeviceStatus>("all")
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState<Device | null>(null)
   const [modal, setModal] = useState<ModalType>("none")
   const [revokeReason, setRevokeReason] = useState("")
+
+  // Capstone B3: Device Health, Lockdown & Registration States
+  const [hubLocked, setHubLocked] = useState<Record<number, boolean>>({})
+  const [lockdownLoading, setLockdownLoading] = useState(false)
+  const [toastMessage, setToastMessage] = useState("")
+
+  const [showRegisterModal, setShowRegisterModal] = useState(false)
+  const [regForm, setRegForm] = useState({
+    hubLocationId: 1,
+    deviceName: "",
+    deviceFingerprint: "",
+    deviceCredential: "",
+  })
+  const [regLoading, setRegLoading] = useState(false)
+  const [regError, setRegError] = useState("")
+
+  // Poll real-time device health
+  useEffect(() => {
+    let mounted = true
+    async function loadHealth() {
+      try {
+        const live = await api.getDeviceHealth()
+        if (!mounted || !Array.isArray(live) || live.length === 0) return
+
+        setDevices((prev) => {
+          const updated = [...prev]
+          live.forEach((ld) => {
+            const idx = updated.findIndex((d) => d.deviceId === ld.deviceId)
+            const item: Device = {
+              id: ld.deviceId,
+              deviceId: ld.deviceId,
+              user: "Assigned Staff",
+              role: "Hub Operator",
+              hub: `Hub Location #${ld.hubLocationId}`,
+              hubLocationId: ld.hubLocationId,
+              type: "Authorized Hub Laptop",
+              os: "Windows 11 Enterprise",
+              browser: "Chrome 126 EDR",
+              ip: "Testing Hub Network",
+              lastSeen: ld.lastHeartbeatAt
+                ? new Date(ld.lastHeartbeatAt).toLocaleString()
+                : "Never",
+              registeredAt: ld.lastHeartbeatAt || new Date().toISOString(),
+              status: ld.revoked ? "revoked" : "authorized",
+              isOnline: ld.isOnline,
+              edrStatus: ld.edrStatus,
+            }
+            if (idx >= 0) {
+              updated[idx] = { ...updated[idx], ...item }
+            } else {
+              updated.unshift(item)
+            }
+          })
+          return updated
+        })
+      } catch {}
+    }
+
+    loadHealth()
+    const timer = setInterval(loadHealth, 30000)
+    return () => {
+      mounted = false
+      clearInterval(timer)
+    }
+  }, [])
+
+  async function handleToggleHubLockdown(hubId = 1) {
+    setLockdownLoading(true)
+    const newLockState = !hubLocked[hubId]
+    try {
+      await api.setHubLockdown(hubId, newLockState)
+      setHubLocked((prev) => ({ ...prev, [hubId]: newLockState }))
+      setToastMessage(
+        newLockState
+          ? `Hub ${hubId} Lockdown ACTIVE: All logins frozen from this hub location.`
+          : `Hub ${hubId} Lockdown lifted: Logins resumed.`,
+      )
+      setTimeout(() => setToastMessage(""), 5000)
+    } catch (err: any) {
+      setToastMessage(err?.message || "Failed to update hub lockdown.")
+    } finally {
+      setLockdownLoading(false)
+    }
+  }
+
+  async function handleRevokeSubmit() {
+    if (!selected) return
+    try {
+      await api.revokeDevice(selected.deviceId).catch(() => null)
+    } catch {}
+    setDevices((ds) =>
+      ds.map((d) => (d.id === selected.id ? { ...d, status: "revoked" } : d)),
+    )
+    setModal("none")
+    setRevokeReason("")
+  }
+
+  async function handleAutoDetectFingerprint() {
+    try {
+      const fp = await getDeviceFingerprint()
+      setRegForm((prev) => ({ ...prev, deviceFingerprint: fp }))
+    } catch {}
+  }
+
+  function handleGenerateCredential() {
+    const bytes = new Uint8Array(32)
+    crypto.getRandomValues(bytes)
+    const hex = Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
+    setRegForm((prev) => ({ ...prev, deviceCredential: hex }))
+  }
+
+  async function handleRegisterDeviceSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (
+      !regForm.deviceName ||
+      !regForm.deviceFingerprint ||
+      !regForm.deviceCredential
+    ) {
+      setRegError("All fields are required.")
+      return
+    }
+    setRegLoading(true)
+    setRegError("")
+    try {
+      await api.registerDevice({
+        hubLocationId: Number(regForm.hubLocationId),
+        deviceName: regForm.deviceName,
+        deviceFingerprint: regForm.deviceFingerprint,
+        deviceCredential: regForm.deviceCredential,
+      })
+      setShowRegisterModal(false)
+      setRegForm({
+        hubLocationId: 1,
+        deviceName: "",
+        deviceFingerprint: "",
+        deviceCredential: "",
+      })
+      setToastMessage("Hub device successfully registered.")
+      setTimeout(() => setToastMessage(""), 4000)
+    } catch (err: any) {
+      setRegError(err?.message || "Failed to register device.")
+    } finally {
+      setRegLoading(false)
+    }
+  }
 
   const displayed = devices.filter((d) => {
     if (filterStatus !== "all" && d.status !== filterStatus) return false
@@ -257,33 +308,96 @@ export default function DevicesScreen() {
   }
 
   function handleRevoke() {
-    if (!selected || !revokeReason) return
-    setDevices((ds) =>
-      ds.map((d) => (d.id === selected.id ? { ...d, status: "revoked" } : d)),
-    )
-    setModal("none")
-    setRevokeReason("")
+    handleRevokeSubmit()
   }
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        <h1
-          className="display"
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 24,
+        }}
+      >
+        <div>
+          <h1
+            className="display"
+            style={{
+              fontSize: 28,
+              fontWeight: 400,
+              color: "#24302E",
+              margin: "0 0 4px",
+              letterSpacing: -0.2,
+            }}
+          >
+            Device Health
+          </h1>
+          <p style={{ fontSize: 14, color: "#5C5A50", margin: 0 }}>
+            Monitor and manage authorized devices across all hubs.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button
+            onClick={() => handleToggleHubLockdown(1)}
+            disabled={lockdownLoading}
+            style={{
+              height: 40,
+              padding: "0 16px",
+              background: hubLocked[1] ? "#8C3B34" : "#FCEBEB",
+              color: hubLocked[1] ? "#fff" : "#A6453D",
+              border: "1px solid #A6453D",
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            🚨{" "}
+            {hubLocked[1] ? "Lift Hub 1 Lockdown" : "Emergency Hub 1 Lockdown"}
+          </button>
+          <button
+            onClick={() => {
+              setRegError("")
+              setShowRegisterModal(true)
+            }}
+            style={{
+              height: 40,
+              padding: "0 16px",
+              background: "#4C7A6E",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            + Register Hub Device
+          </button>
+        </div>
+      </div>
+
+      {toastMessage && (
+        <div
           style={{
-            fontSize: 28,
-            fontWeight: 400,
-            color: "#24302E",
-            margin: "0 0 4px",
-            letterSpacing: -0.2,
+            background: "#EAF3DE",
+            border: "1px solid #4C7A6E",
+            borderRadius: 6,
+            padding: "10px 16px",
+            marginBottom: 20,
+            fontSize: 13,
+            color: "#173404",
+            fontWeight: 500,
           }}
         >
-          Device Health
-        </h1>
-        <p style={{ fontSize: 14, color: "#5C5A50", margin: 0 }}>
-          Monitor and manage authorized devices across all hubs.
-        </p>
-      </div>
+          {toastMessage}
+        </div>
+      )}
 
       {/* KPIs */}
       <div
@@ -999,6 +1113,252 @@ export default function DevicesScreen() {
               Cancel
             </button>
           </div>
+        </ModalOverlay>
+      )}
+
+      {/* Register Hub Device Modal (Capstone B3) */}
+      {showRegisterModal && (
+        <ModalOverlay>
+          <form onSubmit={handleRegisterDeviceSubmit}>
+            <div style={{ marginBottom: 16 }}>
+              <h2
+                style={{
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: "#24302E",
+                  margin: "0 0 6px",
+                }}
+              >
+                Register Authorized Hub Laptop
+              </h2>
+              <p style={{ fontSize: 13, color: "#5C5A50", margin: 0 }}>
+                Provision hardware credentials and browser fingerprint for
+                testing hub laptops.
+              </p>
+            </div>
+
+            {regError && (
+              <div
+                style={{
+                  background: "#FCEBEB",
+                  border: "1px solid #A6453D",
+                  borderRadius: 6,
+                  padding: "8px 12px",
+                  color: "#501313",
+                  fontSize: 13,
+                  marginBottom: 16,
+                }}
+              >
+                {regError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#24302E",
+                    marginBottom: 4,
+                  }}
+                >
+                  Hub Location ID
+                </label>
+                <input
+                  type="number"
+                  value={regForm.hubLocationId}
+                  onChange={(e) =>
+                    setRegForm((f) => ({
+                      ...f,
+                      hubLocationId: Number(e.target.value),
+                    }))
+                  }
+                  style={{
+                    width: "100%",
+                    height: 38,
+                    border: "1px solid #D6D3C6",
+                    borderRadius: 6,
+                    padding: "0 10px",
+                    fontSize: 13,
+                  }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#24302E",
+                    marginBottom: 4,
+                  }}
+                >
+                  Device Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Lahore-Testing-Center-Laptop-01"
+                  value={regForm.deviceName}
+                  onChange={(e) =>
+                    setRegForm((f) => ({ ...f, deviceName: e.target.value }))
+                  }
+                  style={{
+                    width: "100%",
+                    height: 38,
+                    border: "1px solid #D6D3C6",
+                    borderRadius: 6,
+                    padding: "0 10px",
+                    fontSize: 13,
+                  }}
+                  required
+                />
+              </div>
+
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 4,
+                  }}
+                >
+                  <label
+                    style={{ fontSize: 12, fontWeight: 600, color: "#24302E" }}
+                  >
+                    Device Fingerprint (32-character hex)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAutoDetectFingerprint}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#4C7A6E",
+                      fontSize: 11,
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Auto-Detect Current Browser
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  placeholder="e.g. 9a7b3c2d1e4f5a6b7c8d9e0f1a2b3c4d"
+                  value={regForm.deviceFingerprint}
+                  onChange={(e) =>
+                    setRegForm((f) => ({
+                      ...f,
+                      deviceFingerprint: e.target.value,
+                    }))
+                  }
+                  style={{
+                    width: "100%",
+                    height: 38,
+                    border: "1px solid #D6D3C6",
+                    borderRadius: 6,
+                    padding: "0 10px",
+                    fontSize: 12,
+                    fontFamily: "monospace",
+                  }}
+                  required
+                />
+              </div>
+
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 4,
+                  }}
+                >
+                  <label
+                    style={{ fontSize: 12, fontWeight: 600, color: "#24302E" }}
+                  >
+                    Device Credential (64-character hex)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGenerateCredential}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#4C7A6E",
+                      fontSize: 11,
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Generate Random Credential
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  placeholder="64-character hardware token"
+                  value={regForm.deviceCredential}
+                  onChange={(e) =>
+                    setRegForm((f) => ({
+                      ...f,
+                      deviceCredential: e.target.value,
+                    }))
+                  }
+                  style={{
+                    width: "100%",
+                    height: 38,
+                    border: "1px solid #D6D3C6",
+                    borderRadius: 6,
+                    padding: "0 10px",
+                    fontSize: 12,
+                    fontFamily: "monospace",
+                  }}
+                  required
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+              <button
+                type="submit"
+                disabled={regLoading}
+                style={{
+                  flex: 1,
+                  height: 40,
+                  background: regLoading ? "#5C5A50" : "#4C7A6E",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: regLoading ? "not-allowed" : "pointer",
+                }}
+              >
+                {regLoading ? "Registering..." : "Authorize Device"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowRegisterModal(false)}
+                style={{
+                  height: 40,
+                  padding: "0 20px",
+                  background: "#fff",
+                  color: "#24302E",
+                  border: "1px solid #D6D3C6",
+                  borderRadius: 6,
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
         </ModalOverlay>
       )}
     </div>

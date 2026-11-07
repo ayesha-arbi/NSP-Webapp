@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { api } from "./api"
 import { authStore } from "./authStore"
 
@@ -37,12 +37,12 @@ describe("authStore", () => {
       refreshToken: "new-refresh",
       isAuthenticated: true,
     })
-    expect(JSON.parse(sessionStorage.getItem("nsp_session") ?? "{}")).toMatchObject(
-      {
-        accessToken: "new-access",
-        refreshToken: "new-refresh",
-      },
-    )
+    expect(
+      JSON.parse(sessionStorage.getItem("nsp_session") ?? "{}"),
+    ).toMatchObject({
+      accessToken: "new-access",
+      refreshToken: "new-refresh",
+    })
   })
 
   it("revokes the active refresh token before clearing a session", async () => {

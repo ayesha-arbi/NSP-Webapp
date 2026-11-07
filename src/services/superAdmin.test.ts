@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { api, onAuthExpired } from "./api"
 import { superAdminApi } from "./superAdmin"
 import { authStore } from "./authStore"
@@ -28,11 +28,14 @@ describe("Guide #7 Super Admin & MFA Enrollment Service", () => {
           expect(String(input)).toContain("/api/auth/mfa/enroll/start")
           expect(init?.method).toBe("POST")
           const headers = new Headers(init?.headers)
-          expect(headers.get("Authorization")).toBe("Bearer test-enroll-token-123")
+          expect(headers.get("Authorization")).toBe(
+            "Bearer test-enroll-token-123",
+          )
           return jsonResponse(200, {
             success: true,
             secret: "JBSWY3DPEHPK3PXP",
-            otpauthUrl: "otpauth://totp/NSP:user@gov.pk?secret=JBSWY3DPEHPK3PXP",
+            otpauthUrl:
+              "otpauth://totp/NSP:user@gov.pk?secret=JBSWY3DPEHPK3PXP",
           })
         }),
       )
@@ -58,7 +61,10 @@ describe("Guide #7 Super Admin & MFA Enrollment Service", () => {
         }),
       )
 
-      const res = await api.confirmMfaEnrollment("test-enroll-token-123", "654321")
+      const res = await api.confirmMfaEnrollment(
+        "test-enroll-token-123",
+        "654321",
+      )
       expect(res.success).toBe(true)
       expect(res.message).toBe("MFA enrolled successfully")
     })
@@ -83,7 +89,12 @@ describe("Guide #7 Super Admin & MFA Enrollment Service", () => {
             },
             sessions: { activeCount: 5 },
             candidates: { totalEnrolled: 150, verifiedCnic: 140 },
-            assessments: { totalAssessed: 120, submitted: 30, approved: 80, rejected: 10 },
+            assessments: {
+              totalAssessed: 120,
+              submitted: 30,
+              approved: 80,
+              rejected: 10,
+            },
             ledger: {
               totalCredentials: 75,
               pendingApproval: 15,
@@ -127,7 +138,10 @@ describe("Guide #7 Super Admin & MFA Enrollment Service", () => {
         }),
       )
 
-      const res = await superAdminApi.getUsers({ role: "TRADE_TESTER", limit: 10 })
+      const res = await superAdminApi.getUsers({
+        role: "TRADE_TESTER",
+        limit: 10,
+      })
       expect(res.users.length).toBe(1)
       expect(res.users[0].email).toBe("tester@nsp.gov.pk")
     })
@@ -155,7 +169,8 @@ describe("Guide #7 Super Admin & MFA Enrollment Service", () => {
             },
             mfaEnrollment: {
               secret: "NEWSECRETKEY1234",
-              otpauthUrl: "otpauth://totp/NSP:newtester@nsp.gov.pk?secret=NEWSECRETKEY1234",
+              otpauthUrl:
+                "otpauth://totp/NSP:newtester@nsp.gov.pk?secret=NEWSECRETKEY1234",
             },
           })
         }),
@@ -203,7 +218,10 @@ describe("Guide #7 Super Admin & MFA Enrollment Service", () => {
         }),
       )
 
-      const lockRes = await superAdminApi.lockUser("u-target", "Security audit suspicion")
+      const lockRes = await superAdminApi.lockUser(
+        "u-target",
+        "Security audit suspicion",
+      )
       expect(lockRes.success).toBe(true)
       expect(lockedCalled).toBe(true)
 
@@ -216,7 +234,9 @@ describe("Guide #7 Super Admin & MFA Enrollment Service", () => {
       vi.stubGlobal(
         "fetch",
         vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-          expect(String(input)).toContain("/api/super-admin/users/u-target/reset-mfa")
+          expect(String(input)).toContain(
+            "/api/super-admin/users/u-target/reset-mfa",
+          )
           expect(init?.method).toBe("POST")
           expect(JSON.parse(String(init?.body))).toEqual({
             reason: "Lost mobile device",
@@ -225,13 +245,17 @@ describe("Guide #7 Super Admin & MFA Enrollment Service", () => {
             success: true,
             mfaEnrollment: {
               secret: "RESETSECRET5678",
-              otpauthUrl: "otpauth://totp/NSP:user@gov.pk?secret=RESETSECRET5678",
+              otpauthUrl:
+                "otpauth://totp/NSP:user@gov.pk?secret=RESETSECRET5678",
             },
           })
         }),
       )
 
-      const res = await superAdminApi.resetUserMfa("u-target", "Lost mobile device")
+      const res = await superAdminApi.resetUserMfa(
+        "u-target",
+        "Lost mobile device",
+      )
       expect(res.success).toBe(true)
       expect(res.mfaEnrollment?.secret).toBe("RESETSECRET5678")
     })
@@ -243,7 +267,10 @@ describe("Guide #7 Super Admin & MFA Enrollment Service", () => {
         "fetch",
         vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
           const url = String(input)
-          if (url.includes("/api/super-admin/sessions") && init?.method !== "POST") {
+          if (
+            url.includes("/api/super-admin/sessions") &&
+            init?.method !== "POST"
+          ) {
             return jsonResponse(200, [
               {
                 sessionId: "sess-100",
@@ -327,7 +354,9 @@ describe("Guide #7 Super Admin & MFA Enrollment Service", () => {
         vi.fn(async (input: RequestInfo | URL) => {
           const url = String(input)
           if (url.endsWith("/api/auth/refresh")) {
-            throw new Error("Refresh should NOT be called on token invalidation!")
+            throw new Error(
+              "Refresh should NOT be called on token invalidation!",
+            )
           }
           return jsonResponse(401, {
             success: false,
@@ -336,7 +365,9 @@ describe("Guide #7 Super Admin & MFA Enrollment Service", () => {
         }),
       )
 
-      await expect(api.listAssessments()).rejects.toThrow("Session is no longer valid")
+      await expect(api.listAssessments()).rejects.toThrow(
+        "Session is no longer valid",
+      )
       expect(expiredCalled).toBe(true)
     })
   })

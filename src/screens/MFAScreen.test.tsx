@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react"
+﻿import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { api } from "../services/api"
@@ -13,7 +13,9 @@ const user = {
 }
 
 async function enterMfa(container: HTMLElement) {
-  const inputs = Array.from(container.querySelectorAll<HTMLInputElement>(".otp-input"))
+  const inputs = Array.from(
+    container.querySelectorAll<HTMLInputElement>(".otp-input"),
+  )
   for (let index = 0; index < inputs.length; index += 1) {
     await userEvent.type(inputs[index], String(index + 1))
   }
@@ -87,6 +89,8 @@ describe("MFAScreen", () => {
     )
 
     expect(onUseBackupCode).toHaveBeenCalledOnce()
-    expect(screen.queryByRole("heading", { name: "Use Backup Code" })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole("heading", { name: "Use Backup Code" }),
+    ).not.toBeInTheDocument()
   })
 })

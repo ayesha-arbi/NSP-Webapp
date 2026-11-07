@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react"
+﻿import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { api, ApiError } from "../services/api"
@@ -26,7 +26,9 @@ function renderScreen() {
 
 async function submitCode(code = "a1b2c3d4e5f67890") {
   await userEvent.type(screen.getByLabelText("Backup code"), code)
-  await userEvent.click(screen.getByRole("button", { name: "Verify backup code" }))
+  await userEvent.click(
+    screen.getByRole("button", { name: "Verify backup code" }),
+  )
 }
 
 describe("BackupCodeScreen", () => {
@@ -40,7 +42,9 @@ describe("BackupCodeScreen", () => {
     const verify = vi.spyOn(api, "verifyBackupCode")
     renderScreen()
 
-    await userEvent.click(screen.getByRole("button", { name: "Verify backup code" }))
+    await userEvent.click(
+      screen.getByRole("button", { name: "Verify backup code" }),
+    )
 
     expect(screen.getByRole("alert")).toHaveTextContent("Enter a backup code")
     expect(verify).not.toHaveBeenCalled()
@@ -105,15 +109,18 @@ describe("BackupCodeScreen", () => {
   it.each([
     [429, "Too many requests", /cooldown/i],
     [0, "offline", /cannot reach the server/i],
-  ])("maps status %s without implying the code was consumed", async (status, message, expected) => {
-    vi.spyOn(api, "verifyBackupCode").mockRejectedValue(
-      new ApiError(message, status),
-    )
-    renderScreen()
+  ])(
+    "maps status %s without implying the code was consumed",
+    async (status, message, expected) => {
+      vi.spyOn(api, "verifyBackupCode").mockRejectedValue(
+        new ApiError(message, status),
+      )
+      renderScreen()
 
-    await submitCode()
+      await submitCode()
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(expected)
-    expect(screen.getByRole("alert")).not.toHaveTextContent(/consumed/i)
-  })
+      expect(await screen.findByRole("alert")).toHaveTextContent(expected)
+      expect(screen.getByRole("alert")).not.toHaveTextContent(/consumed/i)
+    },
+  )
 })

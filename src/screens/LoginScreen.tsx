@@ -15,13 +15,6 @@ interface LoginScreenProps {
 type LoginState = "idle" | "loading" | "error"
 type ModalType = "none" | "locked" | "unauthorized-device"
 
-const DEMO_ACCOUNTS = {
-  "tradetester@nsp.com": "trade-tester",
-  "tester@hub.pk": "trade-tester",
-  "cs@hub.pk": "center-superintendent",
-  "super@hub.pk": "super-admin",
-} as const
-
 /* ─── tiny icon helpers ─── */
 function EyeOpen() {
   return (
@@ -142,8 +135,8 @@ export default function LoginScreen({
   onEnrollmentRequired,
   enrollmentSuccessMessage,
 }: LoginScreenProps) {
-  const [email, setEmail] = useState("tradetester@nsp.com")
-  const [password, setPassword] = useState("TradeTester123")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [showPw, setShowPw] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [state, setState] = useState<LoginState>("idle")
@@ -152,12 +145,24 @@ export default function LoginScreen({
     password?: string
   }>({})
   const [generalError, setGeneralError] = useState("")
-  const [errorKind, setErrorKind] = useState<
-    "default" | "locked" | "network" | "rate-limit"
-  >("default")
+  const [errorKind, setErrorKind] =
+    useState<"default" | "locked" | "network" | "rate-limit">("default")
   const [modal, setModal] = useState<ModalType>("none")
 
   const lockTimer = useCountdown(1724, modal === "locked")
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined" && window.location?.search) {
+        const params = new URLSearchParams(window.location.search)
+        if (params.get("reason") === "session_revoked") {
+          setGeneralError(
+            "Your session has been revoked due to a security update or token reuse detection. Please sign in again.",
+          )
+        }
+      }
+    } catch {}
+  }, [])
 
   /* ── validation ── */
   function validate() {
@@ -197,16 +202,21 @@ export default function LoginScreen({
       }
     } catch (err: any) {
       setState("error")
-      const message = err?.message || "Login failed. Please check your credentials."
+      const message =
+        err?.message || "Login failed. Please check your credentials."
       if (message.toLowerCase().includes("account locked")) {
         setErrorKind("locked")
         setGeneralError(message)
       } else if (err instanceof ApiError && err.status === 0) {
         setErrorKind("network")
-        setGeneralError("Cannot reach the server. Check your connection and try again.")
+        setGeneralError(
+          "Cannot reach the server. Check your connection and try again.",
+        )
       } else if (err instanceof ApiError && err.status === 429) {
         setErrorKind("rate-limit")
-        setGeneralError("Request cooldown active. Please wait before trying again.")
+        setGeneralError(
+          "Request cooldown active. Please wait before trying again.",
+        )
       } else {
         setErrorKind("default")
         setGeneralError(message)
@@ -469,7 +479,9 @@ export default function LoginScreen({
                 >
                   {errorKind === "locked" && (
                     <>
-                      <strong>Account temporarily suspended for 15 minutes.</strong>{" "}
+                      <strong>
+                        Account temporarily suspended for 15 minutes.
+                      </strong>{" "}
                     </>
                   )}
                   {generalError}
@@ -719,98 +731,6 @@ export default function LoginScreen({
                 action.
               </span>
             </div>
-
-            {/* demo helpers */}
-            {false && <div
-              style={{
-                marginTop: 28,
-                borderTop: "1px solid #E8E6DF",
-                paddingTop: 20,
-              }}
-            >
-              <p
-                style={{
-                  fontSize: 11,
-                  color: "#8C897C",
-                  margin: "0 0 10px",
-                  textTransform: "uppercase",
-                  letterSpacing: 0.6,
-                  fontWeight: 600,
-                }}
-              >
-                Demo Quick Login
-              </p>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 6,
-                  flexWrap: "wrap",
-                  marginBottom: 10,
-                }}
-              >
-                {Object.keys(DEMO_ACCOUNTS).map((e) => (
-                  <button
-                    key={e}
-                    onClick={() => {
-                      setEmail(e)
-                      setPassword(
-                        e === "tradetester@nsp.com"
-                          ? "TradeTester123"
-                          : "password123",
-                      )
-                      setGeneralError("")
-                      setFieldErrors({})
-                    }}
-                    style={{
-                      fontSize: 11,
-                      padding: "4px 10px",
-                      background:
-                        e === "tradetester@nsp.com" ? "#EAF3DE" : "#fff",
-                      border: `1px solid ${
-                        e === "tradetester@nsp.com" ? "#4C7A6E" : "#D6D3C6"
-                      }`,
-                      borderRadius: 4,
-                      cursor: "pointer",
-                      color: "#24302E",
-                      fontFamily: "IBM Plex Mono, monospace",
-                      fontWeight: e === "tradetester@nsp.com" ? 600 : 400,
-                    }}
-                  >
-                    {e === "tradetester@nsp.com" ? `${e} (Live Backend)` : e}
-                  </button>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                <button
-                  onClick={() => setModal("locked")}
-                  style={{
-                    fontSize: 11,
-                    padding: "4px 10px",
-                    background: "#FCEBEB",
-                    border: "1px solid #E8B4B4",
-                    borderRadius: 4,
-                    cursor: "pointer",
-                    color: "#8C3B34",
-                  }}
-                >
-                  Preview: Account Locked
-                </button>
-                <button
-                  onClick={() => setModal("unauthorized-device")}
-                  style={{
-                    fontSize: 11,
-                    padding: "4px 10px",
-                    background: "#FCE8D6",
-                    border: "1px solid #B08D46",
-                    borderRadius: 4,
-                    cursor: "pointer",
-                    color: "#5C3300",
-                  }}
-                >
-                  Preview: Unauthorized Device
-                </button>
-              </div>
-            </div>}
           </div>
         </div>
       </div>

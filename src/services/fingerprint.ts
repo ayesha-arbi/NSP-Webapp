@@ -1,4 +1,4 @@
-import FingerprintJS from "@fingerprintjs/fingerprintjs"
+﻿import FingerprintJS from "@fingerprintjs/fingerprintjs"
 
 let cachedVisitorId: string | null = null
 let fpPromise: Promise<string> | null = null

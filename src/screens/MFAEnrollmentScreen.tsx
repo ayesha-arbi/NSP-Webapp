@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react"
+﻿import { useState, useRef, useEffect } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { api, ApiError } from "../services/api"
 
@@ -12,7 +12,7 @@ interface MFAEnrollmentScreenProps {
 type EnrollmentState = "loading" | "ready" | "submitting" | "success" | "error"
 
 export default function MFAEnrollmentScreen({
-  email = "user@nsp.gov.pk",
+  email,
   enrollmentToken,
   onSuccess,
   onBackToLogin,
@@ -45,18 +45,6 @@ export default function MFAEnrollmentScreen({
           return
         }
       } catch (err: any) {
-        // Offline / dev fallback if backend is not running
-        if (err instanceof ApiError && err.status === 0) {
-          if (active) {
-            const fallbackSecret = "JBSWY3DPEHPK3PXP"
-            const fallbackUrl = `otpauth://totp/NSP:${email}?secret=${fallbackSecret}&issuer=NSP`
-            setSecret(fallbackSecret)
-            setOtpauthUrl(fallbackUrl)
-            setState("ready")
-            setTimeout(() => refs.current[0]?.focus(), 100)
-            return
-          }
-        }
         if (active) {
           setState("error")
           setErrorMessage(
@@ -145,15 +133,6 @@ export default function MFAEnrollmentScreen({
       setState("ready")
       setErrorMessage(res.message || "Invalid verification code.")
     } catch (err: any) {
-      // Offline simulation fallback
-      if (err instanceof ApiError && err.status === 0) {
-        if (mfaCode === "123456" || mfaCode === "012345" || mfaCode.length === 6) {
-          setState("success")
-          setTimeout(onSuccess, 1200)
-          return
-        }
-      }
-
       setAttempts((a) => a + 1)
       setState("ready")
       setErrorMessage(
@@ -561,9 +540,7 @@ export default function MFAEnrollmentScreen({
                         value={d}
                         onChange={(e) => handleDigit(i, e.target.value)}
                         onKeyDown={(e) => handleKeyDown(i, e)}
-                        disabled={
-                          state === "submitting" || state === "success"
-                        }
+                        disabled={state === "submitting" || state === "success"}
                         style={{
                           width: 44,
                           height: 52,

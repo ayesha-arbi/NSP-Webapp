@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+﻿import { describe, it, expect } from "vitest"
 import { getDeviceFingerprint } from "./fingerprint"
 
 describe("fingerprint service", () => {

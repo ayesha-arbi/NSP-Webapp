@@ -1,4 +1,5 @@
-import { useState } from "react"
+﻿import { useState, useEffect } from "react"
+import { api } from "../services/api"
 
 export type RecordStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "MINTED"
 export type CredentialStatus = "Valid" | "Revoked"
@@ -9,10 +10,69 @@ interface HistoryEvent {
   datetime: string
 }
 
+interface Candidate {
+  photo?: string
+  name: string
+  fatherName: string
+  dob: string
+  cnic: string
+  trade: string
+  hub: string
+  id: string
+  enrolledAt: string
+}
+
+interface Assessment {
+  id: string
+  score: number
+  maxScore: number
+  grade: string
+  tester: string
+  submittedAt: string
+  superintendent?: string
+  approvedAt?: string
+  status: RecordStatus
+}
+
+interface Rejection {
+  reason: string
+  rejectedBy: string
+  rejectedAt: string
+}
+
+interface Credential {
+  id: string
+  status: CredentialStatus
+  issuerDid: string
+  hash: string
+  txHash: string
+  blockNumber: number
+  mintedAt: string
+  revocationReason?: string
+  revokedAt?: string
+}
+
+interface MediaItem {
+  type: string
+  url: string
+  name: string
+}
+
+interface RecordData {
+  candidate: Candidate
+  assessment: Assessment
+  rejection?: Rejection
+  credential?: Credential
+  media?: MediaItem[]
+  history: HistoryEvent[]
+}
+
 interface RecordDetailProps {
   onBack?: () => void
   onResubmit?: () => void
   userRole?: "trade-tester" | "center-superintendent" | "super-admin"
+  assessmentId?: string
+  data?: RecordData
 }
 
 const Icons = {
@@ -415,102 +475,157 @@ function DataField({
   )
 }
 
-const DEMO_DATA = {
-  candidate: {
-    photo:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop&auto=format",
-    name: "Muhammad Aamir Khan",
-    fatherName: "Tariq Ali Khan",
-    dob: "1992-05-14",
-    cnic: "35202-*******-1",
-    trade: "Electrician",
-    hub: "Lahore-C01",
-    id: "CAND-2026-98122",
-    enrolledAt: "2026-08-10 10:00",
-  },
-  assessment: {
-    id: "ASS-2026-00482",
-    score: 87,
-    maxScore: 100,
-    grade: "Distinction",
-    tester: "Ahmad Raza",
-    submittedAt: "2026-08-26 09:14",
-    superintendent: "Usman Bukhari",
-    approvedAt: "2026-08-26 11:30",
-    status: "MINTED" as RecordStatus,
-  },
-  rejection: {
-    reason:
-      "Score is slightly below passing threshold in practical section. Recommend a 2-week gap before resubmission.",
-    rejectedBy: "Usman Bukhari",
-    rejectedAt: "2026-08-26 11:45",
-  },
-  credential: {
-    id: "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
-    status: "Valid" as CredentialStatus,
-    issuerDid: "did:nsp:hub:peshawar-01",
-    hash: "0x5a1f8c2b7e9d4013fa67823e590bd71a48c6913e2bf45091c7830de45681ab34",
-    txHash:
-      "0x89abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678",
-    blockNumber: 15923041,
-    mintedAt: "2026-10-18 10:18",
-    revocationReason:
-      "Credential was issued for incorrect trade category due to clerical error.",
-    revokedAt: "2026-10-19 09:10",
-  },
-  media: [
-    {
-      type: "image",
-      url: "https://images.unsplash.com/photo-1544724569-5f546fd6f2b6?w=400&h=300&fit=crop&auto=format",
-      name: "practical_exam_1.jpg",
-    },
-    {
-      type: "image",
-      url: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=400&h=300&fit=crop&auto=format",
-      name: "practical_exam_2.jpg",
-    },
-  ],
-  history: [
-    {
-      action: "Candidate Enrolled",
-      performedBy: "Sana Malik (Registrar)",
-      datetime: "2026-08-10 10:00",
-    },
-    {
-      action: "Assessment Submitted",
-      performedBy: "Ahmad Raza (Trade Tester)",
-      datetime: "2026-08-26 09:14",
-    },
-    {
-      action: "Assessment Approved",
-      performedBy: "Usman Bukhari (Superintendent)",
-      datetime: "2026-08-26 11:30",
-    },
-    {
-      action: "Minting Queued",
-      performedBy: "System",
-      datetime: "2026-08-26 11:31",
-    },
-    {
-      action: "Credential Minted",
-      performedBy: "System",
-      datetime: "2026-08-26 11:35",
-    },
-  ],
-}
-
 export default function CandidateRecordScreen({
   onBack,
   onResubmit,
   userRole = "super-admin",
+  assessmentId,
+  data: initialData,
 }: RecordDetailProps) {
-  // Using demo data, but simulating a rejected state for demonstration if you want
-  const data = DEMO_DATA
+  const [data, setData] = useState<RecordData | null>(initialData || null)
+  const [loading, setLoading] = useState<boolean>(!initialData && !!assessmentId)
+  const [error, setError] = useState<string | null>(null)
 
-  // To test the REJECTED state, you could change this variable:
+  useEffect(() => {
+    if (initialData) {
+      setData(initialData)
+      setLoading(false)
+      return
+    }
+
+    if (assessmentId) {
+      loadAssessmentData(assessmentId)
+    }
+  }, [assessmentId, initialData])
+
+  const loadAssessmentData = async (id: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await api.getAssessment(id)
+      
+      // Transform API response to RecordData format
+      const assessment = response.assessment
+      const transformedData: RecordData = {
+        candidate: {
+          name: assessment.candidateName || "Unknown",
+          fatherName: "",
+          dob: "",
+          cnic: "",
+          trade: assessment.tradeCategory || "Unknown",
+          hub: "",
+          id: assessment.candidateId || "",
+          enrolledAt: assessment.createdAt || "",
+        },
+        assessment: {
+          id: assessment.assessmentId,
+          score: assessment.score,
+          maxScore: 100,
+          grade: assessment.grade,
+          tester: "",
+          submittedAt: assessment.submittedAt || assessment.createdAt,
+          superintendent: "",
+          approvedAt: assessment.approvedAt,
+          status: assessment.status as RecordStatus,
+        },
+        history: [
+          {
+            action: "Assessment Created",
+            performedBy: "System",
+            datetime: assessment.createdAt,
+          },
+          ...(assessment.submittedAt ? [{
+            action: "Assessment Submitted",
+            performedBy: "Trade Tester",
+            datetime: assessment.submittedAt,
+          }] : []),
+          ...(assessment.approvedAt ? [{
+            action: "Assessment Approved",
+            performedBy: "Center Superintendent",
+            datetime: assessment.approvedAt,
+          }] : []),
+        ],
+      }
+
+      if (assessment.rejectionReason) {
+        transformedData.rejection = {
+          reason: assessment.rejectionReason,
+          rejectedBy: "Center Superintendent",
+          rejectedAt: assessment.approvedAt || "",
+        }
+      }
+
+      setData(transformedData)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load assessment data")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Loading state
+  if (loading) {
+    return (
+      <div style={{ maxWidth: 1080, margin: "0 auto", paddingBottom: 64 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "64px 0",
+            color: "#5C5A50",
+            fontSize: 16,
+          }}
+        >
+          Loading record data...
+        </div>
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div style={{ maxWidth: 1080, margin: "0 auto", paddingBottom: 64 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "64px 0",
+            color: "#A6453D",
+            fontSize: 16,
+          }}
+        >
+          {error}
+        </div>
+      </div>
+    )
+  }
+
+  // Empty state
+  if (!data) {
+    return (
+      <div style={{ maxWidth: 1080, margin: "0 auto", paddingBottom: 64 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "64px 0",
+            color: "#5C5A50",
+            fontSize: 16,
+          }}
+        >
+          No record data available. Please provide an assessment ID or record data.
+        </div>
+      </div>
+    )
+  }
+
   const isRejected = data.assessment.status === "REJECTED"
   const isMinted = data.assessment.status === "MINTED"
-  const isRevoked = data.credential.status === "Revoked"
+  const isRevoked = data.credential?.status === "Revoked"
 
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto", paddingBottom: 64 }}>
@@ -684,11 +799,13 @@ export default function CandidateRecordScreen({
                     label="Center Superintendent"
                     value={data.assessment.superintendent}
                   />
-                  <DataField
-                    label="Approval Date/Time"
-                    value={data.assessment.approvedAt}
-                    mono
-                  />
+                  {data.assessment.approvedAt && (
+                    <DataField
+                      label="Approval Date/Time"
+                      value={data.assessment.approvedAt}
+                      mono
+                    />
+                  )}
                 </>
               )}
             </div>
@@ -769,7 +886,7 @@ export default function CandidateRecordScreen({
             </div>
           </SectionCard>
 
-          {isRejected && (
+          {isRejected && data.rejection && (
             <div
               style={{
                 background: "#FCEBEB",
@@ -830,7 +947,7 @@ export default function CandidateRecordScreen({
           )}
 
           <SectionCard title="Credential Information">
-            {isMinted ? (
+            {isMinted && data.credential ? (
               <>
                 <div
                   style={{

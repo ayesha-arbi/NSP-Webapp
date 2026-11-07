@@ -43,15 +43,15 @@ interface AssessmentScreenProps {
 }
 
 const CRITERIA: Criterion[] = [
-  { id: 1, label: "Safety Practices & PPE Compliance", max: 20, score: "18" },
+  { id: 1, label: "Safety Practices & PPE Compliance", max: 20, score: "" },
 
-  { id: 2, label: "Tool & Equipment Handling", max: 20, score: "17" },
+  { id: 2, label: "Tool & Equipment Handling", max: 20, score: "" },
 
-  { id: 3, label: "Technical Knowledge (Theory)", max: 25, score: "22" },
+  { id: 3, label: "Technical Knowledge (Theory)", max: 25, score: "" },
 
-  { id: 4, label: "Practical Task Execution", max: 25, score: "20" },
+  { id: 4, label: "Practical Task Execution", max: 25, score: "" },
 
-  { id: 5, label: "Work Quality & Finishing", max: 10, score: "8" },
+  { id: 5, label: "Work Quality & Finishing", max: 10, score: "" },
 ]
 
 interface CandidateItem {
@@ -159,7 +159,7 @@ export default function AssessmentScreen({
 
           trade: initialCandidate.tradeCategory,
 
-          hub: "Lahore-C01",
+          hub: "",
         },
 
         ...DEFAULT_CANDIDATES.filter((c) => c.id !== initialCandidate.id),
@@ -182,7 +182,7 @@ export default function AssessmentScreen({
 
         trade: initialCandidate.tradeCategory,
 
-        hub: "Lahore-C01",
+        hub: "",
       }
     }
 
