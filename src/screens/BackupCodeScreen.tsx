@@ -108,7 +108,7 @@ export default function BackupCodeScreen({
           </div>
           <div>
             <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>
-              National Skills Passport
+              NSP HUNAR
             </span>
             <span style={{ color: "rgba(255,255,255,0.4)" }}> — </span>
             <span style={{ color: "#B08D46", fontSize: 13 }}>

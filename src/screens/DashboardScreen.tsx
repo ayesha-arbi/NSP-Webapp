@@ -875,7 +875,7 @@ function CenterSuperDashboard({
               fontWeight: 600,
             }}
           >
-            12 pending
+            {approvals.length} pending
           </span>
         </div>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -1088,7 +1088,7 @@ function _SuperAdminDashboard_unused({
           System Overview
         </h1>
         <p style={{ fontSize: 14, color: "#5C5A50", margin: 0 }}>
-          Super Administrator · National Skills Passport — Issuer Portal
+          Super Administrator · NSP HUNAR — Issuer Portal
         </p>
       </div>
 

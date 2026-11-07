@@ -243,7 +243,10 @@ export default function NotificationsScreen() {
             border: "1px solid #D6D3C6",
             borderRadius: 8,
             padding: 64,
-            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
           <svg

@@ -1066,7 +1066,7 @@ export default function CredentialsScreen() {
                   textTransform: "uppercase",
                 }}
               >
-                National Skills Passport
+                NSP HUNAR
               </span>
               <span
                 style={{

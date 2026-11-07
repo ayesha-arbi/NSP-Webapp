@@ -1,4 +1,6 @@
-﻿interface NavBarProps {
+﻿import BrandLogo from "./BrandLogo"
+
+interface NavBarProps {
   breadcrumbs?: { label: string onClick?: () => void }[]
 }
 
@@ -29,26 +31,7 @@ export default function NavBar({ breadcrumbs }: NavBarProps) {
             gap: 12,
           }}
         >
-          <div
-            style={{
-              width: 28,
-              height: 28,
-              background: "#B08D46",
-
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-
-              flexShrink: 0,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M8 1.5L9.8 6H14.5L10.5 8.8L12 13.5L8 10.8L4 13.5L5.5 8.8L1.5 6H6.2L8 1.5Z"
-                fill="#24302E"
-              />
-            </svg>
-          </div>
+          <BrandLogo size={28} />
           <span
             style={{
               color: "#F1F0EA",
@@ -57,7 +40,7 @@ export default function NavBar({ breadcrumbs }: NavBarProps) {
               letterSpacing: "-0.01em",
             }}
           >
-            National Skills Passport
+            NSP HUNAR
           </span>
           <span
             style={{

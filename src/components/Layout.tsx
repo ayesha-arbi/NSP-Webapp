@@ -1,4 +1,6 @@
 import React, { useState } from "react"
+import BrandLogo from "./BrandLogo"
+import { authStore } from "../services/authStore"
 
 type Role = "trade-tester" | "center-superintendent" | "super-admin"
 
@@ -381,8 +383,6 @@ const navItems: NavItem[] = [
     icon: <IconBell />,
 
     roles: ["trade-tester", "center-superintendent", "super-admin"],
-
-    badge: 3,
   },
 
   {
@@ -488,41 +488,8 @@ export default function Layout({
             flexShrink: 0,
           }}
         >
-          <div
-            style={{
-              width: 28,
-
-              height: 28,
-
-              background: "#B08D46",
-
-              borderRadius: 6,
-
-              display: "flex",
-
-              alignItems: "center",
-
-              justifyContent: "center",
-
-              marginRight: 10,
-
-              flexShrink: 0,
-            }}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-            </svg>
-          </div>
-          <div>
+          <BrandLogo size={32} />
+          <div style={{ marginLeft: 12 }}>
             <div
               style={{
                 color: "#fff",
@@ -534,7 +501,7 @@ export default function Layout({
                 lineHeight: 1.2,
               }}
             >
-              National Skills
+              NSP HUNAR
             </div>
             <div style={{ color: "#B08D46", fontSize: 11, fontWeight: 500 }}>
               Issuer Portal
@@ -797,6 +764,9 @@ export default function Layout({
             ))}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
+              Hub: Lahore-C01
+            </span>
             <button
               onClick={() => onNavigate("notifications")}
               style={{
@@ -816,29 +786,7 @@ export default function Layout({
               }}
             >
               <IconBell />
-              <span
-                style={{
-                  position: "absolute",
-
-                  top: 2,
-
-                  right: 2,
-
-                  width: 7,
-
-                  height: 7,
-
-                  background: "#B08D46",
-
-                  borderRadius: "50%",
-
-                  border: "1.5px solid #4C7A6E",
-                }}
-              />
             </button>
-            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
-              Hub: Lahore-C01
-            </span>
           </div>
         </header>
 

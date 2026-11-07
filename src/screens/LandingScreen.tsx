@@ -46,7 +46,7 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
               maxWidth: 540,
             }}
           >
-            Verify a National Skills Passport
+            Verify a NSP HUNAR
           </h1>
           <p
             style={{

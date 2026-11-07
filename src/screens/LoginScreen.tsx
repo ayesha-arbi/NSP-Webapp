@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { api, ApiError } from "../services/api"
 import { mapServerRoleToAppRole } from "../services/authStore"
+import BrandLogo from "../components/BrandLogo"
 
 interface LoginScreenProps {
   onSuccess: (
@@ -88,45 +89,6 @@ function Spinner() {
         />
       </path>
     </svg>
-  )
-}
-
-/* ─── brand logo mark ─── */
-function LogoMark({
-  size = 32,
-  bg = "#B08D46",
-}: {
-  size?: number
-  bg?: string
-}) {
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        background: bg,
-        borderRadius: Math.round(size * 0.22),
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-      }}
-    >
-      <svg
-        width={size * 0.55}
-        height={size * 0.55}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="white"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M12 2L2 7l10 5 10-5-10-5z" />
-        <path d="M2 17l10 5 10-5" />
-        <path d="M2 12l10 5 10-5" />
-      </svg>
-    </div>
   )
 }
 
@@ -262,10 +224,10 @@ export default function LoginScreen({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <LogoMark size={30} />
+          <BrandLogo size={30} />
           <div style={{ lineHeight: 1 }}>
             <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>
-              National Skills Passport
+              NSP HUNAR
             </span>
             <span style={{ color: "rgba(255,255,255,0.35)", margin: "0 8px" }}>
               |
@@ -301,7 +263,7 @@ export default function LoginScreen({
           }}
         >
           <div style={{ marginBottom: 48 }}>
-            <LogoMark size={56} bg="#B08D46" />
+            <BrandLogo size={56} />
           </div>
 
           <h2

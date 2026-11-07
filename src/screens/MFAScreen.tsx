@@ -328,7 +328,7 @@ export default function MFAScreen({
           </div>
           <div>
             <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>
-              National Skills Passport
+              NSP HUNAR
             </span>
             <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>
               {" "}

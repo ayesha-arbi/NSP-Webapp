@@ -637,7 +637,7 @@ export default function SuperAdminDashboard() {
           System Monitoring
         </h1>
         <p style={{ fontSize: 13, color: "#5C5A50", margin: 0 }}>
-          Super Administrator · National Skills Passport — Issuer Portal
+          Super Administrator · NSP HUNAR — Issuer Portal
         </p>
       </div>
 

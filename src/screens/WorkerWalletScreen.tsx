@@ -602,7 +602,7 @@ export default function WorkerWalletScreen({
                         letterSpacing: "0.02em",
                       }}
                     >
-                      National Skills Passport
+                      NSP HUNAR
                     </div>
                   </div>
                   <div

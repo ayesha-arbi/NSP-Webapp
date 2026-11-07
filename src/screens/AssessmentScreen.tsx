@@ -887,29 +887,51 @@ export default function AssessmentScreen({
             >
               Candidate Lookup
             </h2>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name or CNIC…"
-              style={{
-                width: "100%",
+            <div style={{ position: "relative" }}>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search name or CNIC…"
+                style={{
+                  width: "100%",
 
-                padding: "8px 12px",
+                  padding: "8px 12px 8px 36px",
 
-                border: "1px solid #D6D3C6",
+                  border: "1px solid #D6D3C6",
 
-                borderRadius: 6,
+                  borderRadius: 6,
 
-                fontSize: 13,
+                  fontSize: 13,
 
-                background: "#F1F0EA",
+                  background: "#F1F0EA",
 
-                color: "#24302E",
+                  color: "#24302E",
 
-                fontFamily: "Inter, sans-serif",
-              }}
-            />
+                  fontFamily: "Inter, sans-serif",
+                }}
+              />
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#8C897C"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  position: "absolute",
+                  left: 12,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  pointerEvents: "none",
+                }}
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </div>
           </div>
           <div>
             {filtered.map((c) => (

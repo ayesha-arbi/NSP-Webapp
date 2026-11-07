@@ -47,7 +47,7 @@ export default function Footer() {
               </svg>
             </div>
             <span style={{ color: "#F1F0EA", fontWeight: 700, fontSize: 14 }}>
-              National Skills Passport
+              NSP HUNAR
             </span>
           </div>
           <p

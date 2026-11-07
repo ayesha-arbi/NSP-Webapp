@@ -61,7 +61,7 @@ export default function VerificationResultScreen({
   const reportLines = [
     "NSP VERIFICATION REPORT",
 
-    "National Skills Passport — NADRA, Pakistan",
+    "NSP HUNAR — NADRA, Pakistan",
 
     "=".repeat(48),
 

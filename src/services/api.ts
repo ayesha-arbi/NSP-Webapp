@@ -1,5 +1,5 @@
 import { getDeviceFingerprint } from "./fingerprint"
-// API Client for National Skills Passport Backend
+// API Client for NSP HUNAR Backend
 
 export interface User {
   id: string
