@@ -1,4 +1,4 @@
-﻿import SuperAdminDashboard from "./SuperAdminDashboard"
+import SuperAdminDashboard from "./SuperAdminDashboard"
 
 import { authStore } from "../services/authStore"
 import { api } from "../services/api"
@@ -233,19 +233,40 @@ function TradeTesterDashboard({
     let mounted = true
     async function loadData() {
       try {
-        const assessments = await api.listAssessments()
-        if (mounted && assessments) {
-          setRecentCandidates(assessments.slice(0, 5))
+        const [assessmentsRes, candidatesRes] = await Promise.allSettled([
+          api.listAssessments(),
+          api.listCandidates(),
+        ])
+        const assessments = assessmentsRes.status === "fulfilled" && assessmentsRes.value?.assessments
+          ? assessmentsRes.value.assessments
+          : []
+        const candidates = candidatesRes.status === "fulfilled" && Array.isArray(candidatesRes.value)
+          ? candidatesRes.value
+          : []
+
+        if (mounted) {
+          const list = candidates.length > 0
+            ? candidates.map((c: any) => ({
+                id: c.id,
+                name: c.fullName || "Candidate",
+                cnic: c.cnic || "—",
+                trade: c.tradeCategory || c.trade || "—",
+                hub: c.hub || `Hub #${hubId}`,
+                status: "enrolled",
+              }))
+            : assessments.slice(0, 5)
+
+          setRecentCandidates(list.slice(0, 5))
           setStats({
-            enrolled: assessments.length,
+            enrolled: Math.max(candidates.length, assessments.length),
             draft: assessments.filter((a: any) => a.status === "draft").length,
             submitted: assessments.filter((a: any) => a.status === "submitted").length,
             target: 60,
-            targetProgress: Math.round((assessments.length / 60) * 100),
+            targetProgress: Math.round((Math.max(candidates.length, assessments.length) / 60) * 100),
           })
         }
       } catch (err) {
-        console.warn("Failed to load assessments:", err)
+        console.warn("Failed to load assessments/candidates:", err)
       } finally {
         if (mounted) setLoading(false)
       }
