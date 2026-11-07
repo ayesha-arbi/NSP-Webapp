@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { api } from "../services/api"
 
 export type RecordStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "MINTED"
@@ -315,7 +315,7 @@ function StatusPill({ status }: { status: RecordStatus }) {
       ),
     },
   }
-  const s = map[status]
+  const s = (map as Record<string, any>)[status] || (map as any).draft || Object.values(map)[0]
   return (
     <span
       style={{
@@ -374,7 +374,7 @@ function CredentialStatusPill({ status }: { status: CredentialStatus }) {
       ),
     },
   }
-  const s = map[status]
+  const s = (map as Record<string, any>)[status] || (map as any).draft || Object.values(map)[0]
   return (
     <span
       style={{

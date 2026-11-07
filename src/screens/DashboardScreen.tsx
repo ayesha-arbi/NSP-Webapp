@@ -177,9 +177,39 @@ function StatusPill({
         </svg>
       ),
     },
+
+    enrolled: {
+      bg: "#DCE7E3",
+      text: "#2F5C4E",
+      label: "Enrolled",
+      svg: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="8" fill="#4C7A6E" />
+          <path
+            d="M6 10 L9 13 L14 7"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+
+    submitted: {
+      bg: "#F1E7D2",
+      text: "#8C6F35",
+      label: "Submitted",
+      svg: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="7" stroke="#B08D46" strokeWidth="1.5" />
+          <path d="M10 3 A7 7 0 0 1 17 10 L10 10 Z" fill="#B08D46" />
+        </svg>
+      ),
+    },
   }
 
-  const s = map[status]
+  const s = (map as Record<string, any>)[status] || map.draft
 
   return (
     <span

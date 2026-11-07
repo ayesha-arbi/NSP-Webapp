@@ -264,7 +264,7 @@ function StatusPill({ status }: { status: ApprovalStatus }) {
     },
   }
 
-  const s = map[status]
+  const s = (map as Record<string, any>)[status] || (map as any).pending || Object.values(map)[0]
 
   return (
     <span
@@ -356,7 +356,7 @@ function MintingPill({ status }: { status: MintingStatus }) {
     },
   }
 
-  const s = map[status]
+  const s = (map as Record<string, any>)[status] || (map as any).pending || Object.values(map)[0]
 
   return (
     <span
