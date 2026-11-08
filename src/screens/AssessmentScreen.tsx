@@ -236,6 +236,28 @@ export default function AssessmentScreen({
     } catch {
       // Backend not running or no assessments yet, keep empty/mock list
     }
+
+    try {
+      const candidates = await api.listCandidates()
+      if (Array.isArray(candidates) && candidates.length > 0) {
+        setCandidatesList((existing) => {
+          const map = new Map<string, CandidateItem>()
+          for (const c of existing) map.set(c.id, c)
+          for (const c of candidates) {
+            map.set(c.id, {
+              id: c.id,
+              name: c.fullName || `Candidate ${c.id.slice(0, 8)}`,
+              cnic: c.cnic || "—",
+              trade: c.tradeCategory || c.trade || "—",
+              hub: c.hub || (c.testingHubId ? `Hub ${c.testingHubId}` : ""),
+            })
+          }
+          return Array.from(map.values())
+        })
+      }
+    } catch {
+      // Ignore
+    }
   }
 
   // No list-candidates endpoint exists yet: also surface candidates seen in existing assessments.

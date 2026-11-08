@@ -1,4 +1,4 @@
-﻿import SuperAdminDashboard from "./SuperAdminDashboard"
+import SuperAdminDashboard from "./SuperAdminDashboard"
 
 import { authStore } from "../services/authStore"
 import { api } from "../services/api"
@@ -179,9 +179,39 @@ function StatusPill({
         </svg>
       ),
     },
+
+    enrolled: {
+      bg: "#DCE7E3",
+      text: "#2F5C4E",
+      label: "Enrolled",
+      svg: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="8" fill="#4C7A6E" />
+          <path
+            d="M6 10 L9 13 L14 7"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+
+    submitted: {
+      bg: "#F1E7D2",
+      text: "#8C6F35",
+      label: "Submitted",
+      svg: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="7" stroke="#B08D46" strokeWidth="1.5" />
+          <path d="M10 3 A7 7 0 0 1 17 10 L10 10 Z" fill="#B08D46" />
+        </svg>
+      ),
+    },
   }
 
-  const s = map[status]
+  const s = (map as Record<string, any>)[status] || map.draft
 
   return (
     <span
@@ -235,19 +265,40 @@ function TradeTesterDashboard({
     let mounted = true
     async function loadData() {
       try {
-        const assessments = await api.listAssessments()
-        if (mounted && assessments) {
-          setRecentCandidates(assessments.slice(0, 5))
+        const [assessmentsRes, candidatesRes] = await Promise.allSettled([
+          api.listAssessments(),
+          api.listCandidates(),
+        ])
+        const assessments = assessmentsRes.status === "fulfilled" && assessmentsRes.value?.assessments
+          ? assessmentsRes.value.assessments
+          : []
+        const candidates = candidatesRes.status === "fulfilled" && Array.isArray(candidatesRes.value)
+          ? candidatesRes.value
+          : []
+
+        if (mounted) {
+          const list = candidates.length > 0
+            ? candidates.map((c: any) => ({
+                id: c.id,
+                name: c.fullName || "Candidate",
+                cnic: c.cnic || "—",
+                trade: c.tradeCategory || c.trade || "—",
+                hub: c.hub || `Hub #${hubId}`,
+                status: "enrolled",
+              }))
+            : assessments.slice(0, 5)
+
+          setRecentCandidates(list.slice(0, 5))
           setStats({
-            enrolled: assessments.length,
+            enrolled: Math.max(candidates.length, assessments.length),
             draft: assessments.filter((a: any) => a.status === "draft").length,
             submitted: assessments.filter((a: any) => a.status === "submitted").length,
             target: 60,
-            targetProgress: Math.round((assessments.length / 60) * 100),
+            targetProgress: Math.round((Math.max(candidates.length, assessments.length) / 60) * 100),
           })
         }
       } catch (err) {
-        console.warn("Failed to load assessments:", err)
+        console.warn("Failed to load assessments/candidates:", err)
       } finally {
         if (mounted) setLoading(false)
       }

@@ -75,7 +75,7 @@ function StatusPill({ status }: { status: DeviceStatus }) {
       ),
     },
   }
-  const s = map[status]
+  const s = (map as Record<string, any>)[status] || (map as any).active || Object.values(map)[0]
   return (
     <span
       style={{

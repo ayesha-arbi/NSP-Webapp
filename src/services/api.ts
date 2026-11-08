@@ -975,6 +975,24 @@ export const api = {
     })
   },
 
+  async listCandidates(): Promise<CandidateRecord[]> {
+    const r = await request<any>("/api/candidates", { method: "GET" })
+    const list = Array.isArray(r) ? r : Array.isArray(r?.candidates) ? r.candidates : []
+    return list.map((c: any) => ({
+      id: pick(c, "id", "candidateId", "candidate_id"),
+      candidateId: pick(c, "id", "candidateId", "candidate_id"),
+      fullName: pick(c, "fullName", "full_name"),
+      fatherName: pick(c, "fatherName", "father_name"),
+      dob: pick(c, "dob", "date_of_birth"),
+      cnic: pick(c, "cnic") || "—",
+      photoS3Uri: pick(c, "photoS3Uri", "photo_s3_uri"),
+      tradeCategory: pick(c, "tradeCategory", "trade_category", "trade"),
+      trade: pick(c, "tradeCategory", "trade_category", "trade"),
+      testingHubId: pick(c, "testingHubId", "testing_hub_id"),
+      hub: pick(c, "testingHubId", "testing_hub_id") != null ? `Hub ${pick(c, "testingHubId", "testing_hub_id")}` : "",
+    }))
+  },
+
   // 4. Assessments Workflow
 
   async createAssessment(
