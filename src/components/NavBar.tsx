@@ -55,9 +55,6 @@ export default function NavBar({ breadcrumbs }: NavBarProps) {
             Verifier Portal
           </span>
           <div style={{ flex: 1 }} />
-          <span style={{ color: "rgba(241,240,234,0.35)", fontSize: 12 }}>
-            NADRA, Pakistan
-          </span>
         </div>
       </nav>
 

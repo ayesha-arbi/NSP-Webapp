@@ -212,9 +212,6 @@ export default function MFAEnrollmentScreen({
             </span>
           </div>
         </div>
-        <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
-          NAVTTC · Pakistan
-        </span>
       </header>
 
       {/* Main Container */}

@@ -61,7 +61,7 @@ export default function VerificationResultScreen({
   const reportLines = [
     "NSP VERIFICATION REPORT",
 
-    "NSP HUNAR — NADRA, Pakistan",
+    "NSP HUNAR — Pakistan",
 
     "=".repeat(48),
 
@@ -87,7 +87,7 @@ export default function VerificationResultScreen({
 
     `On-Chain Ref    : ${result.txHash ?? "N/A"}`,
 
-    `Ledger          : NADRA Blockchain Ledger`,
+    `Ledger          : Blockchain Ledger`,
 
     "",
 
@@ -457,7 +457,7 @@ export default function VerificationResultScreen({
                         }}
                       >
                         This credential was withdrawn by the issuing authority.
-                        Contact NADRA for further information.
+                        Contact the issuing authority for further information.
                       </span>
                     </TR>
                   </>
@@ -673,7 +673,7 @@ export default function VerificationResultScreen({
               <p style={{ fontSize: 13, color: "#5C5A50", lineHeight: 1.65 }}>
                 {isVerified
                   ? "The credential is genuine and active. You may proceed with employment verification."
-                  : "Ask the worker to contact their issuing centre or NADRA if they believe this is an error."}
+                  : "Ask the worker to contact their issuing centre if they believe this is an error."}
               </p>
             </div>
 

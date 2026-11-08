@@ -278,7 +278,7 @@ export default function App() {
 
           issueDate,
 
-          centre: "NADRA Regional Testing Centre, Lahore (Hub-01)",
+          centre: "Regional Testing Centre, Lahore (Hub-01)",
 
           txHash:
             apiResult.onChainHash ||
@@ -324,7 +324,7 @@ export default function App() {
 
         issueDate,
 
-        centre: "NADRA Regional Centre, Lahore",
+        centre: "Regional Centre, Lahore",
 
         txHash: onChain.dataHash,
 

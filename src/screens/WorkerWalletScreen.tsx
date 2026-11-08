@@ -369,7 +369,7 @@ export default function WorkerWalletScreen({
                 marginTop: 2,
               }}
             >
-              Verified Trade Professional · NADRA Certified
+              Verified Trade Professional
             </div>
           </div>
         </div>

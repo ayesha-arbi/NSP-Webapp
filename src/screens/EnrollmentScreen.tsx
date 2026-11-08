@@ -740,10 +740,10 @@ export default function EnrollmentScreen({
                       marginBottom: 2,
                     }}
                   >
-                    NADRA Verification
+                    Identity Verification
                   </div>
                   <div style={{ fontSize: 13, color: "#5C5A50" }}>
-                    Verify the candidate's CNIC against NADRA records.
+                    Verify the candidate's CNIC against national records.
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -836,7 +836,7 @@ export default function EnrollmentScreen({
                       ? "Verifying…"
                       : nadraStatus === "verified"
                         ? "Verified"
-                        : "Verify with NADRA"}
+                        : "Verify Identity"}
                   </button>
                 </div>
               </div>
@@ -992,7 +992,7 @@ export default function EnrollmentScreen({
               </h3>
               {[
                 {
-                  label: "NADRA",
+                  label: "Identity",
                   val:
                     nadraStatus === "verified"
                       ? "Verified ✓"
@@ -1271,7 +1271,7 @@ export default function EnrollmentScreen({
         </ModalOverlay>
       )}
 
-      {/* NADRA Success Modal */}
+      {/* Verification Success Modal */}
       {modal === "nadra-success" && (
         <ModalOverlay>
           <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
@@ -1312,7 +1312,7 @@ export default function EnrollmentScreen({
                 Identity Verified
               </h2>
               <p style={{ fontSize: 14, color: "#5C5A50", margin: 0 }}>
-                NADRA records match for the provided CNIC.
+                Identity records match for the provided CNIC.
               </p>
             </div>
           </div>
@@ -1396,7 +1396,7 @@ export default function EnrollmentScreen({
         </ModalOverlay>
       )}
 
-      {/* NADRA Fail Modal */}
+      {/* Verification Fail Modal */}
       {modal === "nadra-fail" && (
         <ModalOverlay>
           <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
@@ -1439,7 +1439,7 @@ export default function EnrollmentScreen({
                 Verification Failed
               </h2>
               <p style={{ fontSize: 14, color: "#5C5A50", margin: 0 }}>
-                The CNIC provided does not match NADRA records.
+                The CNIC provided does not match identity records.
               </p>
             </div>
           </div>
@@ -1455,7 +1455,7 @@ export default function EnrollmentScreen({
             }}
           >
             Identity mismatch detected. The provided CNIC could not be verified
-            against NADRA's national registry.
+            against the national registry.
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button

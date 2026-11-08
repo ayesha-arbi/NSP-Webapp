@@ -461,7 +461,7 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
                 {
                   step: "02",
                   title: "We check the ledger",
-                  desc: "The credential hash is recomputed and compared against the on-chain record in the NADRA blockchain ledger.",
+                  desc: "The credential hash is recomputed and compared against the on-chain record in the blockchain ledger.",
                 },
 
                 {

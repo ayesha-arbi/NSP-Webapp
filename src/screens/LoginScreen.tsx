@@ -244,7 +244,6 @@ export default function LoginScreen({
             letterSpacing: 0.3,
           }}
         >
-          NAVTTC · Government of Pakistan
         </span>
       </header>
 
@@ -288,12 +287,12 @@ export default function LoginScreen({
             }}
           >
             Issue verifiable, blockchain-anchored credentials to
-            NAVTTC-certified trade workers across all registered hubs.
+            certified trade workers across all registered hubs.
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {[
-              { icon: "✦", text: "NADRA-verified candidate identity" },
+              { icon: "✦", text: "Verified candidate identity" },
               { icon: "✦", text: "Tamper-proof on-chain credentials" },
               { icon: "✦", text: "Real-time hub progress tracking" },
               { icon: "✦", text: "Role-based access control" },
@@ -340,7 +339,7 @@ export default function LoginScreen({
                 lineHeight: 1.6,
               }}
             >
-              Restricted access. Authorised NAVTTC personnel only.
+              Restricted access. Authorised personnel only.
               <br />
               All activity is logged and audited.
             </p>
@@ -371,7 +370,7 @@ export default function LoginScreen({
                 Sign in to Issuer Portal
               </h1>
               <p style={{ fontSize: 14, color: "#5C5A50", margin: 0 }}>
-                Enter your NAVTTC credentials to continue.
+                Enter your credentials to continue.
               </p>
             </div>
 
@@ -688,7 +687,7 @@ export default function LoginScreen({
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
               <span style={{ fontSize: 12, color: "#8C897C", lineHeight: 1.6 }}>
-                Access is restricted to authorised NAVTTC personnel.
+                Access is restricted to authorised personnel.
                 Unauthorised access attempts are logged and may result in legal
                 action.
               </span>
@@ -943,9 +942,9 @@ export default function LoginScreen({
               }}
             >
               If you believe this is an error, contact your hub administrator or
-              reach NAVTTC support at{" "}
+              reach support at{" "}
               <strong style={{ color: "#24302E" }}>
-                support@navttc.gov.pk
+                support@example.com
               </strong>
             </div>
 

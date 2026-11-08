@@ -786,7 +786,7 @@ export default function SettingsScreen({ role }: SettingsProps) {
                       }}
                     />
                   </Field>
-                  <Field label="NAVTTC Region">
+                  <Field label="Region">
                     <input value="Punjab" disabled style={disabledInputStyle} />
                   </Field>
                 </div>
@@ -1089,7 +1089,7 @@ export default function SettingsScreen({ role }: SettingsProps) {
                     enrollmentAlerts: {
                       title: "Enrollment Alerts",
 
-                      desc: "New candidate enrollments and NADRA results.",
+                      desc: "New candidate enrollments and verification results.",
                     },
 
                     systemAnnouncements: {

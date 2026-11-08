@@ -986,7 +986,7 @@ export default function SuperAdminDashboard() {
                     val: "99.98% uptime",
                   },
                   {
-                    label: "NADRA Verification API",
+                    label: "Verification API",
                     status: "online",
                     val: "Avg 142 ms",
                   },
