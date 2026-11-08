@@ -12,6 +12,8 @@ interface DashboardProps {
   onNavigate: (
     screen: "enrollment" | "assessment" | "approvals" | "record-detail",
   ) => void
+
+  onNavigateToAssessment?: (candidate: { id: string; fullName: string; cnic?: string; tradeCategory: string }) => void
 }
 
 function StatCard({
@@ -592,7 +594,16 @@ function TradeTesterDashboard({
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        onNavigate("record-detail")
+                        if (onNavigateToAssessment) {
+                          onNavigateToAssessment({
+                            id: c.id,
+                            fullName: c.name || c.candidateName || "Unknown",
+                            cnic: c.cnic,
+                            tradeCategory: c.trade || "Unknown",
+                          })
+                        } else {
+                          onNavigate("assessment")
+                        }
                       }}
                       style={{
                         background: "none",
@@ -641,7 +652,9 @@ function CenterSuperDashboard({
       try {
         const assessments = await api.listAssessments()
         if (mounted && assessments) {
-          const pending = assessments.filter((a: any) => a.status === "submitted")
+          const pending = assessments.filter((a: any) => 
+            a.status === "submitted" || a.status === "PENDING_APPROVAL"
+          )
           setApprovals(pending.slice(0, 5))
           setStats({
             pending: pending.length,
@@ -985,6 +998,7 @@ function CenterSuperDashboard({
                   <td style={{ padding: "12px 24px" }}>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
+                        onClick={() => onNavigate("approvals")}
                         style={{
                           height: 30,
                           padding: "0 12px",
@@ -1000,6 +1014,7 @@ function CenterSuperDashboard({
                         Approve
                       </button>
                       <button
+                        onClick={() => onNavigate("approvals")}
                         style={{
                           height: 30,
                           padding: "0 12px",
@@ -1015,7 +1030,12 @@ function CenterSuperDashboard({
                       </button>
                     </div>
                     <button
-                      onClick={() => onNavigate("record-detail")}
+                      onClick={() => onNavigateToAssessment && onNavigateToAssessment({
+                        id: a.id,
+                        fullName: a.candidate || a.name || "Unknown",
+                        cnic: a.cnic,
+                        tradeCategory: a.trade || "Unknown",
+                      })}
                       style={{
                         height: 30,
                         padding: "0 10px",

@@ -495,9 +495,6 @@ export default function App() {
             {session.user?.role})
           </span>
         )}
-        <span style={{ color: "rgba(241,240,234,0.4)", fontSize: 11 }}>
-          NAVTTC / NADRA · Integrated Build #2
-        </span>
       </div>
     </div>
   )
@@ -677,6 +674,7 @@ export default function App() {
           <DashboardScreen
             role={session.role}
             onNavigate={(s) => setScreen(s)}
+            onNavigateToAssessment={handleNavigateToAssessment}
           />
         )}
 

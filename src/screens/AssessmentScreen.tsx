@@ -326,6 +326,10 @@ export default function AssessmentScreen({
       setCurrentAssessment(existing)
 
       loadMedia(existing.assessmentId)
+
+      // Restore criteria scores from existing assessment if available
+      // For now, reset to empty since scores aren't stored in the assessment object
+      setCriteria(CRITERIA.map((cr) => ({ ...cr })))
     } else {
       setCurrentAssessment(null)
 
@@ -446,6 +450,27 @@ export default function AssessmentScreen({
 
   async function handleConfirmSubmit() {
     if (!selected) return
+
+    // Prevent duplicate submission if already submitted
+    if (currentAssessment && currentAssessment.status === "PENDING_APPROVAL") {
+      setFeedbackMsg({
+        text: "This assessment has already been submitted and is pending approval.",
+        type: "error",
+      })
+      setShowSubmitModal(false)
+      setIsProcessing(false)
+      return
+    }
+
+    if (currentAssessment && currentAssessment.status === "SUBMITTED") {
+      setFeedbackMsg({
+        text: "This assessment has already been submitted and is pending approval.",
+        type: "error",
+      })
+      setShowSubmitModal(false)
+      setIsProcessing(false)
+      return
+    }
 
     setIsProcessing(true)
 
