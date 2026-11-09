@@ -1,9 +1,25 @@
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import Layout from "./Layout"
+import { authStore } from "../services/authStore"
 
 describe("Layout sign out", () => {
+  afterEach(() => authStore.clearSession())
+
+  it("shows the signed-in user's hub in the header", () => {
+    authStore.setSession(
+      { id: 1, email: "tradetester.hub4@nsp.com", role: "TRADE_TESTER", hubLocationId: 4 } as never,
+      "access",
+      "refresh",
+    )
+    render(
+      <Layout currentScreen="dashboard" role="trade-tester" onNavigate={vi.fn()} onLogout={vi.fn()}>
+        <div />
+      </Layout>,
+    )
+    expect(screen.getByText("Hub: Faisalabad-C04")).toBeInTheDocument()
+  })
   it("awaits server-side sign out and prevents duplicate confirmation", async () => {
     let finishLogout: (() => void) | undefined
     const onLogout = vi.fn(

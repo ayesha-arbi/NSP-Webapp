@@ -1,4 +1,5 @@
 import { getDeviceFingerprint } from "./fingerprint"
+import { getHubLabel } from "../constants/hubs"
 // API Client for NSP HUNAR Backend
 
 export interface User {
@@ -8,7 +9,7 @@ export interface User {
 
   role: "TRADE_TESTER" | "CENTER_SUPERINTENDENT" | "SUPER_ADMIN"
 
-  hubLocationId: number
+  hubLocationId?: number | null
 
   name?: string
 }
@@ -989,7 +990,7 @@ export const api = {
       tradeCategory: pick(c, "tradeCategory", "trade_category", "trade"),
       trade: pick(c, "tradeCategory", "trade_category", "trade"),
       testingHubId: pick(c, "testingHubId", "testing_hub_id"),
-      hub: pick(c, "testingHubId", "testing_hub_id") != null ? `Hub ${pick(c, "testingHubId", "testing_hub_id")}` : "",
+      hub: getHubLabel(pick(c, "testingHubId", "testing_hub_id")) ?? (pick(c, "hub") || ""),
     }))
   },
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { api } from "../services/api"
+import { getHubLabel } from "../constants/hubs"
 
 export type RecordStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "MINTED"
 export type CredentialStatus = "Valid" | "Revoked"
@@ -530,7 +531,7 @@ export default function CandidateRecordScreen({
           dob: candidate?.dob || "",
           cnic: candidate?.cnic || "",
           trade: candidate?.tradeCategory || candidate?.trade || "General",
-          hub: candidate?.hub || (candidate?.testingHubId ? `Hub ${candidate.testingHubId}` : "Lahore-C01"),
+          hub: getHubLabel(candidate?.testingHubId ?? candidate?.testing_hub_id ?? candidate?.hubLocationId ?? candidate?.hub) ?? "—",
           id: candidate?.id || candidate?.candidateId || cId,
           enrolledAt: candidate?.createdAt || new Date().toISOString().split("T")[0],
           photo: candidate?.photoS3Uri,

@@ -9,6 +9,7 @@ import {
   uploadCandidatePhoto,
 } from "../services/api"
 import { authStore } from "../services/authStore"
+import { HUB_NAMES, getHubLabel } from "../constants/hubs"
 
 interface ExistingCandidateRecord {
   id: string
@@ -43,16 +44,6 @@ const TRADES = [
   "Solar Panel Installation",
 ]
 
-const HUBS = [
-  "Lahore-C01",
-  "Karachi-C02",
-  "Islamabad-C03",
-  "Faisalabad-C04",
-  "Peshawar-C05",
-  "Multan-C06",
-  "Rawalpindi-C07",
-  "Hyderabad-C08",
-]
 
 function UploadIcon() {
   return (
@@ -78,9 +69,7 @@ export default function EnrollmentScreen({
   onNavigateToRecord,
 }: EnrollmentScreenProps) {
   const userHubId = authStore.getState().user?.hubLocationId
-  const initialHub = userHubId != null && userHubId > 0 && userHubId <= HUBS.length
-    ? HUBS[userHubId - 1]
-    : ""
+  const initialHub = getHubLabel(userHubId) ?? ""
 
   const [form, setForm] = useState({
     fullName: "",
@@ -363,18 +352,16 @@ export default function EnrollmentScreen({
                 ? rawStatus.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
                 : "In Review"
 
-            const hubName =
-              candidatePayload.hub ||
-              candidatePayload.hubLocationId ||
-              candidatePayload.testingHubId ||
-              candidatePayload.testing_hub_id ||
-              resData.hub ||
-              resData.testingHubId ||
-              (candidatePayload.hubLocationId != null
-                ? `Hub ${candidatePayload.hubLocationId}`
-                : "") ||
-              form.hub ||
-              "Lahore-C01"
+            const rawHub =
+              candidatePayload.testing_hub_id ??
+              candidatePayload.testingHubId ??
+              candidatePayload.hubLocationId ??
+              candidatePayload.hub ??
+              resData.testingHubId ??
+              resData.hub ??
+              form.hub
+
+            const hubName = getHubLabel(rawHub) ?? "—"
 
             const rawEnrolledAt =
               candidatePayload.enrolledAt ||
@@ -431,7 +418,9 @@ export default function EnrollmentScreen({
                   if (match.createdAt) {
                     rec.enrolledAt = new Date(match.createdAt).toISOString().split("T")[0]
                   }
-                  if (match.hub) rec.hub = match.hub
+                  if (match.hub || match.testingHubId) {
+                    rec.hub = getHubLabel(match.testingHubId ?? match.hub) ?? rec.hub
+                  }
                 }
               } catch {
                 // Graceful fallback if list request fails
@@ -832,7 +821,7 @@ export default function EnrollmentScreen({
                     }}
                     options={[
                       { value: "", label: "Select hub…" },
-                      ...HUBS.map((h) => ({ value: h, label: h })),
+                      ...HUB_NAMES.map((h) => ({ value: h, label: h })),
                     ]}
                     style={{
                       ...inputStyle,
@@ -1764,7 +1753,7 @@ export default function EnrollmentScreen({
               <div>
                 <div style={{ color: "#8C897C", marginBottom: 2 }}>Hub</div>
                 <div style={{ color: "#24302E" }}>
-                  {existingRecord?.hub || form.hub || "Lahore-C01"}
+                  {getHubLabel(existingRecord?.hub || form.hub) ?? "—"}
                 </div>
               </div>
               <div>

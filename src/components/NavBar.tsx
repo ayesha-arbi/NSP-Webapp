@@ -1,7 +1,7 @@
-﻿import BrandLogo from "./BrandLogo"
+import BrandLogo from "./BrandLogo"
 
 interface NavBarProps {
-  breadcrumbs?: { label: string onClick?: () => void }[]
+  breadcrumbs?: { label: string; onClick?: () => void }[]
 }
 
 export default function NavBar({ breadcrumbs }: NavBarProps) {

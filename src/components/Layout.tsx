@@ -1,6 +1,7 @@
-import React, { useState } from "react"
+import React, { useState, useSyncExternalStore } from "react"
 import BrandLogo from "./BrandLogo"
 import { authStore } from "../services/authStore"
+import { getHubLabel } from "../constants/hubs"
 
 type Role = "trade-tester" | "center-superintendent" | "super-admin"
 
@@ -431,6 +432,8 @@ export default function Layout({
 
   onLogout,
 }: LayoutProps) {
+  const session = useSyncExternalStore(authStore.subscribe, authStore.getState)
+  const hubLabel = getHubLabel(session.user?.hubLocationId)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const visibleNav = navItems.filter((item) => item.roles.includes(role))
@@ -764,9 +767,11 @@ export default function Layout({
             ))}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
-              Hub: Lahore-C01
-            </span>
+            {hubLabel && (
+              <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
+                Hub: {hubLabel}
+              </span>
+            )}
             <button
               onClick={() => onNavigate("notifications")}
               style={{

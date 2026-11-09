@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { getHubLabel } from "./constants/hubs"
 
 import Layout from "./components/Layout"
 
@@ -682,7 +683,9 @@ export default function App() {
           <DashboardScreen
             role={session.role}
             onNavigate={(s) => setScreen(s)}
-            onNavigateToAssessment={handleNavigateToAssessment}
+            onNavigateToAssessment={(candidate) =>
+              handleNavigateToAssessment(candidate as CandidateRecord)
+            }
           />
         )}
 
@@ -730,7 +733,7 @@ export default function App() {
                 dob: selectedCandidateData.dob || "",
                 cnic: selectedCandidateData.cnic || "",
                 trade: selectedCandidateData.trade || selectedCandidateData.tradeCategory || "General",
-                hub: selectedCandidateData.hub || "Lahore-C01",
+                hub: getHubLabel(selectedCandidateData.testing_hub_id ?? selectedCandidateData.testingHubId ?? selectedCandidateData.hubLocationId ?? selectedCandidateData.hub) ?? "—",
                 enrolledAt: selectedCandidateData.enrolledAt || "",
                 photo: selectedCandidateData.photo || selectedCandidateData.photoS3Uri,
               },
