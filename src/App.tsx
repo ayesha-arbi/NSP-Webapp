@@ -115,6 +115,8 @@ export default function App() {
 
   const [assessmentCandidate, setAssessmentCandidate] =
     useState<CandidateRecord | null>(null)
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null)
+  const [selectedCandidateData, setSelectedCandidateData] = useState<any>(null)
 
   // ============================================================
 
@@ -213,6 +215,12 @@ export default function App() {
     setAssessmentCandidate(candidate)
 
     setScreen("assessment")
+  }
+
+  function handleNavigateToRecord(candidateId: string, candidateData?: any) {
+    setSelectedCandidateId(candidateId)
+    setSelectedCandidateData(candidateData || null)
+    setScreen("record-detail")
   }
 
   // ============================================================
@@ -681,6 +689,7 @@ export default function App() {
         {authedScreen === "enrollment" && (
           <EnrollmentScreen
             onNavigateToAssessment={handleNavigateToAssessment}
+            onNavigateToRecord={handleNavigateToRecord}
           />
         )}
 
@@ -706,8 +715,42 @@ export default function App() {
 
         {authedScreen === "record-detail" && (
           <CandidateRecordScreen
-            onBack={() => setScreen("dashboard")}
+            onBack={() => {
+              setSelectedCandidateId(null)
+              setSelectedCandidateData(null)
+              setScreen("dashboard")
+            }}
             userRole={session.role}
+            candidateId={selectedCandidateId || undefined}
+            data={selectedCandidateData ? {
+              candidate: {
+                id: selectedCandidateId || selectedCandidateData.id || "",
+                name: selectedCandidateData.fullName || selectedCandidateData.name || "Enrolled Candidate",
+                fatherName: selectedCandidateData.fatherName || "",
+                dob: selectedCandidateData.dob || "",
+                cnic: selectedCandidateData.cnic || "",
+                trade: selectedCandidateData.trade || selectedCandidateData.tradeCategory || "General",
+                hub: selectedCandidateData.hub || "Lahore-C01",
+                enrolledAt: selectedCandidateData.enrolledAt || "",
+                photo: selectedCandidateData.photo || selectedCandidateData.photoS3Uri,
+              },
+              assessment: {
+                id: `ASM-${(selectedCandidateId || "").slice(-6)}`,
+                score: 0,
+                maxScore: 100,
+                grade: "Pending",
+                tester: "Pending Assignment",
+                submittedAt: "—",
+                status: (selectedCandidateData.status as any) || "DRAFT",
+              },
+              history: [
+                {
+                  action: "Candidate Enrolled",
+                  performedBy: "Enrollment Officer",
+                  datetime: selectedCandidateData.enrolledAt || new Date().toISOString(),
+                },
+              ],
+            } : undefined}
           />
         )}
       </Layout>

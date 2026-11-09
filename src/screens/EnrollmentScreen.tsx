@@ -10,8 +10,20 @@ import {
 } from "../services/api"
 import { authStore } from "../services/authStore"
 
+interface ExistingCandidateRecord {
+  id: string
+  status: string
+  hub: string
+  enrolledAt: string
+  fullName?: string
+  trade?: string
+  cnic?: string
+  raw?: any
+}
+
 interface EnrollmentScreenProps {
   onNavigateToAssessment?: (candidate: CandidateRecord) => void
+  onNavigateToRecord?: (candidateId: string, candidateData?: any) => void
 }
 
 type EnrollmentModal = "none" | "nadra-success" | "nadra-fail" | "duplicate" | "photo-uploading" | "photo-done" | "photo-fail" | "enrol-success"
@@ -63,6 +75,7 @@ function UploadIcon() {
 
 export default function EnrollmentScreen({
   onNavigateToAssessment,
+  onNavigateToRecord,
 }: EnrollmentScreenProps) {
   const userHubId = authStore.getState().user?.hubLocationId
   const initialHub = userHubId != null && userHubId > 0 && userHubId <= HUBS.length
@@ -86,6 +99,11 @@ export default function EnrollmentScreen({
 
   const [createdCandidate, setCreatedCandidate] =
     useState<CandidateRecord | null>(null)
+
+  const [existingRecord, setExistingRecord] =
+    useState<ExistingCandidateRecord | null>(null)
+
+  const [duplicateError, setDuplicateError] = useState<string | null>(null)
 
   const [nadraStatus, setNadraStatus] =
     useState<"unverified" | "verifying" | "verified" | "failed">("unverified")
@@ -300,6 +318,128 @@ export default function EnrollmentScreen({
               "Hub Quota Reached: Maximum candidates have already enrolled in this hub.",
             )
           } else {
+            const resData = err.data || {}
+            const candidatePayload =
+              resData.candidate ||
+              resData.existingCandidate ||
+              resData.existingRecord ||
+              resData.record ||
+              resData.data?.candidate ||
+              resData.data?.existingCandidate ||
+              resData.data ||
+              {}
+
+            let extractedId =
+              candidatePayload.id ||
+              candidatePayload.candidateId ||
+              candidatePayload.candidate_id ||
+              candidatePayload.recordId ||
+              candidatePayload.record_id ||
+              resData.id ||
+              resData.candidateId ||
+              resData.candidate_id ||
+              resData.recordId ||
+              resData.record_id ||
+              ""
+
+            if (!extractedId && typeof resData.message === "string") {
+              const match = resData.message.match(
+                /([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|CAND-[A-Za-z0-9-]+)/,
+              )
+              if (match) {
+                extractedId = match[1]
+              }
+            }
+
+            const rawStatus =
+              candidatePayload.status ||
+              candidatePayload.enrollmentStatus ||
+              candidatePayload.recordStatus ||
+              resData.status ||
+              "In Review"
+
+            const formattedStatus =
+              typeof rawStatus === "string"
+                ? rawStatus.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+                : "In Review"
+
+            const hubName =
+              candidatePayload.hub ||
+              candidatePayload.hubLocationId ||
+              candidatePayload.testingHubId ||
+              candidatePayload.testing_hub_id ||
+              resData.hub ||
+              resData.testingHubId ||
+              (candidatePayload.hubLocationId != null
+                ? `Hub ${candidatePayload.hubLocationId}`
+                : "") ||
+              form.hub ||
+              "Lahore-C01"
+
+            const rawEnrolledAt =
+              candidatePayload.enrolledAt ||
+              candidatePayload.enrolled_at ||
+              candidatePayload.createdAt ||
+              candidatePayload.created_at ||
+              candidatePayload.enrollmentDate ||
+              resData.enrolledAt ||
+              resData.createdAt
+
+            let formattedDate = ""
+            if (rawEnrolledAt) {
+              try {
+                formattedDate = new Date(rawEnrolledAt).toISOString().split("T")[0]
+              } catch {
+                formattedDate = String(rawEnrolledAt)
+              }
+            }
+            if (!formattedDate) {
+              formattedDate = new Date().toISOString().split("T")[0]
+            }
+
+            const rec: ExistingCandidateRecord = {
+              id: extractedId ? String(extractedId) : "",
+              status: formattedStatus,
+              hub: String(hubName),
+              enrolledAt: formattedDate,
+              fullName:
+                candidatePayload.fullName ||
+                candidatePayload.full_name ||
+                candidatePayload.name ||
+                form.fullName,
+              trade:
+                candidatePayload.tradeCategory ||
+                candidatePayload.trade_category ||
+                candidatePayload.trade ||
+                form.trade,
+              cnic: candidatePayload.cnic || form.cnic,
+              raw: candidatePayload,
+            }
+
+            // Graceful fallback: if ID wasn't in 409 payload, attempt lookup by CNIC from candidate list
+            if (!rec.id && form.cnic) {
+              try {
+                const candidates = await api.listCandidates()
+                const cleanedCnic = form.cnic.replace(/\D/g, "")
+                const match = candidates.find(
+                  (c) => c.cnic && c.cnic.replace(/\D/g, "") === cleanedCnic,
+                )
+                if (match) {
+                  rec.id = match.id || match.candidateId || ""
+                  if (match.fullName) rec.fullName = match.fullName
+                  if (match.tradeCategory) rec.trade = match.tradeCategory
+                  if (match.createdAt) {
+                    rec.enrolledAt = new Date(match.createdAt).toISOString().split("T")[0]
+                  }
+                  if (match.hub) rec.hub = match.hub
+                }
+              } catch {
+                // Graceful fallback if list request fails
+              }
+            }
+
+            setExistingRecord(rec)
+            setDuplicateError(null)
             setModal("duplicate")
           }
           return
@@ -323,6 +463,23 @@ export default function EnrollmentScreen({
       )
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleViewExistingRecord = () => {
+    const recordId = existingRecord?.id?.trim()
+    if (!recordId) {
+      setDuplicateError(
+        "Candidate record ID is missing or invalid. Please check the candidates list.",
+      )
+      return
+    }
+
+    setModal("none")
+    setDuplicateError(null)
+
+    if (onNavigateToRecord) {
+      onNavigateToRecord(recordId, existingRecord)
     }
   }
 
@@ -1583,7 +1740,7 @@ export default function EnrollmentScreen({
                     fontSize: 12,
                   }}
                 >
-                  CAND-2026-04821
+                  {existingRecord?.id || "ID Not Available"}
                 </div>
               </div>
               <div>
@@ -1601,12 +1758,14 @@ export default function EnrollmentScreen({
                     borderRadius: 999,
                   }}
                 >
-                  In Review
+                  {existingRecord?.status || "Enrolled"}
                 </span>
               </div>
               <div>
                 <div style={{ color: "#8C897C", marginBottom: 2 }}>Hub</div>
-                <div style={{ color: "#24302E" }}>Lahore-C01</div>
+                <div style={{ color: "#24302E" }}>
+                  {existingRecord?.hub || form.hub || "Lahore-C01"}
+                </div>
               </div>
               <div>
                 <div style={{ color: "#8C897C", marginBottom: 2 }}>
@@ -1619,13 +1778,29 @@ export default function EnrollmentScreen({
                     fontSize: 12,
                   }}
                 >
-                  2026-07-14
+                  {existingRecord?.enrolledAt || "—"}
                 </div>
               </div>
             </div>
+            {duplicateError && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: "8px 12px",
+                  background: "#FCEBEB",
+                  border: "1px solid #A6453D",
+                  borderRadius: 4,
+                  fontSize: 12,
+                  color: "#501313",
+                }}
+              >
+                {duplicateError}
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button
+              onClick={handleViewExistingRecord}
               style={{
                 flex: 1,
                 height: 40,
@@ -1641,7 +1816,11 @@ export default function EnrollmentScreen({
               View Existing Record
             </button>
             <button
-              onClick={() => setModal("none")}
+              onClick={() => {
+                setModal("none")
+                setExistingRecord(null)
+                setDuplicateError(null)
+              }}
               style={{
                 height: 40,
                 padding: "0 20px",

@@ -72,6 +72,7 @@ interface RecordDetailProps {
   onResubmit?: () => void
   userRole?: "trade-tester" | "center-superintendent" | "super-admin"
   assessmentId?: string
+  candidateId?: string
   data?: RecordData
 }
 
@@ -480,10 +481,11 @@ export default function CandidateRecordScreen({
   onResubmit,
   userRole = "super-admin",
   assessmentId,
+  candidateId,
   data: initialData,
 }: RecordDetailProps) {
   const [data, setData] = useState<RecordData | null>(initialData || null)
-  const [loading, setLoading] = useState<boolean>(!initialData && !!assessmentId)
+  const [loading, setLoading] = useState<boolean>(!initialData && (!!assessmentId || !!candidateId))
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -495,8 +497,76 @@ export default function CandidateRecordScreen({
 
     if (assessmentId) {
       loadAssessmentData(assessmentId)
+      return
     }
-  }, [assessmentId, initialData])
+
+    if (candidateId) {
+      loadCandidateData(candidateId)
+      return
+    }
+  }, [assessmentId, candidateId, initialData])
+
+  const loadCandidateData = async (cId: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      let candidate: any = null
+      try {
+        const candidates = await api.listCandidates()
+        candidate = candidates.find((c) => c.id === cId || c.candidateId === cId)
+      } catch {}
+
+      let assessment: any = null
+      try {
+        const assessmentsRes = await api.listAssessments()
+        assessment = assessmentsRes.assessments?.find((a) => a.candidateId === cId)
+      } catch {}
+
+      const transformedData: RecordData = {
+        candidate: {
+          name: candidate?.fullName || candidate?.name || "Enrolled Candidate",
+          fatherName: candidate?.fatherName || "",
+          dob: candidate?.dob || "",
+          cnic: candidate?.cnic || "",
+          trade: candidate?.tradeCategory || candidate?.trade || "General",
+          hub: candidate?.hub || (candidate?.testingHubId ? `Hub ${candidate.testingHubId}` : "Lahore-C01"),
+          id: candidate?.id || candidate?.candidateId || cId,
+          enrolledAt: candidate?.createdAt || new Date().toISOString().split("T")[0],
+          photo: candidate?.photoS3Uri,
+        },
+        assessment: {
+          id: assessment?.assessmentId || `ASM-${cId.slice(-6)}`,
+          score: assessment?.score ?? 0,
+          maxScore: 100,
+          grade: assessment?.grade || "Pending",
+          tester: assessment?.candidateName ? "Assigned" : "Pending Assignment",
+          submittedAt: assessment?.submittedAt || assessment?.createdAt || "—",
+          superintendent: "",
+          approvedAt: assessment?.approvedAt,
+          status: (assessment?.status as RecordStatus) || "DRAFT",
+        },
+        history: [
+          {
+            action: "Candidate Enrolled",
+            performedBy: "Enrollment System",
+            datetime: candidate?.createdAt || new Date().toISOString(),
+          },
+          ...(assessment ? [{
+            action: "Assessment Record Linked",
+            performedBy: "Trade Tester",
+            datetime: assessment.createdAt,
+          }] : []),
+        ],
+      }
+
+      setData(transformedData)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load candidate record")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const loadAssessmentData = async (id: string) => {
     try {
@@ -617,7 +687,7 @@ export default function CandidateRecordScreen({
             fontSize: 16,
           }}
         >
-          No record data available. Please provide an assessment ID or record data.
+          No record data available. Please provide a candidate ID, assessment ID, or record data.
         </div>
       </div>
     )
