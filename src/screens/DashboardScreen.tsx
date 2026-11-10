@@ -701,8 +701,8 @@ function CenterSuperDashboard({
     let mounted = true
     async function loadData() {
       try {
-        const assessments = await api.listAssessments()
-        if (mounted && assessments) {
+        const { assessments = [] } = await api.listAssessments()
+        if (mounted) {
           const pending = assessments.filter((a: any) => 
             a.status === "submitted" || a.status === "PENDING_APPROVAL"
           )
