@@ -422,6 +422,43 @@ export default function SuperAdminDashboard() {
         console.warn("superAdminApi.getSessions offline note:", err?.message)
       })
 
+    // Load device health data
+    api.getDeviceHealth()
+      .then((deviceData) => {
+        if (isMounted && deviceData && Array.isArray(deviceData)) {
+          setDevices(deviceData)
+        }
+      })
+      .catch((err) => {
+        console.warn("api.getDeviceHealth offline note:", err?.message)
+      })
+
+    // Load hubs data from dashboard stats
+    superAdminApi.getDashboard()
+      .then((stats) => {
+        if (isMounted && stats) {
+          setDashStats(stats)
+          // Populate hubs from stats if available
+          if (stats.candidates && stats.assessments) {
+            const hubData: Hub[] = [
+              {
+                id: 1,
+                name: "Hub 1",
+                enrolled: stats.candidates.totalEnrolled || 0,
+                submitted: stats.assessments.submitted || 0,
+                pendingApproval: stats.assessments.approved || 0,
+                minted: stats.ledger.mintedOnChain || 0,
+                status: "on-track",
+              },
+            ]
+            setHubs(hubData)
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn("superAdminApi.getDashboard offline note:", err?.message)
+      })
+
     return () => {
       isMounted = false
     }

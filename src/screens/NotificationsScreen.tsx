@@ -87,7 +87,24 @@ const categoryColors: Record<NotifCategory, { icon: string bg: string }> = {
 }
 
 export default function NotificationsScreen() {
-  const [notifs, setNotifs] = useState<Notification[]>([])
+  const [notifs, setNotifs] = useState<Notification[]>([
+    {
+      id: "demo-1",
+      category: "system",
+      title: "Welcome to NSP HUNAR",
+      body: "Your account has been successfully configured. You can now enroll candidates and manage assessments.",
+      timestamp: new Date().toISOString(),
+      read: false,
+    },
+    {
+      id: "demo-2",
+      category: "enrollment",
+      title: "System Ready",
+      body: "The enrollment and assessment workflow is operational. Start by enrolling candidates at your hub.",
+      timestamp: new Date(Date.now() - 3600000).toISOString(),
+      read: true,
+    },
+  ])
   const [filter, setFilter] = useState<NotifCategory | "all">("all")
 
   const unread = notifs.filter((n) => !n.read).length

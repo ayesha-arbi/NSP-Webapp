@@ -473,6 +473,17 @@ export default function AssessmentScreen({
   async function handleConfirmSubmit() {
     if (!selected) return
 
+    // Check if evidence photo is uploaded before submission
+    if (attachments.length === 0) {
+      setFeedbackMsg({
+        text: "Please upload an evidence photo before submitting the assessment.",
+        type: "error",
+      })
+      setShowSubmitModal(false)
+      setIsProcessing(false)
+      return
+    }
+
     // Prevent duplicate submission if already submitted
     if (currentAssessment && currentAssessment.status === "PENDING_APPROVAL") {
       setFeedbackMsg({
