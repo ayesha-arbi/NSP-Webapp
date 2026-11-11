@@ -267,8 +267,8 @@ export default function AssessmentScreen({
               id: c.id,
               name: c.fullName || `Candidate ${c.id.slice(0, 8)}`,
               cnic: c.cnic || "—",
-              trade: c.tradeCategory || c.trade || "—",
-              hub: c.hub || (c.testingHubId ? `Hub ${c.testingHubId}` : ""),
+              trade: (c as any).tradeCategory || (c as any).trade || "—",
+              hub: (c as any).hub || ((c as any).testingHubId ? `Hub ${(c as any).testingHubId}` : ""),
             })
           }
           return Array.from(map.values())
@@ -737,11 +737,12 @@ export default function AssessmentScreen({
   const isOwner =
     !currentAssessment ||
     !currentAssessment.testerUserId ||
-    currentAssessment.testerUserId === currentUser?.userId
+    currentAssessment.testerUserId === (currentUser as any)?.userId ||
+    currentAssessment.testerUserId === currentUser?.id
 
   const isSuperintendent =
-    currentUser?.role === "CENTER_SUPERINTENDENT" ||
-    currentUser?.role === "SUPERINTENDENT" ||
+    (currentUser?.role as any) === "CENTER_SUPERINTENDENT" ||
+    (currentUser?.role as any) === "SUPERINTENDENT" ||
     currentUser?.role === "SUPER_ADMIN"
 
   const isReadOnly = isSubmitted || (!isOwner && isSuperintendent)

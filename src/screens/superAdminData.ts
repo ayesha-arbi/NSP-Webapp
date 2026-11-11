@@ -1012,12 +1012,18 @@ const FULL_AUDIT_LOG: FullAuditEntry[] = [
       Conflicts: "None",
     },
   },
-]
-
-export { HUBS, INIT_MINT_TXS, DEVICES, AUDIT_LOG, FULL_AUDIT_LOG }
+  {
+    id: "f31a",
+    timestamp: "2026-08-26 15:00:00",
+    eventType: "Credential Minted",
+    category: "mint" as AuditCategory,
+    user: "System",
+    userRole: "system" as UserRole,
+    hub: "Lahore-C01",
+    result: "success" as "success",
     detail: "Credential confirmed on-chain",
     targetId: "CRED-2026-00083",
-    targetType: "credential",
+    targetType: "credential" as "credential",
     metadata: {
       "Block Number": "4821101",
       "Tx Hash": "0x1a3c5e7b9d0f2a4c6e8b0d2f4a6c8e0a",

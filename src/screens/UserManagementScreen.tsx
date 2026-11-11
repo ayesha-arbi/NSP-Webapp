@@ -508,7 +508,7 @@ export default function UserManagementScreen() {
           ? "CENTER_SUPERINTENDENT"
           : "SUPER_ADMIN"
 
-    let mfaEnroll: { secret: string otpauthUrl: string } | undefined
+    let mfaEnroll: { secret: string; otpauthUrl: string } | undefined
 
     try {
       const res = await superAdminApi.createUser({
@@ -625,7 +625,7 @@ export default function UserManagementScreen() {
 
   async function handleMfaReset() {
     if (!target || !mfaVerified || !mfaReason.trim()) return
-    let resetEnroll: { secret: string otpauthUrl: string } | undefined
+    let resetEnroll: { secret: string; otpauthUrl: string } | undefined
     try {
       const res = await superAdminApi.resetUserMfa(target.id, mfaReason.trim())
       if (res?.mfaEnrollment || res?.enrollment) {

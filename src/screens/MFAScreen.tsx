@@ -134,7 +134,7 @@ export default function MFAScreen({
     setCustomError("")
 
     try {
-      const res = await api.verifyMfa(email, code)
+      const res = await api.verifyMfa(email || "", code)
       const user = res.user || (res as any).data?.user
       const accessToken =
         res.accessToken ||
@@ -220,7 +220,7 @@ export default function MFAScreen({
 
     try {
       const res = await api.verifyBackupCode(
-        email,
+        email || "",
         backupPassword.trim(),
         backupCode.trim(),
       )

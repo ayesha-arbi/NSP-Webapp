@@ -223,7 +223,7 @@ export default function CredentialsScreen() {
   const [revokeReason, setRevokeReason] = useState("")
   const [toast, setToast] = useState<string | null>(null)
 
-  const pollTimers = useRef<Record<string, { timer: any elapsed: number }>>({})
+  const pollTimers = useRef<Record<string, { timer: any; elapsed: number }>>({})
 
   useEffect(() => {
     let mounted = true
@@ -263,7 +263,7 @@ export default function CredentialsScreen() {
               trade: a.tradeCategory || "General",
               hub: a.testingHubId ? `Hub ${a.testingHubId}` : "Lahore-C01",
               approvedAt: a.approvedAt || a.submittedAt || "Recently",
-              txnId: a.txHash,
+              txnId: a.txHash || undefined,
               mintedAt:
                 status === "confirmed" ? a.approvedAt || "Recently" : undefined,
               status,
@@ -313,7 +313,7 @@ export default function CredentialsScreen() {
           if (mStatus === "MINTED") {
             delete pollTimers.current[credentialId]
             setToast("Credential anchored on Polygon blockchain!")
-            const tx = res.data.tx_hash
+            const tx = res.data.tx_hash || undefined
             setCreds((cs) =>
               cs.map((c) =>
                 c.id === credentialId

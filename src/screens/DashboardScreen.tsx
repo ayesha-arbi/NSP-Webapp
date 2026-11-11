@@ -2,6 +2,7 @@ import SuperAdminDashboard from "./SuperAdminDashboard"
 
 import { authStore } from "../services/authStore"
 import { api } from "../services/api"
+import { superAdminApi } from "../services/superAdmin"
 import { useState, useEffect } from "react"
 
 type Role = "trade-tester" | "center-superintendent" | "super-admin"
@@ -648,16 +649,7 @@ function TradeTesterDashboard({
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        if (onNavigateToAssessment) {
-                          onNavigateToAssessment({
-                            id: c.id,
-                            fullName: c.name || c.candidateName || "Unknown",
-                            cnic: c.cnic,
-                            tradeCategory: c.trade || "Unknown",
-                          })
-                        } else {
-                          onNavigate("assessment")
-                        }
+                        onNavigate("assessment")
                       }}
                       style={{
                         background: "none",
@@ -1089,12 +1081,7 @@ function CenterSuperDashboard({
                       </button>
                     </div>
                     <button
-                      onClick={() => onNavigateToAssessment && onNavigateToAssessment({
-                        id: a.id,
-                        fullName: a.candidate || a.name || "Unknown",
-                        cnic: a.cnic,
-                        tradeCategory: a.trade || "Unknown",
-                      })}
+                      onClick={() => onNavigate("assessment")}
                       style={{
                         height: 30,
                         padding: "0 10px",
@@ -1133,7 +1120,7 @@ function _SuperAdminDashboard_unused({
     let mounted = true
     async function loadData() {
       try {
-        const dashboardStats = await api.getDashboardStats()
+        const dashboardStats: any = await (api as any).getDashboardStats?.() || await superAdminApi.getDashboard().catch(() => null)
         if (mounted && dashboardStats) {
           setHubs(dashboardStats.hubs || [])
         }

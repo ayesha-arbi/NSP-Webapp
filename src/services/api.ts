@@ -95,7 +95,7 @@ export interface UserStats {
 export interface DashboardStats {
   users: UserStats
   sessions: { activeCount: number }
-  candidates: { totalEnrolled: number verifiedCnic: number }
+  candidates: { totalEnrolled: number; verifiedCnic: number }
   assessments: {
     totalAssessed: number
     submitted: number
@@ -806,7 +806,7 @@ const one = (r: any): WithAssessment => ({
     : undefined as any,
 })
 
-const many = (r: any): { success: boolean assessments: Assessment[] } => ({
+const many = (r: any): { success: boolean; assessments: Assessment[] } => ({
   ...r,
 
   assessments: (r?.assessments ?? []).map(normalizeAssessment),
@@ -826,7 +826,7 @@ export const api = {
     endpoint: string,
     body?: any,
     options?: RequestInit,
-  ): Promise<{ data: T status: number }> {
+  ): Promise<{ data: T; status: number }> {
     const data = await request<T>(endpoint, {
       ...options,
       method: "POST",
@@ -844,7 +844,7 @@ export const api = {
     endpoint: string,
     body?: any,
     options?: RequestInit,
-  ): Promise<{ data: T status: number }> {
+  ): Promise<{ data: T; status: number }> {
     const data = await request<T>(endpoint, {
       ...options,
       method: "PATCH",
@@ -870,7 +870,7 @@ export const api = {
     endpoint: string,
     body?: any,
     options?: RequestInit,
-  ): Promise<{ data: T status: number }> {
+  ): Promise<{ data: T; status: number }> {
     const data = await request<T>(endpoint, {
       ...options,
       method: "PUT",
@@ -1063,7 +1063,7 @@ export const api = {
 
   // 6. Superintendent approval workflow (role CENTER_SUPERINTENDENT, hub-scoped server-side)
 
-  async getQueue(): Promise<{ success: boolean assessments: Assessment[] }> {
+  async getQueue(): Promise<{ success: boolean; assessments: Assessment[] }> {
     return many(await request<any>("/api/assessments/queue", { method: "GET" }))
   },
 
@@ -1256,8 +1256,8 @@ export const api = {
   // CAPSTONE B2: Profile & Self-Service Password
   // ============================================================
 
-  async getProfile(): Promise<{ success: boolean profile: UserProfile }> {
-    return request<{ success: boolean profile: UserProfile }>(
+  async getProfile(): Promise<{ success: boolean; profile: UserProfile }> {
+    return request<{ success: boolean; profile: UserProfile }>(
       "/api/auth/profile",
       { method: "GET" },
     )
@@ -1267,7 +1267,7 @@ export const api = {
     success: boolean
     message: string
   }> {
-    return request<{ success: boolean message: string }>("/api/auth/profile", {
+    return request<{ success: boolean; message: string }>("/api/auth/profile", {
       method: "PATCH",
       body: JSON.stringify({ currentPassword, newPassword }),
     })
@@ -1317,7 +1317,7 @@ export const api = {
     devices: AuthorizedDevice[]
   }> {
     const qs = hubLocationId != null ? `?hubLocationId=${hubLocationId}` : ""
-    return request<{ success: boolean devices: AuthorizedDevice[] }>(
+    return request<{ success: boolean; devices: AuthorizedDevice[] }>(
       `/api/super-admin/devices${qs}`,
       { method: "GET" },
     )
@@ -1327,7 +1327,7 @@ export const api = {
     success: boolean
     devices: DeviceHealth[]
   }> {
-    return request<{ success: boolean devices: DeviceHealth[] }>(
+    return request<{ success: boolean; devices: DeviceHealth[] }>(
       "/api/super-admin/devices/health",
       { method: "GET" },
     )
@@ -1337,7 +1337,7 @@ export const api = {
     success: boolean
     message: string
   }> {
-    return request<{ success: boolean message: string }>(
+    return request<{ success: boolean; message: string }>(
       "/api/super-admin/devices/lockdown",
       { method: "POST", body: JSON.stringify({ hubLocationId, isLocked }) },
     )
@@ -1347,7 +1347,7 @@ export const api = {
     success: boolean
     message: string
   }> {
-    return request<{ success: boolean message: string }>(
+    return request<{ success: boolean; message: string }>(
       `/api/super-admin/devices/${encodeURIComponent(deviceId)}/revoke`,
       { method: "POST" },
     )
@@ -1565,7 +1565,7 @@ export const superAdminApi = {
     offset?: number
   }): Promise<{
     users: HubUser[]
-    pagination: { limit: number offset: number total: number }
+    pagination: { limit: number; offset: number; total: number }
   }> => {
     const query = new URLSearchParams()
     if (params?.role) query.set("role", params.role)
@@ -1674,7 +1674,7 @@ export const superAdminApi = {
 
   listDevices: async (hubLocationId?: number) => {
     const qs = hubLocationId != null ? `?hubLocationId=${hubLocationId}` : ""
-    return request<{ success: boolean devices: AuthorizedDevice[] }>(
+    return request<{ success: boolean; devices: AuthorizedDevice[] }>(
       `/api/super-admin/devices${qs}`,
       { method: "GET" },
     )
@@ -1688,14 +1688,14 @@ export const superAdminApi = {
   },
 
   setHubLockdown: async (hubLocationId: number, isLocked: boolean) => {
-    return request<{ success: boolean message: string }>(
+    return request<{ success: boolean; message: string }>(
       "/api/super-admin/devices/lockdown",
       { method: "POST", body: JSON.stringify({ hubLocationId, isLocked }) },
     )
   },
 
   revokeDevice: async (deviceId: string) => {
-    return request<{ success: boolean message: string }>(
+    return request<{ success: boolean; message: string }>(
       `/api/super-admin/devices/${encodeURIComponent(deviceId)}/revoke`,
       { method: "POST" },
     )
@@ -1713,7 +1713,7 @@ export const enhancedApi = {
     mfaCode?: string,
     backupCode?: string,
   ): Promise<string> {
-    const res = await api.post<{ success: boolean stepUpToken: string }>(
+    const res = await api.post<{ success: boolean; stepUpToken: string }>(
       "/api/auth/step-up",
       {
         scope,

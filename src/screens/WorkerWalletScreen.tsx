@@ -118,8 +118,8 @@ export default function WorkerWalletScreen({
         const minted = assessments.filter(
           (a) =>
             a.status === "MINTED" ||
-            a.mintingStatus === "minted" ||
-            a.mintingStatus === "confirmed",
+            String(a.mintingStatus || "").toLowerCase() === "minted" ||
+            String(a.mintingStatus || "").toLowerCase() === "confirmed",
         )
         if (minted.length > 0) {
           const mapped: WalletCredential[] = minted.map((a) => ({

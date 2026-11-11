@@ -483,7 +483,7 @@ export default function ApprovalsScreen() {
 
   const [rejectionReason, setRejectionReason] = useState("")
 
-  const pollTimers = useRef<Record<string, { timer: any elapsed: number }>>({})
+  const pollTimers = useRef<Record<string, { timer: any; elapsed: number }>>({})
 
   useEffect(() => {
     return () => {

@@ -418,8 +418,9 @@ export default function EnrollmentScreen({
                   if (match.createdAt) {
                     rec.enrolledAt = new Date(match.createdAt).toISOString().split("T")[0]
                   }
-                  if (match.hub || match.testingHubId) {
-                    rec.hub = getHubLabel(match.testingHubId ?? match.hub) ?? rec.hub
+                  const matchAny = match as any
+                  if (matchAny.hub || matchAny.testingHubId) {
+                    rec.hub = getHubLabel(matchAny.testingHubId ?? matchAny.hub) ?? rec.hub
                   }
                 }
               } catch {
