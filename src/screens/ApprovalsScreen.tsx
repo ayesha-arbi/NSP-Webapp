@@ -153,10 +153,10 @@ interface Submission {
 
 // Guide 5: Stable canonical URN generator for records without server-assigned credentialId yet
 function getStableCredentialId(
-  assessmentId: string,
+  assessmentId?: string,
   candidateId?: string,
 ): string {
-  const seed = (assessmentId + (candidateId || ""))
+  const seed = ((assessmentId || "") + (candidateId || ""))
     .replace(/[^0-9a-f]/gi, "")
     .padEnd(12, "0")
     .slice(0, 12)
@@ -179,7 +179,7 @@ function toSubmission(a: Assessment): Submission {
   return {
     id: a.assessmentId,
 
-    candidate: a.candidateName || `Candidate ${a.candidateId.slice(0, 8)}`,
+    candidate: a.candidateName || (a.candidateId ? `Candidate ${a.candidateId.slice(0, 8)}` : "Candidate"),
 
     cnic: "—",
 
@@ -663,12 +663,14 @@ export default function ApprovalsScreen() {
     try {
       const res = await api.getQueue()
 
-      // Keep items actioned in this session so the Approved/Rejected tabs still show them
+      const newItems = (Array.isArray(res?.assessments) ? res.assessments : []).map(toSubmission)
 
-      setSubmissions((prev) => [
-        ...res.assessments.map(toSubmission),
-        ...prev.filter((p) => p.status !== "submitted"),
-      ])
+      // Keep items actioned in this session so the Approved/Rejected tabs still show them
+      setSubmissions((prev) => {
+        const newIds = new Set(newItems.map((item) => item.id))
+        const preserved = prev.filter((p) => !newIds.has(p.id) && p.status !== "submitted")
+        return [...newItems, ...preserved]
+      })
     } catch (err: any) {
       setLoadError(
         err instanceof ApiError && err.status === 403

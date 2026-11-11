@@ -291,8 +291,11 @@ function TradeTesterDashboard({
           setRecentCandidates(list.slice(0, 5))
           setStats({
             enrolled: Math.max(candidates.length, assessments.length),
-            draft: assessments.filter((a: any) => a.status === "draft").length,
-            submitted: assessments.filter((a: any) => a.status === "submitted").length,
+            draft: assessments.filter((a: any) => (a.status || "").toLowerCase() === "draft").length,
+            submitted: assessments.filter((a: any) => {
+              const s = (a.status || "").toLowerCase();
+              return s === "submitted" || s === "pending_approval";
+            }).length,
             target: 60,
             targetProgress: Math.round((Math.max(candidates.length, assessments.length) / 60) * 100),
           })
@@ -701,16 +704,21 @@ function CenterSuperDashboard({
     let mounted = true
     async function loadData() {
       try {
-        const { assessments = [] } = await api.listAssessments()
+        const res = await api.listAssessments()
+        const assessments = Array.isArray(res?.assessments) ? res.assessments : []
         if (mounted) {
-          const pending = assessments.filter((a: any) => 
-            a.status === "submitted" || a.status === "PENDING_APPROVAL"
-          )
+          const pending = assessments.filter((a: any) => {
+            const s = (a.status || "").toLowerCase()
+            return s === "submitted" || s === "pending_approval"
+          })
           setApprovals(pending.slice(0, 5))
           setStats({
             pending: pending.length,
-            approved: assessments.filter((a: any) => a.status === "approved").length,
-            rejected: assessments.filter((a: any) => a.status === "rejected").length,
+            approved: assessments.filter((a: any) => {
+              const s = (a.status || "").toLowerCase()
+              return s === "approved" || s === "minted"
+            }).length,
+            rejected: assessments.filter((a: any) => (a.status || "").toLowerCase() === "rejected").length,
             enrolled: assessments.length,
             target: 60,
             targetProgress: Math.round((assessments.length / 60) * 100),

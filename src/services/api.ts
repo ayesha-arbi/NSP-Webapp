@@ -721,21 +721,21 @@ export function normalizeAssessment(r: any): Assessment {
 
     candidateId: pick(r, "candidateId", "candidate_id"),
 
-    candidateName: pick(r, "candidateName", "candidate_name"),
+    candidateName: pick(r, "candidateName", "candidate_name", "full_name", "fullName", "name"),
 
-    tradeCategory: pick(r, "tradeCategory", "trade_category"),
+    tradeCategory: pick(r, "tradeCategory", "trade_category", "trade"),
 
-    testingHubId: pick(r, "testingHubId", "testing_hub_id"),
+    testingHubId: pick(r, "testingHubId", "testing_hub_id", "hubId", "hub_id"),
 
-    score: Number(r?.score),
+    score: Number(r?.score ?? r?.totalScore ?? r?.total_score ?? 0),
 
-    grade: r?.grade,
+    grade: r?.grade ?? r?.gradeCode ?? "",
 
-    status: r?.status,
+    status: r?.status ?? r?.assessmentStatus ?? "DRAFT",
 
     rejectionReason: pick(r, "rejectionReason", "rejection_reason"),
 
-    testerUserId: pick(r, "testerUserId", "tester_user_id"),
+    testerUserId: pick(r, "testerUserId", "tester_user_id", "submittedBy", "submitted_by"),
 
     superintendentUserId: pick(
       r,

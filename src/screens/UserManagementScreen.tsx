@@ -42,6 +42,185 @@ interface AuditEntry {
   result: "success" | "failure"
 }
 
+/* ── Fallback data ── */
+const INITIAL_USERS: User[] = [
+  {
+    id: "u1",
+    name: "Ahmad Raza",
+    email: "tester.hub1@nsp.com",
+    role: "trade-tester",
+    hub: "Lahore-C01",
+    status: "active",
+    mfa: "enabled",
+    lastLogin: "2026-08-27 09:58",
+    createdAt: "2026-01-15",
+    session: {
+      id: "s1",
+      device: "Chrome 126 · Windows 11",
+      ip: "203.128.22.14",
+      lastActive: "Active now",
+      location: "Lahore, Punjab",
+    },
+  },
+  {
+    id: "u2",
+    name: "Fatima Malik",
+    email: "superintendent.hub1@nsp.com",
+    role: "center-superintendent",
+    hub: "Lahore-C01",
+    status: "active",
+    mfa: "enabled",
+    lastLogin: "2026-08-27 08:30",
+    createdAt: "2026-01-15",
+    session: {
+      id: "s2",
+      device: "Edge 126 · Windows 10",
+      ip: "203.128.22.15",
+      lastActive: "2 hrs ago",
+      location: "Lahore, Punjab",
+    },
+  },
+  {
+    id: "u3",
+    name: "Bilal Ahmed",
+    email: "bilal.ahmed@navttc.gov.pk",
+    role: "trade-tester",
+    hub: "Karachi-C02",
+    status: "active",
+    mfa: "enabled",
+    lastLogin: "2026-08-27 10:12",
+    createdAt: "2026-01-20",
+    session: {
+      id: "s3",
+      device: "Chrome 126 · macOS",
+      ip: "42.201.64.88",
+      lastActive: "18 min ago",
+      location: "Karachi, Sindh",
+    },
+  },
+  {
+    id: "u4",
+    name: "Ali Hassan",
+    email: "ali.hassan@navttc.gov.pk",
+    role: "center-superintendent",
+    hub: "Karachi-C02",
+    status: "active",
+    mfa: "disabled",
+    lastLogin: "2026-08-26 17:45",
+    createdAt: "2026-01-20",
+  },
+  {
+    id: "u5",
+    name: "Sana Malik",
+    email: "sana.malik@navttc.gov.pk",
+    role: "trade-tester",
+    hub: "Islamabad-C03",
+    status: "active",
+    mfa: "disabled",
+    lastLogin: "2026-08-27 09:05",
+    createdAt: "2026-02-03",
+    session: {
+      id: "s5",
+      device: "Firefox 128 · Ubuntu",
+      ip: "119.155.30.44",
+      lastActive: "1 hr ago",
+      location: "Islamabad",
+    },
+  },
+  {
+    id: "u6",
+    name: "Usman Tariq",
+    email: "usman.tariq@navttc.gov.pk",
+    role: "center-superintendent",
+    hub: "Islamabad-C03",
+    status: "active",
+    mfa: "enabled",
+    lastLogin: "2026-08-26 15:20",
+    createdAt: "2026-02-03",
+  },
+  {
+    id: "u7",
+    name: "Khalid Mehmood",
+    email: "khalid.mehmood@navttc.gov.pk",
+    role: "trade-tester",
+    hub: "Peshawar-C04",
+    status: "locked",
+    mfa: "enabled",
+    lastLogin: "2026-08-25 14:10",
+    createdAt: "2026-02-10",
+    lockReason: "Automatic lock — 5 consecutive failed login attempts.",
+    lockedBy: "System",
+  },
+  {
+    id: "u8",
+    name: "Nadia Hussain",
+    email: "nadia.hussain@navttc.gov.pk",
+    role: "trade-tester",
+    hub: "Quetta-C05",
+    status: "active",
+    mfa: "enabled",
+    lastLogin: "2026-08-27 07:48",
+    createdAt: "2026-02-14",
+    session: {
+      id: "s8",
+      device: "Chrome 126 · Android",
+      ip: "103.55.68.22",
+      lastActive: "3 hrs ago",
+      location: "Quetta, Balochistan",
+    },
+  },
+  {
+    id: "u9",
+    name: "Raheela Qasim",
+    email: "raheela.qasim@navttc.gov.pk",
+    role: "trade-tester",
+    hub: "Quetta-C05",
+    status: "locked",
+    mfa: "pending-reset",
+    lastLogin: "2026-08-22 11:30",
+    createdAt: "2026-03-01",
+    lockReason: "Locked by administrator pending identity re-verification.",
+    lockedBy: "Zara Khan",
+  },
+  {
+    id: "u10",
+    name: "Zara Khan",
+    email: "superadmin@nsp.com",
+    role: "super-admin",
+    hub: "—",
+    status: "active",
+    mfa: "enabled",
+    lastLogin: "2026-08-27 09:58",
+    createdAt: "2026-01-01",
+    session: {
+      id: "s10",
+      device: "Chrome 126 · Windows 11",
+      ip: "203.128.22.20",
+      lastActive: "Active now",
+      location: "Islamabad",
+    },
+  },
+]
+
+const INITIAL_AUDIT: AuditEntry[] = [
+  {
+    id: "a1",
+    action: "Account locked — 5 failed login attempts",
+    admin: "System",
+    affectedUser: "Khalid Mehmood",
+    timestamp: "2026-08-25 14:15",
+    result: "success",
+  },
+  {
+    id: "a2",
+    action: "Account created",
+    admin: "Zara Khan",
+    affectedUser: "Raheela Qasim",
+    timestamp: "2026-03-01 10:00",
+    result: "success",
+  },
+]
+
 /* ── Constants ── */
 const ROLE_LABELS: Record<UserRole, string> = {
   "trade-tester": "Trade Tester",
@@ -161,8 +340,8 @@ function ModalOverlay({
 
 /* ── Screen ── */
 export default function UserManagementScreen() {
-  const [users, setUsers] = useState<User[]>([])
-  const [audit, setAudit] = useState<AuditEntry[]>([])
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS)
+  const [audit, setAudit] = useState<AuditEntry[]>(INITIAL_AUDIT)
   const [tab, setTab] = useState<Tab>("users")
   const [search, setSearch] = useState("")
   const [roleF, setRoleF] = useState("All Roles")
@@ -224,7 +403,14 @@ export default function UserManagementScreen() {
             createdAt: hu.createdAt ? hu.createdAt.slice(0, 10) : "2026-01-01",
           }
         })
-        setUsers(mapped)
+        setUsers((prev) => {
+          const map = new Map<string, User>()
+          mapped.forEach((u) => map.set(u.email, u))
+          prev.forEach((u) => {
+            if (!map.has(u.email)) map.set(u.email, u)
+          })
+          return Array.from(map.values())
+        })
       })
       .catch((err) => {
         console.warn("superAdminApi.getUsers offline note:", err?.message)

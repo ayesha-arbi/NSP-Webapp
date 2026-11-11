@@ -157,7 +157,8 @@ export default function DevicesScreen() {
     let mounted = true
     async function loadHealth() {
       try {
-        const live = await api.getDeviceHealth()
+        const res: any = await api.getDeviceHealth()
+        const live = Array.isArray(res) ? res : res?.devices || []
         if (!mounted || !Array.isArray(live) || live.length === 0) return
 
         setDevices((prev) => {

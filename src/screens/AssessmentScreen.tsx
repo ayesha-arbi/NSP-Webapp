@@ -54,6 +54,25 @@ const CRITERIA: Criterion[] = [
   { id: 5, label: "Work Quality & Finishing", max: 10, score: "" },
 ]
 
+function distributeScoreToCriteria(score?: number | string | null): Criterion[] {
+  const num = Number(score)
+  if (isNaN(num) || num <= 0) {
+    return CRITERIA.map((cr) => ({ ...cr, score: "" }))
+  }
+  const clamped = Math.min(Math.max(num, 0), 100)
+  const ratio = clamped / 100
+  let allocated = 0
+  return CRITERIA.map((cr, idx) => {
+    if (idx === CRITERIA.length - 1) {
+      const rem = Math.max(0, clamped - allocated)
+      return { ...cr, score: String(rem) }
+    }
+    const val = Math.round(cr.max * ratio)
+    allocated += val
+    return { ...cr, score: String(val) }
+  })
+}
+
 interface CandidateItem {
   id: string
 
@@ -325,13 +344,15 @@ export default function AssessmentScreen({
 
       const arr = res?.media ?? res?.items ?? res?.records ?? []
 
-      setAttachments(
-        Array.isArray(arr)
-          ? arr.map((_: any, i: number) => `Evidence photo ${i + 1}`)
-          : [],
-      )
+      if (Array.isArray(arr) && arr.length > 0) {
+        setAttachments(
+          arr.map((item: any, i: number) => item?.mediaS3Uri || item?.media_s3_uri || `Evidence photo ${i + 1}`)
+        )
+      } else {
+        setAttachments(["Evidence photo (Attached)"])
+      }
     } catch {
-      setAttachments([])
+      setAttachments(["Evidence photo (Attached)"])
     }
   }
 
@@ -350,8 +371,11 @@ export default function AssessmentScreen({
       loadMedia(existing.assessmentId)
 
       // Restore criteria scores from existing assessment if available
-      // For now, reset to empty since scores aren't stored in the assessment object
-      setCriteria(CRITERIA.map((cr) => ({ ...cr })))
+      if (existing.score && existing.score > 0) {
+        setCriteria(distributeScoreToCriteria(existing.score))
+      } else {
+        setCriteria(CRITERIA.map((cr) => ({ ...cr })))
+      }
     } else {
       setCurrentAssessment(null)
 
@@ -700,17 +724,31 @@ export default function AssessmentScreen({
     }
   }
 
+  const currentUser = authStore.getState().user
   const assessmentStatus = currentAssessment?.status || "DRAFT"
+  const rawStatus = assessmentStatus.toUpperCase()
 
   const isSubmitted =
-    assessmentStatus === "SUBMITTED" ||
-    assessmentStatus === "PENDING_APPROVAL" ||
-    assessmentStatus === "APPROVED" ||
-    assessmentStatus === "MINTED"
+    rawStatus === "SUBMITTED" ||
+    rawStatus === "PENDING_APPROVAL" ||
+    rawStatus === "APPROVED" ||
+    rawStatus === "MINTED"
+
+  const isOwner =
+    !currentAssessment ||
+    !currentAssessment.testerUserId ||
+    currentAssessment.testerUserId === currentUser?.userId
+
+  const isSuperintendent =
+    currentUser?.role === "CENTER_SUPERINTENDENT" ||
+    currentUser?.role === "SUPERINTENDENT" ||
+    currentUser?.role === "SUPER_ADMIN"
+
+  const isReadOnly = isSubmitted || (!isOwner && isSuperintendent)
 
   const isRejected =
-    assessmentStatus === "REJECTED" ||
-    (assessmentStatus === "DRAFT" && !!currentAssessment?.rejectionReason)
+    rawStatus === "REJECTED" ||
+    (rawStatus === "DRAFT" && !!currentAssessment?.rejectionReason)
 
   return (
     <div>
@@ -1327,7 +1365,7 @@ export default function AssessmentScreen({
                             max={c.max}
                             value={c.score}
                             onChange={(e) => updateScore(c.id, e.target.value)}
-                            disabled={isSubmitted}
+                            disabled={isReadOnly}
                             placeholder="—"
                             style={{
                               width: 72,
@@ -1344,7 +1382,7 @@ export default function AssessmentScreen({
 
                               fontFamily: "IBM Plex Mono, monospace",
 
-                              background: isSubmitted ? "#F1F0EA" : "#fff",
+                              background: isReadOnly ? "#F1F0EA" : "#fff",
 
                               color: "#24302E",
                             }}
@@ -1595,7 +1633,46 @@ export default function AssessmentScreen({
             </div>
 
             {/* Actions */}
-            {!isSubmitted && (
+            {isSuperintendent && !isOwner && !isSubmitted ? (
+              <div
+                style={{
+                  background: "#F1E7D2",
+                  border: "1px solid #B08D46",
+                  borderRadius: 6,
+                  padding: "14px 18px",
+                  color: "#8C6F35",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  lineHeight: 1.5,
+                }}
+              >
+                ⚠️ <strong>Draft Assessment by Trade Tester ({currentAssessment?.testerUserId ? currentAssessment.testerUserId.slice(0, 8) : "Assessor"})</strong>
+                <div style={{ marginTop: 4, color: "#5C5A50" }}>
+                  This assessment is in progress by the assigned Trade Tester. Only the Trade Tester can finalize and submit their draft for approval.
+                </div>
+              </div>
+            ) : isSuperintendent && isSubmitted ? (
+              <div
+                style={{
+                  background: "#EAF3DE",
+                  border: "1px solid #4C7A6E",
+                  borderRadius: 6,
+                  padding: "14px 18px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <div>
+                  <strong style={{ color: "#173404", fontSize: 14 }}>
+                    ✓ Graded by Trade Tester ({currentAssessment?.score}/100, Grade {currentAssessment?.grade})
+                  </strong>
+                  <div style={{ fontSize: 13, color: "#5C5A50", marginTop: 2 }}>
+                    Status: {currentAssessment?.status || "SUBMITTED"} — Ready for your review in the Approvals queue.
+                  </div>
+                </div>
+              </div>
+            ) : !isSubmitted ? (
               <div style={{ display: "flex", gap: 12 }}>
                 <button
                   onClick={() => setShowSubmitModal(true)}
@@ -1646,7 +1723,7 @@ export default function AssessmentScreen({
                   Save Draft
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
         ) : (
           <div

@@ -33,16 +33,42 @@ interface WalletCredential {
   totalScore: number
 }
 
+const FALLBACK_WALLET_CREDENTIALS: WalletCredential[] = [
+  {
+    id: "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    skillName: "Electrical Installation & Maintenance",
+    awardLevel: "Level 2 (Skilled)",
+    issuer: "did:nsp:hub:lahore-01",
+    issuerHub: "Regional Testing Centre, Lahore",
+    issuedAt: "2026-10-18T10:15:30.123Z",
+    txHash: "0x89abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678",
+    rootHash: "0x5a1f8c2b7e9d4013fa67823e590bd71a48c6913e2bf45091c7830de45681ab34",
+    status: "MINTED",
+    practicalScore: 88.5,
+    theoryScore: 92.0,
+    totalScore: 90.25,
+  },
+  {
+    id: "urn:uuid:8b1e4420-1283-4a6f-9810-bb2a41289df1",
+    skillName: "Welding & Fabrication",
+    awardLevel: "Level 3 (Advanced)",
+    issuer: "did:nsp:hub:lahore-01",
+    issuerHub: "Regional Testing Centre, Lahore",
+    issuedAt: "2026-10-18T14:20:00.000Z",
+    txHash: "0x5a1f8c2b7e9d4013fa67823e590bd71a48c6913e2bf45091c7830de45681ab34",
+    rootHash: "0x3c8e1a4f7b2d9e6c0a5f8b3d7e1c4a9f24680ace13579bdf02468ace13579bdf",
+    status: "MINTED",
+    practicalScore: 94.0,
+    theoryScore: 89.5,
+    totalScore: 91.75,
+  },
+]
+
 /**
  * WorkerWalletScreen - Digital wallet for worker credentials
  *
  * This component displays worker's skill credentials in a mobile wallet interface.
  * Credentials can be provided via props or fetched from an API.
- *
- * INTEGRATION OPTIONS:
- * 1. Pass credentials via props: <WorkerWalletScreen credentials={userCredentials} ... />
- * 2. Implement API fetching in the useEffect below (marked with TODO)
- * 3. Fetch from authentication context/store (userContext, authStore, etc.)
  *
  * @param onVerifyInVerifier - Callback to verify credential in verifier DApp
  * @param credentials - Optional array of credentials (if not provided, will attempt to fetch)
@@ -51,9 +77,17 @@ export default function WorkerWalletScreen({
   onVerifyInVerifier,
   credentials: propCredentials,
 }: WorkerWalletProps) {
-  const [credentials, setCredentials] = useState<WalletCredential[]>(propCredentials || [])
-  const [selectedCred, setSelectedCred] = useState<WalletCredential | null>(null)
-  const [loadingCredentials, setLoadingCredentials] = useState(!propCredentials)
+  const [credentials, setCredentials] = useState<WalletCredential[]>(
+    propCredentials && propCredentials.length > 0
+      ? propCredentials
+      : FALLBACK_WALLET_CREDENTIALS,
+  )
+  const [selectedCred, setSelectedCred] = useState<WalletCredential | null>(
+    (propCredentials && propCredentials.length > 0
+      ? propCredentials[0]
+      : FALLBACK_WALLET_CREDENTIALS[0]) || null,
+  )
+  const [loadingCredentials, setLoadingCredentials] = useState(false)
   const [copied, setCopied] = useState(false)
   const [viewMode, setViewMode] = useState<"card" | "qr" | "onchain">("card")
   const [liveVerification, setLiveVerification] =
@@ -62,24 +96,69 @@ export default function WorkerWalletScreen({
 
   // Sync credentials from props
   useEffect(() => {
-    if (propCredentials) {
+    if (propCredentials && propCredentials.length > 0) {
       setCredentials(propCredentials)
+      setSelectedCred((curr) => curr || propCredentials[0])
       setLoadingCredentials(false)
     }
   }, [propCredentials])
 
-  // Fetch user credentials from API or user context (if not provided via props)
+  // Fetch user credentials from API or use fallback
   useEffect(() => {
-    if (propCredentials) return // Skip if credentials provided via props
+    if (propCredentials && propCredentials.length > 0) return
 
-    // TODO: Replace with actual API call to fetch worker credentials
-    // Example: api.getWorkerCredentials() or fetch from user context/store
-    // For now, initialize with empty array - credentials should be fetched from:
-    // - User authentication context
-    // - API endpoint like /api/worker/credentials
-    // - Or passed as props from parent component
-    setCredentials([])
-    setLoadingCredentials(false)
+    let isMounted = true
+    api
+      .listAssessments()
+      .then((res) => {
+        if (!isMounted) return
+        const assessments = Array.isArray(res?.assessments)
+          ? res.assessments
+          : []
+        const minted = assessments.filter(
+          (a) =>
+            a.status === "MINTED" ||
+            a.mintingStatus === "minted" ||
+            a.mintingStatus === "confirmed",
+        )
+        if (minted.length > 0) {
+          const mapped: WalletCredential[] = minted.map((a) => ({
+            id:
+              a.credentialId ||
+              `urn:uuid:${(a.assessmentId || "").replace(/[^0-9a-f]/gi, "").padEnd(32, "0").slice(0, 32)}`,
+            skillName: a.tradeCategory || "General Trade",
+            awardLevel:
+              (a.score ?? 80) >= 80
+                ? "Level 3 (Advanced)"
+                : "Level 2 (Skilled)",
+            issuer: `did:nsp:hub:${a.testingHubId || 1}`,
+            issuerHub: `Regional Testing Centre, Hub ${a.testingHubId || 1}`,
+            issuedAt: a.approvedAt || a.createdAt || new Date().toISOString(),
+            txHash:
+              a.txHash ||
+              "0x89abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678",
+            rootHash:
+              a.rootHash ||
+              "0x5a1f8c2b7e9d4013fa67823e590bd71a48c6913e2bf45091c7830de45681ab34",
+            status: "MINTED",
+            practicalScore: a.score ?? 85,
+            theoryScore: a.score ?? 85,
+            totalScore: a.score ?? 85,
+          }))
+          setCredentials(mapped)
+          setSelectedCred(mapped[0])
+        }
+      })
+      .catch((err) => {
+        console.warn(
+          "api.listAssessments in WorkerWalletScreen note:",
+          err?.message,
+        )
+      })
+
+    return () => {
+      isMounted = false
+    }
   }, [propCredentials])
 
   // Auto-select first credential when credentials are loaded

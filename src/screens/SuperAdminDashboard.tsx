@@ -2,81 +2,26 @@
 import Select from "@/components/Select"
 import { api, DashboardStats, ActiveSession } from "../services/api"
 import { superAdminApi } from "../services/superAdmin"
+import {
+  Hub,
+  MintTx,
+  DeviceHub,
+  AuditEntry,
+  FullAuditEntry,
+  HubStatus,
+  MintStatus,
+  DeviceStatus,
+  AuditCategory,
+  UserRole,
+  HUBS,
+  INIT_MINT_TXS,
+  DEVICES,
+  AUDIT_LOG,
+  FULL_AUDIT_LOG,
+} from "./superAdminData"
 
 /* ── Types ── */
 type Tab = "overview" | "hubs" | "minting" | "devices" | "sessions" | "audit"
-type MintStatus = "queued" | "minting" | "confirmed" | "failed"
-type HubStatus = "on-track" | "behind" | "critical"
-type DeviceStatus = "online" | "offline" | "degraded"
-type AuditCategory = "auth" | "approval" | "mint" | "credential" | "device" | "admin" | "assessment"
-type UserRole = "trade-tester" | "center-superintendent" | "super-admin" | "system"
-
-interface Hub {
-  id: string
-  name: string
-  enrolled: number
-  target: number
-  submitted: number
-  pendingApproval: number
-  minted: number
-  status: HubStatus
-}
-
-interface MintTx {
-  id: string
-  credId: string
-  assessId: string
-  candidate: string
-  hub: string
-  status: MintStatus
-  retryCount: number
-  failReason?: string
-  txHash?: string
-  lastUpdated: string
-  submittedAt: string
-}
-
-interface DeviceHub {
-  hubId: string
-  hubName: string
-  deviceStatus: DeviceStatus
-  connectivity: string
-  lastConnected: string
-  deviceHealth: "good" | "degraded" | "critical"
-  edrStatus: "active" | "inactive" | "warning"
-  lastSync: string
-  offlineRecords: number
-}
-
-interface AuditEntry {
-  id: string
-  action: string
-  user: string
-  hub: string
-  timestamp: string
-  result: "success" | "failure" | "warning"
-  category: AuditCategory
-  detail?: string
-}
-
-interface FullAuditEntry {
-  id: string
-  timestamp: string
-  eventType: string
-  category: AuditCategory
-  user: string
-  userRole: UserRole
-  hub: string
-  targetId?: string
-  targetType?: "credential" | "assessment" | "user" | "session" | "device"
-  ip?: string
-  device?: string
-  result: "success" | "failure" | "warning"
-  detail: string
-  metadata?: Record<string, string>
-}
-
-/* ── Static data removed - now loaded from API ── */
 
 /* ── Helpers ── */
 function hubStatusColor(s: HubStatus) {
@@ -395,90 +340,13 @@ export default function SuperAdminDashboard() {
   const [sessionRevokeSuccess, setSessionRevokeSuccess] =
     useState<string | null>(null)
 
-  useEffect(() => {
-    let isMounted = true
-    superAdminApi
-      .getDashboard()
-      .then((stats) => {
-        if (isMounted && stats) setDashStats(stats)
-      })
-      .catch((err) => {
-        console.warn("superAdminApi.getDashboard offline note:", err?.message)
-      })
+  /* ── State initialized with fallback data & updated from API ── */
+  const [hubs, setHubs] = useState<Hub[]>(HUBS)
+  const [devices, setDevices] = useState<DeviceHub[]>(DEVICES)
+  const [txs, setTxs] = useState<MintTx[]>(INIT_MINT_TXS)
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>(AUDIT_LOG)
+  const [fullAuditLog, setFullAuditLog] = useState<FullAuditEntry[]>(FULL_AUDIT_LOG)
 
-    superAdminApi
-      .getSessions()
-      .then((sessions) => {
-        if (
-          isMounted &&
-          sessions &&
-          Array.isArray(sessions) &&
-          sessions.length > 0
-        ) {
-          setActiveSessions(sessions)
-        }
-      })
-      .catch((err) => {
-        console.warn("superAdminApi.getSessions offline note:", err?.message)
-      })
-
-    // Load device health data
-    api.getDeviceHealth()
-      .then((deviceData) => {
-        if (isMounted && deviceData && Array.isArray(deviceData)) {
-          setDevices(deviceData)
-        }
-      })
-      .catch((err) => {
-        console.warn("api.getDeviceHealth offline note:", err?.message)
-      })
-
-    // Load hubs data from dashboard stats
-    superAdminApi.getDashboard()
-      .then((stats) => {
-        if (isMounted && stats) {
-          setDashStats(stats)
-          // Populate hubs from stats if available
-          if (stats.candidates && stats.assessments) {
-            const hubData: Hub[] = [
-              {
-                id: 1,
-                name: "Hub 1",
-                enrolled: stats.candidates.totalEnrolled || 0,
-                submitted: stats.assessments.submitted || 0,
-                pendingApproval: stats.assessments.approved || 0,
-                minted: stats.ledger.mintedOnChain || 0,
-                status: "on-track",
-              },
-            ]
-            setHubs(hubData)
-          }
-        }
-      })
-      .catch((err) => {
-        console.warn("superAdminApi.getDashboard offline note:", err?.message)
-      })
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  async function handleRevokeSession(sessionId: string) {
-    setRevokingSessionId(sessionId)
-    try {
-      await superAdminApi.revokeSession(sessionId)
-    } catch (err: any) {
-      console.warn("superAdminApi.revokeSession offline note:", err?.message)
-    }
-    setActiveSessions((prev) => prev.filter((s) => s.sessionId !== sessionId))
-    setRevokingSessionId(null)
-    setSessionRevokeSuccess(
-      `Session ${sessionId} successfully revoked. Token invalidation broadcast completed.`,
-    )
-    setTimeout(() => setSessionRevokeSuccess(null), 5000)
-  }
-  const [txs, setTxs] = useState<MintTx[]>([])
   const [selectedTx, setSelectedTx] = useState<MintTx | null>(null)
   const [modal, setModal] = useState<"none" | "intervene" | "mfa">("none")
   const [mfaCode, setMfaCode] = useState("")
@@ -504,11 +372,92 @@ export default function SuperAdminDashboard() {
   const [selectedAuditEntry, setSelectedAuditEntry] =
     useState<FullAuditEntry | null>(null)
 
-  /* ── State for data loaded from API ── */
-  const [hubs, setHubs] = useState<Hub[]>([])
-  const [devices, setDevices] = useState<DeviceHub[]>([])
-  const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
-  const [fullAuditLog, setFullAuditLog] = useState<FullAuditEntry[]>([])
+  useEffect(() => {
+    let isMounted = true
+    superAdminApi
+      .getDashboard()
+      .then((stats) => {
+        if (isMounted && stats) {
+          setDashStats(stats)
+          if (stats.candidates && stats.assessments) {
+            setHubs((prev) =>
+              prev.map((h, i) =>
+                i === 0
+                  ? {
+                      ...h,
+                      enrolled: stats.candidates?.totalEnrolled ?? h.enrolled,
+                      submitted: stats.assessments?.submitted ?? h.submitted,
+                      pendingApproval: stats.assessments?.approved ?? h.pendingApproval,
+                      minted: stats.ledger?.mintedOnChain ?? h.minted,
+                    }
+                  : h,
+              ),
+            )
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn("superAdminApi.getDashboard offline note:", err?.message)
+      })
+
+    superAdminApi
+      .getSessions()
+      .then((sessions) => {
+        if (
+          isMounted &&
+          sessions &&
+          Array.isArray(sessions) &&
+          sessions.length > 0
+        ) {
+          setActiveSessions(sessions)
+        }
+      })
+      .catch((err) => {
+        console.warn("superAdminApi.getSessions offline note:", err?.message)
+      })
+
+    // Load device health data
+    api.getDeviceHealth()
+      .then((res: any) => {
+        const rawDevices = Array.isArray(res) ? res : res?.devices || []
+        if (isMounted && rawDevices.length > 0) {
+          const mapped: DeviceHub[] = rawDevices.map((d: any, idx: number) => ({
+            hubId: String(d.hub_location_id || d.hubId || `HUB-${idx + 1}`),
+            hubName: d.hub_name || d.hubName || `Hub ${d.hub_location_id || idx + 1}`,
+            deviceStatus: (d.status === "active" || d.status === "online" ? "online" : d.status === "degraded" ? "degraded" : "offline") as DeviceStatus,
+            connectivity: d.connectivity || (d.is_online ? "Connected (WiFi)" : "Offline"),
+            lastConnected: d.last_sync || d.lastConnected || "Just now",
+            deviceHealth: (d.health_score > 80 ? "good" : d.health_score > 50 ? "degraded" : "critical") as "good" | "degraded" | "critical",
+            edrStatus: (d.edr_status || "active") as "active" | "inactive" | "warning",
+            lastSync: d.last_sync || d.lastSync || "Just now",
+            offlineRecords: d.pending_sync_count ?? d.offlineRecords ?? 0,
+          }))
+          setDevices(mapped)
+        }
+      })
+      .catch((err) => {
+        console.warn("api.getDeviceHealth offline note:", err?.message)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  async function handleRevokeSession(sessionId: string) {
+    setRevokingSessionId(sessionId)
+    try {
+      await superAdminApi.revokeSession(sessionId)
+    } catch (err: any) {
+      console.warn("superAdminApi.revokeSession offline note:", err?.message)
+    }
+    setActiveSessions((prev) => prev.filter((s) => s.sessionId !== sessionId))
+    setRevokingSessionId(null)
+    setSessionRevokeSuccess(
+      `Session ${sessionId} successfully revoked. Token invalidation broadcast completed.`,
+    )
+    setTimeout(() => setSessionRevokeSuccess(null), 5000)
+  }
 
   const totalEnrolled = hubs.reduce((s, h) => s + h.enrolled, 0)
   const totalSubmitted = hubs.reduce((s, h) => s + h.submitted, 0)

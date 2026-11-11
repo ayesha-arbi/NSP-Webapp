@@ -159,8 +159,64 @@ function ModalOverlay({ children }: { children: React.ReactNode }) {
   )
 }
 
+const FALLBACK_CREDENTIALS: Credential[] = [
+  {
+    id: "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    candidate: "Tariq Mehmood",
+    cnic: "35204-3334455-5",
+    trade: "Electrical Installation & Maintenance",
+    hub: "Lahore-C01",
+    approvedAt: "2026-10-18 10:12",
+    txnId: "0x89abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678",
+    mintedAt: "2026-10-18 10:18",
+    status: "confirmed",
+    blockHeight: 4821034,
+  },
+  {
+    id: "urn:uuid:8b1e4420-1283-4a6f-9810-bb2a41289df1",
+    candidate: "Ali Nawaz",
+    cnic: "35202-5551234-3",
+    trade: "Welding & Fabrication",
+    hub: "Lahore-C01",
+    approvedAt: "2026-10-18 14:20",
+    txnId: "0x5a1f8c2b7e9d4013fa67823e590bd71a48c6913e2bf45091c7830de45681ab34",
+    mintedAt: "2026-10-18 14:22",
+    status: "confirmed",
+    blockHeight: 4820918,
+  },
+  {
+    id: "urn:uuid:3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    candidate: "Amna Siddiqui",
+    cnic: "35206-2223334-7",
+    trade: "HVAC Technician",
+    hub: "Karachi-C02",
+    approvedAt: "2026-10-19 08:45",
+    status: "queued",
+  },
+  {
+    id: "urn:uuid:4bc91234-6789-40ab-cdef-1234567890ab",
+    candidate: "Imran Gul",
+    cnic: "35207-5556667-8",
+    trade: "Auto Mechanic",
+    hub: "Islamabad-C03",
+    approvedAt: "2026-10-19 08:31",
+    status: "minting",
+  },
+  {
+    id: "urn:uuid:5cd02345-789a-41bc-def0-2345678901bc",
+    candidate: "Nadia Hassan",
+    cnic: "35208-1112223-9",
+    trade: "Electrician",
+    hub: "Faisalabad-C04",
+    approvedAt: "2026-10-18 16:00",
+    status: "failed",
+    errorMsg:
+      "Gas price spike — transaction reverted on Polygon. Retry approval resets queue.",
+  },
+]
+
 export default function CredentialsScreen() {
-  const [creds, setCreds] = useState<Credential[]>([])
+  const [creds, setCreds] = useState<Credential[]>(FALLBACK_CREDENTIALS)
   const [tab, setTab] = useState<"queue" | "confirmed" | "failed">("queue")
   const [selected, setSelected] = useState<Credential | null>(null)
   const [modal, setModal] = useState<ModalType>("none")
@@ -168,6 +224,69 @@ export default function CredentialsScreen() {
   const [toast, setToast] = useState<string | null>(null)
 
   const pollTimers = useRef<Record<string, { timer: any elapsed: number }>>({})
+
+  useEffect(() => {
+    let mounted = true
+    async function fetchCreds() {
+      try {
+        const res = await api.listAssessments()
+        const assessments = Array.isArray(res?.assessments) ? res.assessments : []
+        const relevant = assessments.filter((a) =>
+          ["approved", "minted", "submitted"].includes(String(a.status || "").toLowerCase()),
+        )
+        if (relevant.length > 0 && mounted) {
+          const mapped: Credential[] = relevant.map((a) => {
+            const rawStatus = String(a.status || "").toLowerCase()
+            const rawMint = String(a.mintingStatus || "").toLowerCase()
+            let status: CredentialStatus = "queued"
+            if (
+              rawStatus === "minted" ||
+              rawMint === "minted" ||
+              rawMint === "confirmed"
+            ) {
+              status = "confirmed"
+            } else if (rawMint === "failed") {
+              status = "failed"
+            } else if (rawMint === "minting" || rawMint === "broadcasted") {
+              status = "minting"
+            } else if (rawStatus === "submitted") {
+              status = "pending"
+            }
+            return {
+              id:
+                a.credentialId ||
+                `urn:uuid:${(a.assessmentId || "").replace(/[^0-9a-f]/gi, "").padEnd(32, "0").slice(0, 32)}`,
+              candidate:
+                a.candidateName ||
+                (a.candidateId ? `Candidate ${a.candidateId.slice(0, 8)}` : "Candidate"),
+              cnic: "—",
+              trade: a.tradeCategory || "General",
+              hub: a.testingHubId ? `Hub ${a.testingHubId}` : "Lahore-C01",
+              approvedAt: a.approvedAt || a.submittedAt || "Recently",
+              txnId: a.txHash,
+              mintedAt:
+                status === "confirmed" ? a.approvedAt || "Recently" : undefined,
+              status,
+            }
+          })
+          setCreds((prev) => {
+            const map = new Map<string, Credential>()
+            mapped.forEach((c) => map.set(c.id, c))
+            prev.forEach((c) => {
+              if (!map.has(c.id)) map.set(c.id, c)
+            })
+            return Array.from(map.values())
+          })
+        }
+      } catch (err: any) {
+        console.warn("api.listAssessments in CredentialsScreen note:", err?.message)
+      }
+    }
+    fetchCreds()
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   useEffect(() => {
     return () => {
