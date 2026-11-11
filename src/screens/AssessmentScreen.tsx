@@ -6,11 +6,13 @@ import {
   CandidateRecord,
   ApiError,
   uploadAssessmentPhoto,
+  WithAssessment,
 } from "../services/api"
 
 import { enqueueAssessment } from "../services/offlineQueue"
 
 import { authStore } from "../services/authStore"
+import { assessmentStore } from "../services/assessmentStore"
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -245,12 +247,62 @@ export default function AssessmentScreen({
     loadAssessments()
   }, [])
 
+  function restoreScoresForCandidate(
+    candidateId: string,
+    assessmentId?: string,
+    serverAssessment?: Assessment | null,
+  ) {
+    const local =
+      assessmentStore.getAssessmentByCandidate(candidateId) ||
+      (assessmentId ? assessmentStore.getAssessmentById(assessmentId) : null)
+
+    if (
+      local?.criteria &&
+      Array.isArray(local.criteria) &&
+      local.criteria.length > 0
+    ) {
+      setCriteria(
+        CRITERIA.map((cr) => {
+          const match = local.criteria!.find((lc) => lc.id === cr.id)
+          return match ? { ...cr, score: String(match.score ?? "") } : { ...cr }
+        }),
+      )
+      return
+    }
+
+    if (serverAssessment && serverAssessment.score > 0) {
+      setCriteria(distributeScoreToCriteria(serverAssessment.score))
+      return
+    }
+
+    setCriteria(CRITERIA.map((cr) => ({ ...cr })))
+  }
+
   async function loadAssessments() {
+    let loadedAssessments: Assessment[] = []
     try {
       const res = await api.listAssessments()
 
       if (res.success && res.assessments) {
+        loadedAssessments = res.assessments
         setAssessmentsList(res.assessments)
+
+        for (const a of res.assessments) {
+          assessmentStore.saveAssessmentLocal({
+            candidateId: a.candidateId,
+            candidateName: a.candidateName,
+            tradeCategory: a.tradeCategory,
+            testingHubId: a.testingHubId,
+            assessmentId: a.assessmentId,
+            score: a.score,
+            grade: a.grade,
+            status: a.status,
+            credentialId: a.credentialId,
+            rootHash: a.rootHash,
+            submittedAt: a.submittedAt,
+            updatedAt: a.createdAt || new Date().toISOString(),
+          })
+        }
       }
     } catch {
       // Backend not running or no assessments yet, keep empty/mock list
@@ -276,6 +328,22 @@ export default function AssessmentScreen({
       }
     } catch {
       // Ignore
+    }
+
+    // Hydrate existing assessment & scores for selected candidate if present
+    if (selected) {
+      const existing = loadedAssessments.find(
+        (a) =>
+          a.candidateId === selected.id ||
+          String(a.candidateId) === String(selected.id),
+      )
+      if (existing) {
+        setCurrentAssessment(existing)
+        loadMedia(existing.assessmentId)
+        restoreScoresForCandidate(selected.id, existing.assessmentId, existing)
+      } else {
+        restoreScoresForCandidate(selected.id)
+      }
     }
   }
 
@@ -323,8 +391,8 @@ export default function AssessmentScreen({
   const grade = getGrade(pct)
 
   function updateScore(id: number, val: string) {
-    setCriteria((cs) =>
-      cs.map((c) => {
+    setCriteria((cs) => {
+      const updated = cs.map((c) => {
         if (c.id !== id) return c
 
         const n = parseInt(val)
@@ -334,8 +402,32 @@ export default function AssessmentScreen({
         if (!isNaN(n) && n >= 0 && n <= c.max) return { ...c, score: val }
 
         return c
-      }),
-    )
+      })
+
+      if (selected) {
+        const newTotal = updated.reduce(
+          (s, c) => s + (parseInt(c.score) || 0),
+          0,
+        )
+        const newMax = updated.reduce((s, c) => s + c.max, 0)
+        const newPct = newMax > 0 ? Math.round((newTotal / newMax) * 100) : 0
+        const newGrade = getGrade(newPct)
+
+        assessmentStore.saveAssessmentLocal({
+          candidateId: selected.id,
+          candidateName: selected.name,
+          tradeCategory: selected.trade,
+          assessmentId: currentAssessment?.assessmentId,
+          criteria: updated,
+          score: newTotal,
+          grade: newGrade.code,
+          status: currentAssessment?.status || "DRAFT",
+          updatedAt: new Date().toISOString(),
+        })
+      }
+
+      return updated
+    })
   }
 
   async function loadMedia(assessmentId: string) {
@@ -363,24 +455,37 @@ export default function AssessmentScreen({
 
     setAttachments([])
 
-    const existing = assessmentsList.find((a) => a.candidateId === c.id)
+    const existing =
+      assessmentsList.find(
+        (a) =>
+          a.candidateId === c.id || String(a.candidateId) === String(c.id),
+      ) || null
 
     if (existing) {
       setCurrentAssessment(existing)
 
       loadMedia(existing.assessmentId)
-
-      // Restore criteria scores from existing assessment if available
-      if (existing.score && existing.score > 0) {
-        setCriteria(distributeScoreToCriteria(existing.score))
-      } else {
-        setCriteria(CRITERIA.map((cr) => ({ ...cr })))
-      }
     } else {
-      setCurrentAssessment(null)
-
-      setCriteria(CRITERIA.map((cr) => ({ ...cr })))
+      const local = assessmentStore.getAssessmentByCandidate(c.id)
+      if (local?.assessmentId && !local.assessmentId.startsWith("ASM-TEMP")) {
+        setCurrentAssessment({
+          assessmentId: local.assessmentId,
+          candidateId: c.id,
+          candidateName: c.name,
+          tradeCategory: c.trade,
+          score: local.score,
+          grade: local.grade,
+          status: (local.status as any) || "DRAFT",
+          credentialId: local.credentialId,
+          rootHash: local.rootHash,
+          createdAt: local.updatedAt || new Date().toISOString(),
+        })
+      } else {
+        setCurrentAssessment(null)
+      }
     }
+
+    restoreScoresForCandidate(c.id, existing?.assessmentId, existing)
   }
 
   function describeError(err: any) {
@@ -401,21 +506,109 @@ export default function AssessmentScreen({
   // Creates the draft if it doesn't exist yet (idempotent via clientRequestId).
 
   async function ensureAssessment(): Promise<Assessment> {
-    if (currentAssessment) return currentAssessment
+    if (
+      currentAssessment &&
+      currentAssessment.assessmentId &&
+      !currentAssessment.assessmentId.startsWith("ASM-TEMP")
+    ) {
+      return currentAssessment
+    }
 
-    const res = await api.createAssessment({
-      candidateId: selected!.id,
+    const existingFromList = assessmentsList.find(
+      (a) =>
+        a.candidateId === selected!.id ||
+        String(a.candidateId) === String(selected!.id),
+    )
+    if (existingFromList && existingFromList.assessmentId) {
+      setCurrentAssessment(existingFromList)
+      return existingFromList
+    }
 
-      score: totalScore,
+    const fromStore = assessmentStore.getAssessmentByCandidate(selected!.id)
+    if (
+      fromStore?.assessmentId &&
+      !fromStore.assessmentId.startsWith("ASM-TEMP")
+    ) {
+      try {
+        const serverRecord = await api.getAssessment(fromStore.assessmentId)
+        if (serverRecord?.assessment) {
+          setCurrentAssessment(serverRecord.assessment)
+          return serverRecord.assessment
+        }
+      } catch {}
+    }
 
-      grade: grade.code,
+    try {
+      const res = await api.createAssessment({
+        candidateId: selected!.id,
 
-      clientRequestId: getRequestId(selected!.id),
-    })
+        score: totalScore,
 
-    setCurrentAssessment(res.assessment)
+        grade: grade.code,
 
-    return res.assessment
+        clientRequestId: getRequestId(selected!.id),
+      })
+
+      if (res?.assessment) {
+        setCurrentAssessment(res.assessment)
+        assessmentStore.saveAssessmentLocal({
+          candidateId: selected!.id,
+          candidateName: selected!.name,
+          tradeCategory: selected!.trade,
+          assessmentId: res.assessment.assessmentId,
+          criteria,
+          score: totalScore,
+          grade: grade.code,
+          status: res.assessment.status || "DRAFT",
+          updatedAt: new Date().toISOString(),
+        })
+        return res.assessment
+      }
+    } catch (err: any) {
+      // 409 Conflict: Assessment already exists on server, fetch existing record
+      if (err instanceof ApiError && err.status === 409) {
+        const payload =
+          err.data?.assessment || err.data?.data?.assessment || err.data
+        const existingId =
+          payload?.assessmentId || payload?.assessment_id || payload?.id
+
+        if (existingId) {
+          try {
+            const getRes = await api.getAssessment(existingId)
+            if (getRes?.assessment) {
+              setCurrentAssessment(getRes.assessment)
+              return getRes.assessment
+            }
+          } catch {}
+          const fallback: Assessment = {
+            assessmentId: existingId,
+            candidateId: selected!.id,
+            score: totalScore,
+            grade: grade.code,
+            status: "DRAFT",
+            createdAt: new Date().toISOString(),
+          }
+          setCurrentAssessment(fallback)
+          return fallback
+        }
+
+        try {
+          const listRes = await api.listAssessments()
+          const match = listRes.assessments?.find(
+            (a) =>
+              a.candidateId === selected!.id ||
+              String(a.candidateId) === String(selected!.id),
+          )
+          if (match) {
+            setCurrentAssessment(match)
+            return match
+          }
+        } catch {}
+      }
+      throw err
+    }
+
+    throw new Error("Unable to establish assessment session.")
   }
 
   async function handleSaveDraft() {
@@ -426,45 +619,66 @@ export default function AssessmentScreen({
     setFeedbackMsg(null)
 
     try {
-      if (currentAssessment) {
-        const res = await api.updateAssessment(currentAssessment.assessmentId, {
+      let activeAssessment: Assessment | null = currentAssessment
+      if (!activeAssessment) {
+        try {
+          activeAssessment = await ensureAssessment()
+        } catch (ensureErr) {
+          if (ensureErr instanceof ApiError && ensureErr.status === 0) {
+            await enqueueAssessment(
+              { candidateId: selected.id, score: totalScore, grade: grade.code },
+              getRequestId(selected.id),
+            )
+            assessmentStore.saveAssessmentLocal({
+              candidateId: selected.id,
+              candidateName: selected.name,
+              tradeCategory: selected.trade,
+              criteria,
+              score: totalScore,
+              grade: grade.code,
+              status: "DRAFT",
+              updatedAt: new Date().toISOString(),
+            })
+            setFeedbackMsg({
+              text: "You are offline. Saved on this device and will sync automatically.",
+              type: "success",
+            })
+            return
+          }
+          throw ensureErr
+        }
+      }
+
+      if (activeAssessment && activeAssessment.assessmentId) {
+        const res = await api.updateAssessment(activeAssessment.assessmentId, {
           score: totalScore,
 
           grade: grade.code,
         })
 
-        setCurrentAssessment(
-          res.assessment ?? {
-            ...currentAssessment,
+        const updated = res.assessment ?? {
+          ...activeAssessment,
 
-            score: totalScore,
+          score: totalScore,
 
-            grade: grade.code,
-          },
-        )
+          grade: grade.code,
+        }
+
+        setCurrentAssessment(updated)
+        assessmentStore.saveAssessmentLocal({
+          candidateId: selected.id,
+          candidateName: selected.name,
+          tradeCategory: selected.trade,
+          assessmentId: updated.assessmentId,
+          criteria,
+          score: totalScore,
+          grade: grade.code,
+          status: updated.status || "DRAFT",
+          updatedAt: new Date().toISOString(),
+        })
 
         setFeedbackMsg({
           text: "Draft assessment updated successfully.",
-
-          type: "success",
-        })
-      } else {
-        const res = await api.createAssessment({
-          candidateId: selected.id,
-
-          score: totalScore,
-
-          grade: grade.code,
-
-          clientRequestId: getRequestId(selected.id),
-        })
-
-        setCurrentAssessment(res.assessment)
-
-        setFeedbackMsg({
-          text: res.replayed
-            ? "This draft was already saved."
-            : "Draft assessment saved successfully.",
 
           type: "success",
         })
@@ -509,17 +723,11 @@ export default function AssessmentScreen({
     }
 
     // Prevent duplicate submission if already submitted
-    if (currentAssessment && currentAssessment.status === "PENDING_APPROVAL") {
-      setFeedbackMsg({
-        text: "This assessment has already been submitted and is pending approval.",
-        type: "error",
-      })
-      setShowSubmitModal(false)
-      setIsProcessing(false)
-      return
-    }
-
-    if (currentAssessment && currentAssessment.status === "SUBMITTED") {
+    if (
+      currentAssessment &&
+      (currentAssessment.status === "PENDING_APPROVAL" ||
+        currentAssessment.status === "SUBMITTED")
+    ) {
       setFeedbackMsg({
         text: "This assessment has already been submitted and is pending approval.",
         type: "error",
@@ -538,17 +746,80 @@ export default function AssessmentScreen({
     try {
       const a = await ensureAssessment()
 
+      const currentScore = totalScore > 0 ? totalScore : a.score || 0
+      const currentGrade = totalScore > 0 ? grade.code : a.grade || "F"
+
       // Make sure the server has the scores currently on screen before submitting.
-
-      if (currentAssessment) {
+      try {
         await api.updateAssessment(a.assessmentId, {
-          score: totalScore,
-
-          grade: grade.code,
+          score: currentScore,
+          grade: currentGrade,
         })
+      } catch (updateErr) {
+        console.warn("Update before submit note:", updateErr)
       }
 
-      const res = await api.submitAssessment(a.assessmentId).catch(() => null)
+      // Submit assessment: DO NOT silently catch errors with .catch(() => null)!
+      let submitRes: WithAssessment | null = null
+      try {
+        submitRes = await api.submitAssessment(a.assessmentId)
+      } catch (submitErr: any) {
+        if (submitErr instanceof ApiError && submitErr.status === 409) {
+          // 409 Conflict: Fetch the existing record
+          let existingRecord: Assessment | null = null
+          try {
+            const getRes = await api.getAssessment(a.assessmentId)
+            if (getRes?.assessment) existingRecord = getRes.assessment
+          } catch {
+            const listRes = await api.listAssessments().catch(() => null)
+            existingRecord =
+              listRes?.assessments?.find(
+                (item) => item.assessmentId === a.assessmentId,
+              ) || null
+          }
+
+          if (
+            existingRecord &&
+            (existingRecord.status === "SUBMITTED" ||
+              existingRecord.status === "PENDING_APPROVAL" ||
+              existingRecord.status === "APPROVED")
+          ) {
+            setCurrentAssessment(existingRecord)
+            assessmentStore.saveAssessmentLocal({
+              candidateId: selected.id,
+              candidateName: selected.name,
+              tradeCategory: selected.trade,
+              assessmentId: existingRecord.assessmentId,
+              criteria,
+              score: currentScore,
+              grade: currentGrade,
+              status: existingRecord.status,
+              submittedAt:
+                existingRecord.submittedAt || new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            })
+            setFeedbackMsg({
+              text: "Assessment was already submitted and is pending Center Superintendent approval.",
+              type: "success",
+            })
+            await loadAssessments()
+            return
+          } else {
+            // Actual 409 error: show to user
+            setFeedbackMsg({
+              text:
+                submitErr.message ||
+                "Conflict: This assessment cannot be submitted in its current state.",
+              type: "error",
+            })
+            return
+          }
+        }
+
+        // Any other error: show to user instead of silently pretending success!
+        setFeedbackMsg({ text: describeError(submitErr), type: "error" })
+        return
+      }
 
       // Guide #6 §2: End-to-End Assessment to Blockchain Issuance
 
@@ -558,7 +829,7 @@ export default function AssessmentScreen({
 
       let rootHash: string | null | undefined = a.rootHash
 
-      if (totalScore >= 60) {
+      if (currentScore >= 60) {
         const user = authStore.getState().user
 
         const hubLocationId = user?.hubLocationId ?? 1
@@ -606,39 +877,38 @@ export default function AssessmentScreen({
         }
       }
 
-      setCurrentAssessment(
-        res?.assessment
-          ? {
-              ...res.assessment,
+      const submittedAssessment: Assessment = {
+        ...(submitRes?.assessment || a),
+        score: currentScore,
+        grade: currentGrade,
+        status: "PENDING_APPROVAL",
+        credentialId,
+        rootHash,
+        submittedAt: new Date().toISOString(),
+      }
 
-              score: totalScore,
+      setCurrentAssessment(submittedAssessment)
 
-              grade: grade.code,
-
-              status: "PENDING_APPROVAL",
-
-              credentialId,
-
-              rootHash,
-            }
-          : {
-              ...a,
-
-              score: totalScore,
-
-              grade: grade.code,
-
-              status: "PENDING_APPROVAL",
-
-              credentialId,
-
-              rootHash,
-            },
-      )
+      // Persist submitted assessment so it survives screen transitions & reloads
+      assessmentStore.saveAssessmentLocal({
+        candidateId: selected.id,
+        candidateName: selected.name,
+        tradeCategory: selected.trade,
+        assessmentId: a.assessmentId,
+        criteria,
+        score: currentScore,
+        grade: currentGrade,
+        status: "PENDING_APPROVAL",
+        credentialId,
+        rootHash,
+        submittedAt: submittedAssessment.submittedAt,
+        updatedAt: new Date().toISOString(),
+      })
 
       setFeedbackMsg({
-        text: `Credential issued (${credentialId}) and stored pending Center Superintendent approval.`,
-
+        text: credentialId
+          ? `Credential issued (${credentialId}) and stored pending Center Superintendent approval.`
+          : "Assessment submitted successfully and pending Center Superintendent approval.",
         type: "success",
       })
 

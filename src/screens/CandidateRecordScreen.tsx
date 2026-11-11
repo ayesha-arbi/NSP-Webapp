@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { api } from "../services/api"
 import { getHubLabel } from "../constants/hubs"
+import { assessmentStore } from "../services/assessmentStore"
 
 export type RecordStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "MINTED"
 export type CredentialStatus = "Valid" | "Revoked"
@@ -521,8 +522,14 @@ export default function CandidateRecordScreen({
       let assessment: any = null
       try {
         const assessmentsRes = await api.listAssessments()
-        assessment = assessmentsRes.assessments?.find((a) => a.candidateId === cId)
+        assessment = assessmentsRes.assessments?.find(
+          (a) => a.candidateId === cId || String(a.candidateId) === String(cId),
+        )
       } catch {}
+
+      if (!assessment) {
+        assessment = assessmentStore.getAssessmentByCandidate(cId)
+      }
 
       const transformedData: RecordData = {
         candidate: {

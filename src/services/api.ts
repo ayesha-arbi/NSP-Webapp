@@ -727,7 +727,10 @@ export function normalizeAssessment(r: any): Assessment {
 
     testingHubId: pick(r, "testingHubId", "testing_hub_id", "hubId", "hub_id"),
 
-    score: Number(r?.score ?? r?.totalScore ?? r?.total_score ?? 0),
+    score: (() => {
+      const val = r?.score ?? r?.totalScore ?? r?.total_score
+      return val != null && !isNaN(Number(val)) ? Number(val) : 0
+    })(),
 
     grade: r?.grade ?? r?.gradeCode ?? "",
 
@@ -792,25 +795,47 @@ function normalizeCandidate(
   }
 }
 
-type WithAssessment = {
+export type WithAssessment = {
   success: boolean
-  message: string
+  message?: string
   assessment: Assessment
 }
 
-const one = (r: any): WithAssessment => ({
-  ...r,
+const one = (r: any): WithAssessment => {
+  const root =
+    r?.assessment ||
+    r?.data?.assessment ||
+    (r?.assessmentId || r?.assessment_id ? r : undefined) ||
+    r?.data ||
+    r
+  return {
+    ...r,
+    success: r?.success ?? true,
+    assessment:
+      root && (root.assessmentId || root.assessment_id || root.id)
+        ? normalizeAssessment(root)
+        : r?.assessment
+          ? normalizeAssessment(r.assessment)
+          : (undefined as any),
+  }
+}
 
-  assessment: r?.assessment
-    ? normalizeAssessment(r.assessment)
-    : undefined as any,
-})
-
-const many = (r: any): { success: boolean; assessments: Assessment[] } => ({
-  ...r,
-
-  assessments: (r?.assessments ?? []).map(normalizeAssessment),
-})
+const many = (r: any): { success: boolean; assessments: Assessment[] } => {
+  const list = Array.isArray(r)
+    ? r
+    : Array.isArray(r?.assessments)
+      ? r.assessments
+      : Array.isArray(r?.data?.assessments)
+        ? r.data.assessments
+        : Array.isArray(r?.data)
+          ? r.data
+          : []
+  return {
+    ...r,
+    success: r?.success ?? true,
+    assessments: list.map(normalizeAssessment),
+  }
+}
 
 export const api = {
   // Generic HTTP methods

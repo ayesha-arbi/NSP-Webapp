@@ -6,6 +6,7 @@ import StepUpModal from "@/components/StepUpModal"
 import { api, ApiError, Assessment } from "../services/api"
 
 import { authStore } from "../services/authStore"
+import { assessmentStore } from "../services/assessmentStore"
 
 const Icons = {
   Check: ({ size = 24, strokeWidth = 2, color = "currentColor" }) => (
@@ -176,12 +177,22 @@ function toSubmission(a: Assessment): Submission {
     else if (raw === "failed") mStatus = "failed"
   }
 
+  const rawStatus = (a.status || "").toUpperCase()
+  const approvalStatus: ApprovalStatus =
+    rawStatus === "APPROVED" || rawStatus === "MINTED"
+      ? "approved"
+      : rawStatus === "REJECTED"
+        ? "rejected"
+        : "submitted"
+
   return {
     id: a.assessmentId,
 
-    candidate: a.candidateName || (a.candidateId ? `Candidate ${a.candidateId.slice(0, 8)}` : "Candidate"),
+    candidate:
+      a.candidateName ||
+      (a.candidateId ? `Candidate ${a.candidateId.slice(0, 8)}` : "Candidate"),
 
-    cnic: "—",
+    cnic: (a as any).cnic || "—",
 
     trade: a.tradeCategory || "—",
 
@@ -191,18 +202,17 @@ function toSubmission(a: Assessment): Submission {
 
     submittedAt: a.submittedAt
       ? a.submittedAt.slice(0, 16).replace("T", " ")
-      : "—",
+      : a.createdAt
+        ? a.createdAt.slice(0, 16).replace("T", " ")
+        : "—",
 
-    score: a.score,
+    score: Number(a.score) || 0,
 
     maxScore: 100, // criteria in AssessmentScreen sum to 100
 
-    grade: a.grade,
+    grade: a.grade || "—",
 
-    status:
-      a.status === "APPROVED" || a.status === "MINTED"
-        ? "approved"
-        : "submitted",
+    status: approvalStatus,
 
     credentialId: credId,
 
@@ -661,15 +671,96 @@ export default function ApprovalsScreen() {
     setLoadError("")
 
     try {
-      const res = await api.getQueue()
+      let queueAssessments: Assessment[] = []
 
-      const newItems = (Array.isArray(res?.assessments) ? res.assessments : []).map(toSubmission)
+      // 1. Fetch from server queue endpoint
+      try {
+        const res = await api.getQueue()
+        if (res && Array.isArray(res.assessments)) {
+          queueAssessments = res.assessments
+        }
+      } catch (queueErr) {
+        console.warn("Queue fetch note:", queueErr)
+      }
+
+      // 2. Also check listAssessments for submitted/pending assessments
+      try {
+        const listRes = await api.listAssessments()
+        if (listRes && Array.isArray(listRes.assessments)) {
+          for (const a of listRes.assessments) {
+            const st = (a.status || "").toUpperCase()
+            if (
+              st === "SUBMITTED" ||
+              st === "PENDING_APPROVAL" ||
+              st === "IN_REVIEW"
+            ) {
+              if (
+                !queueAssessments.some(
+                  (q) => q.assessmentId === a.assessmentId,
+                )
+              ) {
+                queueAssessments.push(a)
+              }
+            }
+          }
+        }
+      } catch (listErr) {
+        console.warn("List assessments fetch note:", listErr)
+      }
+
+      // 3. Include any locally saved submitted assessments from assessmentStore
+      const localSubmitted = assessmentStore.getSubmittedAssessments()
+      for (const item of localSubmitted) {
+        if (
+          item.assessmentId &&
+          !queueAssessments.some((q) => q.assessmentId === item.assessmentId)
+        ) {
+          queueAssessments.push({
+            assessmentId: item.assessmentId,
+            candidateId: item.candidateId,
+            candidateName: item.candidateName,
+            tradeCategory: item.tradeCategory,
+            testingHubId: item.testingHubId,
+            score: item.score,
+            grade: item.grade,
+            status: (item.status as any) || "PENDING_APPROVAL",
+            credentialId: item.credentialId,
+            rootHash: item.rootHash,
+            submittedAt: item.submittedAt,
+            createdAt: item.updatedAt || new Date().toISOString(),
+          })
+        }
+      }
+
+      // 4. Enrich with candidate details (CNIC, trade, full name)
+      try {
+        const candidates = await api.listCandidates()
+        if (Array.isArray(candidates) && candidates.length > 0) {
+          const cMap = new Map(candidates.map((c) => [c.id, c]))
+          queueAssessments = queueAssessments.map((a) => {
+            const cand = cMap.get(a.candidateId)
+            return {
+              ...a,
+              candidateName: a.candidateName || cand?.fullName,
+              tradeCategory:
+                a.tradeCategory || cand?.tradeCategory || (cand as any)?.trade,
+              cnic: (a as any).cnic || cand?.cnic,
+              testingHubId:
+                a.testingHubId ?? (cand as any)?.testingHubId ?? cand?.hubLocationId,
+            }
+          })
+        }
+      } catch {}
+
+      const mapped = queueAssessments.map(toSubmission)
 
       // Keep items actioned in this session so the Approved/Rejected tabs still show them
       setSubmissions((prev) => {
-        const newIds = new Set(newItems.map((item) => item.id))
-        const preserved = prev.filter((p) => !newIds.has(p.id) && p.status !== "submitted")
-        return [...newItems, ...preserved]
+        const newIds = new Set(mapped.map((item) => item.id))
+        const preserved = prev.filter(
+          (p) => !newIds.has(p.id) && p.status !== "submitted",
+        )
+        return [...mapped, ...preserved]
       })
     } catch (err: any) {
       setLoadError(

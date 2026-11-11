@@ -3,6 +3,7 @@ import SuperAdminDashboard from "./SuperAdminDashboard"
 import { authStore } from "../services/authStore"
 import { api } from "../services/api"
 import { superAdminApi } from "../services/superAdmin"
+import { assessmentStore } from "../services/assessmentStore"
 import { useState, useEffect } from "react"
 
 type Role = "trade-tester" | "center-superintendent" | "super-admin"
@@ -279,14 +280,46 @@ function TradeTesterDashboard({
 
         if (mounted) {
           const list = candidates.length > 0
-            ? candidates.map((c: any) => ({
-                id: c.id,
-                name: c.fullName || "Candidate",
-                cnic: c.cnic || "—",
-                trade: c.tradeCategory || c.trade || "—",
-                hub: c.hub || `Hub #${hubId}`,
-                status: "enrolled",
-              }))
+            ? candidates.map((c: any) => {
+                const match =
+                  assessments.find(
+                    (a: any) =>
+                      a.candidateId === c.id ||
+                      String(a.candidateId) === String(c.id),
+                  ) || assessmentStore.getAssessmentByCandidate(c.id)
+
+                let status:
+                  | "draft"
+                  | "in-progress"
+                  | "in-review"
+                  | "completed"
+                  | "failed" = "draft"
+
+                if (match?.status) {
+                  const s = String(match.status).toLowerCase()
+                  if (s === "pending_approval" || s === "submitted")
+                    status = "in-review"
+                  else if (s === "approved" || s === "minted")
+                    status = "completed"
+                  else if (s === "rejected") status = "failed"
+                  else if (s === "draft")
+                    status =
+                      match.score && match.score > 0 ? "in-progress" : "draft"
+                } else if (match?.score && match.score > 0) {
+                  status = "in-progress"
+                }
+
+                return {
+                  id: c.id,
+                  name: c.fullName || "Candidate",
+                  cnic: c.cnic || "—",
+                  trade: c.tradeCategory || c.trade || "—",
+                  hub: c.hub || `Hub #${hubId}`,
+                  status,
+                  grade: match?.grade,
+                  score: match?.score,
+                }
+              })
             : assessments.slice(0, 5)
 
           setRecentCandidates(list.slice(0, 5))
@@ -643,7 +676,23 @@ function TradeTesterDashboard({
                     {c.hub || `Hub #${hubId}`}
                   </td>
                   <td style={{ padding: "12px 24px" }}>
-                    <StatusPill status={c.status || "draft"} />
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <StatusPill status={c.status || "draft"} />
+                      {c.grade && c.grade !== "Pending" && (
+                        <span
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            background: "#E4E2D9",
+                            color: "#4C7A6E",
+                          }}
+                        >
+                          Grade: {c.grade}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td style={{ padding: "12px 24px" }}>
                     <button
