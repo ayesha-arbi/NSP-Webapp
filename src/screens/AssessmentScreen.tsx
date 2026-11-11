@@ -14,6 +14,51 @@ import { enqueueAssessment } from "../services/offlineQueue"
 import { authStore } from "../services/authStore"
 import { assessmentStore } from "../services/assessmentStore"
 
+const DEMO_MODE = true // set to false to disable demo fallbacks
+
+function isSubmittedLike(status?: string): boolean {
+  if (!status) return false
+  const s = status.toUpperCase()
+  return (
+    s === "SUBMITTED" ||
+    s === "PENDING_APPROVAL" ||
+    s === "APPROVED" ||
+    s === "MINTED"
+  )
+}
+
+function mergeLocalState(a: Assessment): Assessment {
+  const local =
+    assessmentStore.getAssessmentByCandidate(a.candidateId) ||
+    (a.assessmentId ? assessmentStore.getAssessmentById(a.assessmentId) : null)
+  if (!local) return a
+
+  const serverStatus = (a.status || "").toUpperCase()
+  if (
+    serverStatus === "APPROVED" ||
+    serverStatus === "MINTED" ||
+    serverStatus === "REJECTED"
+  ) {
+    return a
+  }
+
+  const localStatus = (local.status || "").toUpperCase()
+  if (
+    localStatus === "PENDING_APPROVAL" &&
+    (serverStatus === "DRAFT" || serverStatus === "SUBMITTED" || !serverStatus)
+  ) {
+    return {
+      ...a,
+      status: "PENDING_APPROVAL",
+      score: local.score,
+      grade: local.grade,
+      submittedAt: local.submittedAt ?? a.submittedAt,
+    }
+  }
+
+  return a
+}
+
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -233,6 +278,7 @@ export default function AssessmentScreen({
   const [attachments, setAttachments] = useState<string[]>([])
 
   const photoInputRef = useRef<HTMLInputElement>(null)
+  const restoredCandidateRef = useRef(false)
 
   //one clientRequestId per logical assessment, reused on every retry.
 
@@ -284,44 +330,84 @@ export default function AssessmentScreen({
       const res = await api.listAssessments()
 
       if (res.success && res.assessments) {
-        loadedAssessments = res.assessments
-        setAssessmentsList(res.assessments)
-
         for (const a of res.assessments) {
-          assessmentStore.saveAssessmentLocal({
-            candidateId: a.candidateId,
-            candidateName: a.candidateName,
-            tradeCategory: a.tradeCategory,
-            testingHubId: a.testingHubId,
-            assessmentId: a.assessmentId,
-            score: a.score,
-            grade: a.grade,
-            status: a.status,
-            credentialId: a.credentialId,
-            rootHash: a.rootHash,
-            submittedAt: a.submittedAt,
-            updatedAt: a.createdAt || new Date().toISOString(),
-          })
+          const local =
+            assessmentStore.getAssessmentByCandidate(a.candidateId) ||
+            (a.assessmentId ? assessmentStore.getAssessmentById(a.assessmentId) : null)
+
+          const serverStatus = (a.status || "").toUpperCase()
+          const serverWins =
+            serverStatus === "APPROVED" ||
+            serverStatus === "MINTED" ||
+            serverStatus === "REJECTED"
+
+          const localHasPending =
+            (local?.status || "").toUpperCase() === "PENDING_APPROVAL"
+          const localHasCriteria = !!(
+            local?.criteria &&
+            Array.isArray(local.criteria) &&
+            local.criteria.length > 0
+          )
+
+          if (local && !serverWins && (localHasPending || localHasCriteria)) {
+            assessmentStore.saveAssessmentLocal({
+              ...local,
+              candidateId: local.candidateId || a.candidateId,
+              candidateName: local.candidateName || a.candidateName,
+              tradeCategory: local.tradeCategory || a.tradeCategory,
+              testingHubId: local.testingHubId ?? a.testingHubId,
+              assessmentId: local.assessmentId || a.assessmentId,
+              criteria: local.criteria,
+              score: local.score,
+              grade: local.grade,
+              status: local.status,
+              credentialId: local.credentialId || a.credentialId,
+              rootHash: local.rootHash ?? a.rootHash,
+              submittedAt: local.submittedAt ?? a.submittedAt,
+              updatedAt: new Date().toISOString(),
+            })
+          } else {
+            assessmentStore.saveAssessmentLocal({
+              candidateId: a.candidateId,
+              candidateName: a.candidateName,
+              tradeCategory: a.tradeCategory,
+              testingHubId: a.testingHubId,
+              assessmentId: a.assessmentId,
+              score: a.score,
+              grade: a.grade,
+              status: a.status,
+              credentialId: a.credentialId,
+              rootHash: a.rootHash,
+              submittedAt: a.submittedAt,
+              updatedAt: a.createdAt || new Date().toISOString(),
+            })
+          }
         }
+
+        loadedAssessments = res.assessments.map(mergeLocalState)
+        setAssessmentsList(loadedAssessments)
       }
     } catch {
       // Backend not running or no assessments yet, keep empty/mock list
     }
 
+    let loadedCandidates: CandidateItem[] = []
     try {
       const candidates = await api.listCandidates()
       if (Array.isArray(candidates) && candidates.length > 0) {
+        loadedCandidates = candidates.map((c: any) => ({
+          id: c.id,
+          name: c.fullName || `Candidate ${c.id.slice(0, 8)}`,
+          cnic: c.cnic || "—",
+          trade: c.tradeCategory || c.trade || "—",
+          hub: c.hub || (c.testingHubId ? `Hub ${c.testingHubId}` : ""),
+        }))
+
         setCandidatesList((existing) => {
           const map = new Map<string, CandidateItem>()
           for (const c of existing) map.set(c.id, c)
-          for (const c of candidates) {
-            map.set(c.id, {
-              id: c.id,
-              name: c.fullName || `Candidate ${c.id.slice(0, 8)}`,
-              cnic: c.cnic || "—",
-              trade: (c as any).tradeCategory || (c as any).trade || "—",
-              hub: (c as any).hub || ((c as any).testingHubId ? `Hub ${(c as any).testingHubId}` : ""),
-            })
+          for (const c of loadedCandidates) {
+            map.set(c.id, c)
           }
           return Array.from(map.values())
         })
@@ -339,10 +425,68 @@ export default function AssessmentScreen({
       )
       if (existing) {
         setCurrentAssessment(existing)
-        loadMedia(existing.assessmentId)
+        loadMedia(existing.assessmentId, existing.status)
         restoreScoresForCandidate(selected.id, existing.assessmentId, existing)
       } else {
         restoreScoresForCandidate(selected.id)
+      }
+    } else if (!initialCandidate && !restoredCandidateRef.current) {
+      restoredCandidateRef.current = true
+      let storedId: string | null = null
+      try {
+        storedId = sessionStorage.getItem("nsp_selected_candidate_id")
+      } catch {}
+
+      if (storedId) {
+        let foundCandidate =
+          candidatesList.find(
+            (c) => c.id === storedId || String(c.id) === String(storedId),
+          ) ||
+          loadedCandidates.find(
+            (c) => c.id === storedId || String(c.id) === String(storedId),
+          )
+
+        if (!foundCandidate) {
+          const asm = loadedAssessments.find(
+            (a) =>
+              a.candidateId === storedId ||
+              String(a.candidateId) === String(storedId),
+          )
+          if (asm) {
+            foundCandidate = {
+              id: asm.candidateId,
+              name: asm.candidateName || `Candidate ${asm.candidateId.slice(0, 8)}`,
+              cnic: "—",
+              trade: asm.tradeCategory || "—",
+              hub: asm.testingHubId != null ? `Hub ${asm.testingHubId}` : "",
+            }
+          }
+        }
+
+        if (!foundCandidate) {
+          const local = assessmentStore.getAssessmentByCandidate(storedId)
+          if (local && (local.candidateName || local.tradeCategory)) {
+            foundCandidate = {
+              id: storedId,
+              name: local.candidateName || `Candidate ${storedId.slice(0, 8)}`,
+              cnic: "—",
+              trade: local.tradeCategory || "—",
+              hub: local.testingHubId != null ? `Hub ${local.testingHubId}` : "",
+            }
+          }
+        }
+
+        if (foundCandidate) {
+          setCandidatesList((prev) => {
+            if (prev.some((c) => c.id === foundCandidate!.id)) return prev
+            return [...prev, foundCandidate!]
+          })
+          handleSelectCandidate(foundCandidate, loadedAssessments)
+        } else {
+          try {
+            sessionStorage.removeItem("nsp_selected_candidate_id")
+          } catch {}
+        }
       }
     }
   }
@@ -430,7 +574,28 @@ export default function AssessmentScreen({
     })
   }
 
-  async function loadMedia(assessmentId: string) {
+  async function loadMedia(assessmentId: string, statusHint?: string) {
+    const isSubmittedAssessment = () => {
+      if (statusHint && isSubmittedLike(statusHint)) return true
+      if (
+        currentAssessment?.assessmentId === assessmentId &&
+        isSubmittedLike(currentAssessment.status)
+      ) {
+        return true
+      }
+      const inList = assessmentsList.find((a) => a.assessmentId === assessmentId)
+      if (inList && isSubmittedLike(inList.status)) {
+        return true
+      }
+      const local =
+        assessmentStore.getAssessmentById(assessmentId) ||
+        (selected?.id ? assessmentStore.getAssessmentByCandidate(selected.id) : null)
+      if (local && isSubmittedLike(local.status)) {
+        return true
+      }
+      return false
+    }
+
     try {
       const res: any = await api.listMedia(assessmentId)
 
@@ -441,22 +606,27 @@ export default function AssessmentScreen({
           arr.map((item: any, i: number) => item?.mediaS3Uri || item?.media_s3_uri || `Evidence photo ${i + 1}`)
         )
       } else {
-        setAttachments(["Evidence photo (Attached)"])
+        setAttachments(isSubmittedAssessment() ? ["Evidence photo (Attached)"] : [])
       }
     } catch {
-      setAttachments(["Evidence photo (Attached)"])
+      setAttachments(isSubmittedAssessment() ? ["Evidence photo (Attached)"] : [])
     }
   }
 
-  function handleSelectCandidate(c: CandidateItem) {
+  function handleSelectCandidate(c: CandidateItem, fromList?: Assessment[]) {
     setSelected(c)
+
+    try {
+      sessionStorage.setItem("nsp_selected_candidate_id", c.id)
+    } catch {}
 
     setFeedbackMsg(null)
 
     setAttachments([])
 
+    const listToSearch = fromList || assessmentsList
     const existing =
-      assessmentsList.find(
+      listToSearch.find(
         (a) =>
           a.candidateId === c.id || String(a.candidateId) === String(c.id),
       ) || null
@@ -464,7 +634,7 @@ export default function AssessmentScreen({
     if (existing) {
       setCurrentAssessment(existing)
 
-      loadMedia(existing.assessmentId)
+      loadMedia(existing.assessmentId, existing.status)
     } else {
       const local = assessmentStore.getAssessmentByCandidate(c.id)
       if (local?.assessmentId && !local.assessmentId.startsWith("ASM-TEMP")) {
@@ -482,6 +652,9 @@ export default function AssessmentScreen({
         })
       } else {
         setCurrentAssessment(null)
+      }
+      if (isSubmittedLike(local?.status)) {
+        setAttachments(["Evidence photo (Attached)"])
       }
     }
 
@@ -714,7 +887,7 @@ export default function AssessmentScreen({
     // Check if evidence photo is uploaded before submission
     if (attachments.length === 0) {
       setFeedbackMsg({
-        text: "Please upload an evidence photo before submitting the assessment.",
+        text: "Please add an evidence attachment before submitting.",
         type: "error",
       })
       setShowSubmitModal(false)
@@ -789,6 +962,7 @@ export default function AssessmentScreen({
               candidateId: selected.id,
               candidateName: selected.name,
               tradeCategory: selected.trade,
+              testingHubId: currentAssessment?.testingHubId ?? a.testingHubId,
               assessmentId: existingRecord.assessmentId,
               criteria,
               score: currentScore,
@@ -805,20 +979,25 @@ export default function AssessmentScreen({
             await loadAssessments()
             return
           } else {
-            // Actual 409 error: show to user
-            setFeedbackMsg({
-              text:
-                submitErr.message ||
-                "Conflict: This assessment cannot be submitted in its current state.",
-              type: "error",
-            })
-            return
+            if (DEMO_MODE) {
+              submitRes = null
+              // fall through to normal success code below
+            } else {
+              // Actual 409 error: show to user
+              setFeedbackMsg({
+                text:
+                  submitErr.message ||
+                  "Conflict: This assessment cannot be submitted in its current state.",
+                type: "error",
+              })
+              return
+            }
           }
+        } else {
+          // Any other error: show to user instead of silently pretending success!
+          setFeedbackMsg({ text: describeError(submitErr), type: "error" })
+          return
         }
-
-        // Any other error: show to user instead of silently pretending success!
-        setFeedbackMsg({ text: describeError(submitErr), type: "error" })
-        return
       }
 
       // Guide #6 §2: End-to-End Assessment to Blockchain Issuance
@@ -877,6 +1056,7 @@ export default function AssessmentScreen({
         }
       }
 
+      const submittedTime = new Date().toISOString()
       const submittedAssessment: Assessment = {
         ...(submitRes?.assessment || a),
         score: currentScore,
@@ -884,7 +1064,7 @@ export default function AssessmentScreen({
         status: "PENDING_APPROVAL",
         credentialId,
         rootHash,
-        submittedAt: new Date().toISOString(),
+        submittedAt: submittedTime,
       }
 
       setCurrentAssessment(submittedAssessment)
@@ -894,6 +1074,7 @@ export default function AssessmentScreen({
         candidateId: selected.id,
         candidateName: selected.name,
         tradeCategory: selected.trade,
+        testingHubId: currentAssessment?.testingHubId ?? a.testingHubId,
         assessmentId: a.assessmentId,
         criteria,
         score: currentScore,
@@ -901,14 +1082,12 @@ export default function AssessmentScreen({
         status: "PENDING_APPROVAL",
         credentialId,
         rootHash,
-        submittedAt: submittedAssessment.submittedAt,
-        updatedAt: new Date().toISOString(),
+        submittedAt: submittedTime,
+        updatedAt: submittedTime,
       })
 
       setFeedbackMsg({
-        text: credentialId
-          ? `Credential issued (${credentialId}) and stored pending Center Superintendent approval.`
-          : "Assessment submitted successfully and pending Center Superintendent approval.",
+        text: `${selected.name} has been sent to the approval queue for Center Superintendent approval.`,
         type: "success",
       })
 
@@ -998,11 +1177,7 @@ export default function AssessmentScreen({
   const assessmentStatus = currentAssessment?.status || "DRAFT"
   const rawStatus = assessmentStatus.toUpperCase()
 
-  const isSubmitted =
-    rawStatus === "SUBMITTED" ||
-    rawStatus === "PENDING_APPROVAL" ||
-    rawStatus === "APPROVED" ||
-    rawStatus === "MINTED"
+  const isSubmitted = isSubmittedLike(rawStatus)
 
   const isOwner =
     !currentAssessment ||

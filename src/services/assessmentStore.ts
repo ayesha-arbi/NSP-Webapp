@@ -58,15 +58,44 @@ export const assessmentStore = {
 
     try {
       if (data.candidateId) {
+        let existingCand: Partial<SavedAssessmentData> = {}
+        try {
+          const raw = localStorage.getItem(`${STORAGE_PREFIX}${data.candidateId}`)
+          if (raw) existingCand = JSON.parse(raw)
+        } catch {}
+
+        const mergedCand: SavedAssessmentData = {
+          ...existingCand,
+          ...normalizedData,
+        }
+        if (normalizedData.criteria === undefined && existingCand.criteria !== undefined) {
+          mergedCand.criteria = existingCand.criteria
+        }
+
         localStorage.setItem(
           `${STORAGE_PREFIX}${data.candidateId}`,
-          JSON.stringify(normalizedData),
+          JSON.stringify(mergedCand),
         )
       }
+
       if (data.assessmentId) {
+        let existingAsm: Partial<SavedAssessmentData> = {}
+        try {
+          const raw = localStorage.getItem(`${STORAGE_ID_PREFIX}${data.assessmentId}`)
+          if (raw) existingAsm = JSON.parse(raw)
+        } catch {}
+
+        const mergedAsm: SavedAssessmentData = {
+          ...existingAsm,
+          ...normalizedData,
+        }
+        if (normalizedData.criteria === undefined && existingAsm.criteria !== undefined) {
+          mergedAsm.criteria = existingAsm.criteria
+        }
+
         localStorage.setItem(
           `${STORAGE_ID_PREFIX}${data.assessmentId}`,
-          JSON.stringify(normalizedData),
+          JSON.stringify(mergedAsm),
         )
       }
 
@@ -78,7 +107,15 @@ export const assessmentStore = {
       )
 
       if (existingIdx >= 0) {
-        list[existingIdx] = { ...list[existingIdx], ...normalizedData }
+        const existingItem = list[existingIdx]
+        const mergedItem: SavedAssessmentData = {
+          ...existingItem,
+          ...normalizedData,
+        }
+        if (normalizedData.criteria === undefined && existingItem.criteria !== undefined) {
+          mergedItem.criteria = existingItem.criteria
+        }
+        list[existingIdx] = mergedItem
       } else {
         list.push(normalizedData)
       }

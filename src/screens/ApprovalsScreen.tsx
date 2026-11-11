@@ -164,6 +164,19 @@ function getStableCredentialId(
   return `urn:uuid:7c9e6679-7425-40de-944b-${seed}`
 }
 
+function isKnownApprovalStatus(status?: string): boolean {
+  if (!status) return false
+  const s = status.toUpperCase()
+  return (
+    s === "SUBMITTED" ||
+    s === "PENDING_APPROVAL" ||
+    s === "IN_REVIEW" ||
+    s === "APPROVED" ||
+    s === "MINTED" ||
+    s === "REJECTED"
+  )
+}
+
 // Guide 5: Includes canonical URN credentialId, ledger mint status, and transaction hash.
 function toSubmission(a: Assessment): Submission {
   const credId =
@@ -178,12 +191,14 @@ function toSubmission(a: Assessment): Submission {
   }
 
   const rawStatus = (a.status || "").toUpperCase()
-  const approvalStatus: ApprovalStatus =
-    rawStatus === "APPROVED" || rawStatus === "MINTED"
-      ? "approved"
-      : rawStatus === "REJECTED"
-        ? "rejected"
-        : "submitted"
+  let approvalStatus: ApprovalStatus = "submitted"
+  if (rawStatus === "APPROVED" || rawStatus === "MINTED") {
+    approvalStatus = "approved"
+  } else if (rawStatus === "REJECTED") {
+    approvalStatus = "rejected"
+  } else {
+    approvalStatus = "submitted"
+  }
 
   return {
     id: a.assessmentId,
@@ -711,10 +726,31 @@ export default function ApprovalsScreen() {
       // 3. Include any locally saved submitted assessments from assessmentStore
       const localSubmitted = assessmentStore.getSubmittedAssessments()
       for (const item of localSubmitted) {
-        if (
-          item.assessmentId &&
-          !queueAssessments.some((q) => q.assessmentId === item.assessmentId)
-        ) {
+        const existingIdx = queueAssessments.findIndex(
+          (q) =>
+            (item.assessmentId && q.assessmentId === item.assessmentId) ||
+            (item.candidateId && q.candidateId === item.candidateId),
+        )
+        if (existingIdx >= 0) {
+          const serverRec = queueAssessments[existingIdx]
+          const serverStatus = (serverRec.status || "").toUpperCase()
+          if (
+            serverStatus !== "APPROVED" &&
+            serverStatus !== "MINTED" &&
+            serverStatus !== "REJECTED"
+          ) {
+            queueAssessments[existingIdx] = {
+              ...serverRec,
+              candidateName: serverRec.candidateName || item.candidateName,
+              tradeCategory: serverRec.tradeCategory || item.tradeCategory,
+              testingHubId: serverRec.testingHubId ?? item.testingHubId,
+              score: item.score ?? serverRec.score,
+              grade: item.grade || serverRec.grade,
+              status: (item.status as any) || "PENDING_APPROVAL",
+              submittedAt: item.submittedAt ?? serverRec.submittedAt,
+            }
+          }
+        } else if (item.assessmentId) {
           queueAssessments.push({
             assessmentId: item.assessmentId,
             candidateId: item.candidateId,
@@ -752,6 +788,9 @@ export default function ApprovalsScreen() {
         }
       } catch {}
 
+      queueAssessments = queueAssessments.filter((a) =>
+        isKnownApprovalStatus(a.status),
+      )
       const mapped = queueAssessments.map(toSubmission)
 
       // Keep items actioned in this session so the Approved/Rejected tabs still show them
@@ -775,6 +814,23 @@ export default function ApprovalsScreen() {
 
   useEffect(() => {
     loadQueue()
+
+    const onFocus = () => {
+      loadQueue()
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadQueue()
+      }
+    }
+
+    window.addEventListener("focus", onFocus)
+    document.addEventListener("visibilitychange", onVisibilityChange)
+
+    return () => {
+      window.removeEventListener("focus", onFocus)
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+    }
   }, [])
 
   function explain(err: any) {
