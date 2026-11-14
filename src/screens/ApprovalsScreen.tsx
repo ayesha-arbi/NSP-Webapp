@@ -148,6 +148,7 @@ interface Submission {
   failReason?: string
 
   retryStatus?: string
+  candidateId?: string
 
   rejectionReason?: string
 }
@@ -162,6 +163,13 @@ function getStableCredentialId(
     .padEnd(12, "0")
     .slice(0, 12)
   return `urn:uuid:7c9e6679-7425-40de-944b-${seed}`
+}
+
+// A record belongs on the Approvals page if it is awaiting review, already actioned,
+// or was rejected (the server returns rejected records to DRAFT with a reason attached).
+function isApprovalRecord(a: Assessment): boolean {
+  if (isKnownApprovalStatus(a.status)) return true
+  return (a.status || "").toUpperCase() === "DRAFT" && !!a.rejectionReason
 }
 
 function isKnownApprovalStatus(status?: string): boolean {
@@ -194,7 +202,7 @@ function toSubmission(a: Assessment): Submission {
   let approvalStatus: ApprovalStatus = "submitted"
   if (rawStatus === "APPROVED" || rawStatus === "MINTED") {
     approvalStatus = "approved"
-  } else if (rawStatus === "REJECTED") {
+  } else if (rawStatus === "REJECTED" || (rawStatus === "DRAFT" && !!a.rejectionReason)) {
     approvalStatus = "rejected"
   } else {
     approvalStatus = "submitted"
@@ -234,6 +242,8 @@ function toSubmission(a: Assessment): Submission {
     mintingStatus: mStatus,
 
     txHash: a.txHash || undefined,
+    candidateId: a.candidateId,
+    rejectionReason: a.rejectionReason || undefined,
   }
 }
 
@@ -703,12 +713,7 @@ export default function ApprovalsScreen() {
         const listRes = await api.listAssessments()
         if (listRes && Array.isArray(listRes.assessments)) {
           for (const a of listRes.assessments) {
-            const st = (a.status || "").toUpperCase()
-            if (
-              st === "SUBMITTED" ||
-              st === "PENDING_APPROVAL" ||
-              st === "IN_REVIEW"
-            ) {
+            if (isApprovalRecord(a)) {
               if (
                 !queueAssessments.some(
                   (q) => q.assessmentId === a.assessmentId,
@@ -737,7 +742,8 @@ export default function ApprovalsScreen() {
           if (
             serverStatus !== "APPROVED" &&
             serverStatus !== "MINTED" &&
-            serverStatus !== "REJECTED"
+            serverStatus !== "REJECTED" &&
+            !serverRec.rejectionReason
           ) {
             queueAssessments[existingIdx] = {
               ...serverRec,
@@ -768,6 +774,28 @@ export default function ApprovalsScreen() {
         }
       }
 
+      // 3b. Approved/rejected records saved on this device (in case the server does not list them)
+      for (const item of assessmentStore.getAllSavedAssessments()) {
+        const st = (item.status || "").toUpperCase()
+        if (st !== "APPROVED" && st !== "MINTED" && st !== "REJECTED") continue
+        if (!item.assessmentId) continue
+        if (queueAssessments.some((q) => q.assessmentId === item.assessmentId)) continue
+        queueAssessments.push({
+          assessmentId: item.assessmentId,
+          candidateId: item.candidateId,
+          candidateName: item.candidateName,
+          tradeCategory: item.tradeCategory,
+          testingHubId: item.testingHubId,
+          score: item.score,
+          grade: item.grade,
+          status: st as any,
+          credentialId: item.credentialId,
+          rootHash: item.rootHash,
+          submittedAt: item.submittedAt,
+          createdAt: item.updatedAt || new Date().toISOString(),
+        })
+      }
+
       // 4. Enrich with candidate details (CNIC, trade, full name)
       try {
         const candidates = await api.listCandidates()
@@ -788,9 +816,7 @@ export default function ApprovalsScreen() {
         }
       } catch {}
 
-      queueAssessments = queueAssessments.filter((a) =>
-        isKnownApprovalStatus(a.status),
-      )
+      queueAssessments = queueAssessments.filter((a) => isApprovalRecord(a))
       const mapped = queueAssessments.map(toSubmission)
 
       // Keep items actioned in this session so the Approved/Rejected tabs still show them
@@ -901,6 +927,17 @@ export default function ApprovalsScreen() {
         }
 
         const assignedCredId = queueRes?.data?.credential_id || credId
+        assessmentStore.saveAssessmentLocal({
+          candidateId: selected.candidateId || "",
+          candidateName: selected.candidate,
+          tradeCategory: selected.trade,
+          assessmentId: selected.id,
+          score: selected.score,
+          grade: selected.grade,
+          status: "APPROVED",
+          credentialId: assignedCredId,
+          updatedAt: new Date().toISOString(),
+        })
 
         setSubmissions((ss) =>
           ss.map((s) =>
@@ -950,6 +987,16 @@ export default function ApprovalsScreen() {
 
     try {
       await api.rejectAssessment(selected.id, rejectionReason.trim())
+      assessmentStore.saveAssessmentLocal({
+        candidateId: selected.candidateId || "",
+        candidateName: selected.candidate,
+        tradeCategory: selected.trade,
+        assessmentId: selected.id,
+        score: selected.score,
+        grade: selected.grade,
+        status: "REJECTED",
+        updatedAt: new Date().toISOString(),
+      })
 
       // Server auto-returns the record to DRAFT; REJECTED is never a resting state.
 
