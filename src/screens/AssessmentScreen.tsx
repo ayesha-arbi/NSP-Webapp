@@ -1267,12 +1267,18 @@ export default function AssessmentScreen({
   const isSubmitted = isSubmittedLike(rawStatus)
 
 
+  const isOwner =
+    !currentAssessment ||
+    !currentAssessment.testerUserId ||
+    currentAssessment.testerUserId === (currentUser as any)?.userId ||
+    currentAssessment.testerUserId === currentUser?.id
+
   const isSuperintendent =
     (currentUser?.role as any) === "CENTER_SUPERINTENDENT" ||
     (currentUser?.role as any) === "SUPERINTENDENT" ||
     currentUser?.role === "SUPER_ADMIN"
 
-  const isReadOnly = isSubmitted
+  const isReadOnly = isSubmitted || (!isOwner && isSuperintendent)
 
   const isRejected =
     rawStatus === "REJECTED" ||
@@ -2167,7 +2173,25 @@ export default function AssessmentScreen({
             </div>
 
             {/* Actions */}
-            {isSuperintendent && isSubmitted ? (
+            {isSuperintendent && !isOwner && !isSubmitted ? (
+              <div
+                style={{
+                  background: "#F1E7D2",
+                  border: "1px solid #B08D46",
+                  borderRadius: 6,
+                  padding: "14px 18px",
+                  color: "#8C6F35",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  lineHeight: 1.5,
+                }}
+              >
+                ⚠️ <strong>Draft Assessment by Trade Tester ({currentAssessment?.testerUserId ? currentAssessment.testerUserId.slice(0, 8) : "Assessor"})</strong>
+                <div style={{ marginTop: 4, color: "#5C5A50" }}>
+                  The server only lets the assigned Trade Tester edit, attach evidence to and submit this draft. Sign in as that Trade Tester to submit it; it will then appear in your Approvals queue.
+                </div>
+              </div>
+            ) : isSuperintendent && isSubmitted ? (
               <div
                 style={{
                   background: "#EAF3DE",

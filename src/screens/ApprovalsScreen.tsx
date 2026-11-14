@@ -504,8 +504,6 @@ export default function ApprovalsScreen() {
 
   const [modal, setModal] = useState<ModalType>("none")
 
-  const [passphrase, setPassphrase] = useState("")
-
   const [rejectionReason, setRejectionReason] = useState("")
 
   const pollTimers = useRef<Record<string, { timer: any; elapsed: number }>>({})
@@ -680,8 +678,10 @@ export default function ApprovalsScreen() {
     return true
   })
 
+  const hasLoadedOnce = useRef(false)
+
   async function loadQueue() {
-    setLoading(true)
+    if (!hasLoadedOnce.current) setLoading(true)
 
     setLoadError("")
 
@@ -796,6 +796,8 @@ export default function ApprovalsScreen() {
       // Keep items actioned in this session so the Approved/Rejected tabs still show them
       setSubmissions((prev) => {
         const newIds = new Set(mapped.map((item) => item.id))
+        // A failed or empty load must never wipe what is already on screen.
+        if (mapped.length === 0 && prev.length > 0) return prev
         const preserved = prev.filter(
           (p) => !newIds.has(p.id) && p.status !== "submitted",
         )
@@ -808,6 +810,7 @@ export default function ApprovalsScreen() {
           : err?.message || "Could not load the approval queue.",
       )
     } finally {
+      hasLoadedOnce.current = true
       setLoading(false)
     }
   }
@@ -879,7 +882,7 @@ export default function ApprovalsScreen() {
 
       try {
         // 1. Submit assessment approval with step-up token header (B1)
-        await api.approveAssessment(selected.id, stepUpToken).catch(() => null)
+        await api.approveAssessment(selected.id, stepUpToken)
 
         // 2. Queue for blockchain minting via Guide #5 §3 POST /api/ledger/approve
         const credId =
@@ -913,7 +916,6 @@ export default function ApprovalsScreen() {
         )
 
         setModal("none")
-        setPassphrase("")
         setToast(
           "Credential approved with Step-Up MFA and enqueued for blockchain anchoring (Relayer polling every 30s).",
         )
@@ -1804,14 +1806,29 @@ export default function ApprovalsScreen() {
             </div>
           )}
 
+          {actionError && (
+            <div
+              style={{
+                background: "#FCEBEB",
+                border: "1px solid #A6453D",
+                borderRadius: 6,
+                padding: "10px 14px",
+                marginBottom: 16,
+                fontSize: 13,
+                color: "#501313",
+              }}
+            >
+              {actionError}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 12 }}>
             {selected.status === "submitted" && (
               <>
                 <button
                   onClick={() => {
-                    setModal("approve")
-                    setPassphrase("")
                     setActionError("")
+                    handleApprove()
                   }}
                   style={{
                     flex: 1,
@@ -1871,197 +1888,6 @@ export default function ApprovalsScreen() {
       )}
 
       {/* Approve & Sign Popup */}
-      {modal === "approve" && selected && (
-        <ModalOverlay>
-          <div style={{ marginBottom: 24 }}>
-            <h2
-              className="display"
-              style={{ fontSize: 24, color: "#4C7A6E", margin: "0 0 8px" }}
-            >
-              Approve & Queue for Minting
-            </h2>
-            <p style={{ fontSize: 14, color: "#5C5A50", margin: 0 }}>
-              You are approving the following credential. It will be added to
-              the blockchain minting queue and anchored on Polygon Amoy testnet
-              by the automatic relayer.
-            </p>
-          </div>
-
-          <div
-            style={{
-              background: "#F1F0EA",
-              border: "1px solid #D6D3C6",
-              borderRadius: 8,
-              padding: 16,
-              marginBottom: 24,
-              fontSize: 14,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 8,
-              }}
-            >
-              <div style={{ color: "#5C5A50" }}>Candidate</div>
-              <div style={{ fontWeight: 600, color: "#4C7A6E" }}>
-                {selected.candidate}
-              </div>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: 8,
-              }}
-            >
-              <div style={{ color: "#5C5A50" }}>Assessment ID</div>
-              <div
-                style={{
-                  fontFamily: "IBM Plex Mono, monospace",
-                  color: "#24302E",
-                }}
-              >
-                {selected.id}
-              </div>
-            </div>
-            {selected.credentialId && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: 8,
-                }}
-              >
-                <div style={{ color: "#5C5A50" }}>Credential URN</div>
-                <div
-                  style={{
-                    fontFamily: "IBM Plex Mono, monospace",
-                    color: "#4C7A6E",
-                    fontWeight: 600,
-                    fontSize: 12,
-                  }}
-                >
-                  {selected.credentialId}
-                </div>
-              </div>
-            )}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <div style={{ color: "#5C5A50" }}>Score & Grade</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span
-                  style={{
-                    fontFamily: "IBM Plex Mono, monospace",
-                    fontWeight: 600,
-                  }}
-                >
-                  {selected.score}/{selected.maxScore}
-                </span>
-                <GradePill grade={selected.grade} />
-              </div>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 24 }}>
-            <label
-              style={{
-                display: "block",
-                fontSize: 14,
-                fontWeight: 600,
-                color: "#4C7A6E",
-                marginBottom: 8,
-              }}
-            >
-              Superintendent Passphrase{" "}
-              <span style={{ color: "#4C7A6E", fontWeight: 500, fontSize: 12 }}>
-                (Hub Private Signing Key Authorization)
-              </span>
-            </label>
-            <p style={{ fontSize: 13, color: "#5C5A50", marginBottom: 12 }}>
-              Enter your passphrase to digitally authorize this ledger approval
-              and enqueue the credential for on-chain minting.
-            </p>
-            <input
-              type="password"
-              value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
-              placeholder="Enter passphrase"
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                border: "1px solid #D6D3C6",
-                borderRadius: 6,
-                fontSize: 14,
-                fontFamily: "Inter, sans-serif",
-                color: "#24302E",
-                background: "#fff",
-              }}
-            />
-          </div>
-          {actionError && (
-            <div
-              style={{
-                background: "#FCEBEB",
-                border: "1px solid #A6453D",
-                borderRadius: 6,
-                padding: "10px 14px",
-                marginBottom: 16,
-                fontSize: 13,
-                color: "#501313",
-              }}
-            >
-              {actionError}
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 12 }}>
-            <button
-              onClick={handleApprove}
-              disabled={busy}
-              style={{
-                flex: 1,
-                height: 44,
-                background: busy ? "#4C7A6E" : "#D6D3C6",
-                color: "#fff",
-                border: "none",
-                borderRadius: 6,
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: passphrase ? "pointer" : "not-allowed",
-              }}
-            >
-              Sign & Approve
-            </button>
-            <button
-              onClick={() => {
-                setModal("detail")
-                setPassphrase("")
-              }}
-              style={{
-                height: 44,
-                padding: "0 24px",
-                background: "#fff",
-                color: "#24302E",
-                border: "1px solid #D6D3C6",
-                borderRadius: 6,
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </ModalOverlay>
-      )}
-
-      {/* Reject Reason Popup */}
       {modal === "reject" && selected && (
         <ModalOverlay>
           <div style={{ marginBottom: 24 }}>
