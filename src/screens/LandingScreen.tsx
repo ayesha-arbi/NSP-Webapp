@@ -205,7 +205,7 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
                     }}
                   >
                     Use your device camera to scan the QR code on the worker's
-                    certificate or digital wallet.
+                    certificate.
                   </p>
                   <BtnPrimary onClick={onQRScan}>
                     Scan QR Code
@@ -287,8 +287,7 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
                       marginBottom: 16,
                     }}
                   >
-                    Type the NSP Credential ID printed on the certificate or
-                    shown in the worker's digital wallet.
+                    Type the NSP Credential ID printed on the certificate.
                   </p>
                   <BtnSecondary onClick={onManualEntry}>
                     Enter Credential ID

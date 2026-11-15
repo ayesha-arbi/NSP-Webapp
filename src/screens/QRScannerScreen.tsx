@@ -177,7 +177,7 @@ export default function QRScannerScreen({
               lineHeight: 1.6,
             }}
           >
-            Hold the worker's certificate or digital wallet up to your camera.
+            Hold the worker's certificate up to your camera.
           </p>
         </div>
       </div>

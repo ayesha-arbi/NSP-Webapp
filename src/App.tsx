@@ -40,8 +40,6 @@ import ManualEntryScreen from "./screens/ManualEntryScreen"
 
 import VerificationResultScreen from "./screens/VerificationResultScreen"
 
-import WorkerWalletScreen from "./screens/WorkerWalletScreen"
-
 import { authStore, AppRole } from "./services/authStore"
 
 import { CandidateRecord, verifyNspCredential, api } from "./services/api"
@@ -112,7 +110,7 @@ export default function App() {
   const [enrollmentSuccessMessage, setEnrollmentSuccessMessage] = useState("")
 
   const [activePortal, setActivePortal] =
-    useState<"issuer" | "verifier" | "wallet">("issuer")
+    useState<"issuer" | "verifier">("issuer")
 
   const [assessmentCandidate, setAssessmentCandidate] =
     useState<CandidateRecord | null>(null)
@@ -470,30 +468,6 @@ export default function App() {
           >
             Verifier DApp (On-Chain)
           </button>
-          <button
-            onClick={() => {
-              setActivePortal("wallet")
-            }}
-            style={{
-              border: "none",
-
-              background: activePortal === "wallet" ? "#4C7A6E" : "transparent",
-
-              color: "#fff",
-
-              padding: "3px 10px",
-
-              borderRadius: 3,
-
-              fontSize: 11,
-
-              fontWeight: 600,
-
-              cursor: "pointer",
-            }}
-          >
-            Worker Wallet (WW-01 – WW-05)
-          </button>
         </div>
       </div>
 
@@ -550,29 +524,6 @@ export default function App() {
             }}
           />
         )}
-      </div>
-    )
-  }
-
-  // ============================================================
-
-  // WORKER MOBILE WALLET (WW-01 – WW-05)
-
-  // ============================================================
-
-  if (activePortal === "wallet") {
-    return (
-      <div
-        style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
-      >
-        {renderPortalSwitcher()}
-        <WorkerWalletScreen
-          onVerifyInVerifier={(urn) => {
-            setActivePortal("verifier")
-
-            handleVerify(urn)
-          }}
-        />
       </div>
     )
   }

@@ -179,8 +179,7 @@ export default function ManualEntryScreen({
               lineHeight: 1.6,
             }}
           >
-            Type the ID exactly as it appears on the worker's certificate or
-            digital wallet.
+            Type the ID exactly as it appears on the worker's certificate.
           </p>
         </div>
       </div>
@@ -680,7 +679,7 @@ export default function ManualEntryScreen({
                   {[
                     "Printed below the QR code on the physical certificate",
 
-                    "Shown in the worker's NSP digital wallet app",
+
 
                     "Starts with NSP- followed by digits",
                   ].map((t) => (
