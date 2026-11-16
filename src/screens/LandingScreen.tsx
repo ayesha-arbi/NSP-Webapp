@@ -1,16 +1,66 @@
+import { useState } from "react"
 import NavBar from "../components/NavBar"
-
 import Footer from "../components/Footer"
-
 import { BtnPrimary, BtnSecondary } from "../components/Btn"
+import { verifyNspCredential, type VerificationResult } from "../services/api"
 
 interface Props {
-  onManualEntry: () => void
-
-  onQRScan: () => void
+  onManualEntry?: () => void
+  onQRScan?: () => void
 }
 
 export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
+  const [showInput, setShowInput] = useState(false)
+  const [credentialId, setCredentialId] = useState(
+    "urn:uuid:a8482d43-182c-4a21-b5b6-437eb03ad506"
+  )
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<VerificationResult | null>(null)
+
+  const handleVerify = async () => {
+  const cleanId = credentialId.trim()
+  if (!cleanId) {
+    setError("Please enter a valid Credential ID.")
+    return
+  }
+
+  setLoading(true)
+  setError(null)
+  setResult(null)
+
+  const res = await verifyNspCredential(cleanId)
+
+  if (res.verified) setResult(res)
+  else setError(res.errorMessage || "Credential not found or invalid.")
+
+  setLoading(false)
+}
+
+  // ─── Prefer top-level flat fields from backend ──────────────
+  const workerName = result?.workerName || "Not specified on-chain"
+  const skillTrade = result?.skill || "Not specified on-chain"
+  const assessmentResult = result?.grade || "Not specified on-chain"
+  const testingCentre = result?.centre || "Not recorded"
+  const credentialStatus = result?.status || "Unknown"
+  const issuerName = result?.issuer || "National Skills Passport"
+  const candidateDid = result?.candidateDid || null
+  const issueDate = result?.issuedAt
+    ? new Date(result.issuedAt).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "—"
+  const polygonUrl =
+    result?.explorerUrl ||
+    (result?.txHash
+      ? `https://amoy.polygonscan.com/tx/${result.txHash}`
+      : null)
+  const ledger =
+    result?.ledger ||
+    "Polygon Amoy Testnet (Smart Contract Direct Verification)"
+
   return (
     <div
       style={{
@@ -73,7 +123,6 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
             gap: 24,
           }}
         >
-          {/* Top: method cards + sidebar */}
           <div
             style={{
               display: "grid",
@@ -95,13 +144,12 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
                 Choose a verification method
               </p>
 
-              {/* Scan QR — PRIMARY */}
+              {/* Scan QR */}
               <div
                 style={{
                   background: "#FFFFFF",
                   border: "1px solid #D6D3C6",
                   borderRadius: 8,
-
                   padding: "24px",
                   display: "flex",
                   alignItems: "flex-start",
@@ -114,7 +162,6 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
                     height: 48,
                     background: "#F1F0EA",
                     border: "1px solid #D6D3C6",
-
                     borderRadius: 8,
                     display: "flex",
                     alignItems: "center",
@@ -123,112 +170,42 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
                   }}
                 >
                   <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                    <rect
-                      x="2"
-                      y="2"
-                      width="7"
-                      height="7"
-                      rx="0.5"
-                      stroke="#24302E"
-                      strokeWidth="1.5"
-                      fill="none"
-                    />
-                    <rect
-                      x="13"
-                      y="2"
-                      width="7"
-                      height="7"
-                      rx="0.5"
-                      stroke="#24302E"
-                      strokeWidth="1.5"
-                      fill="none"
-                    />
-                    <rect
-                      x="2"
-                      y="13"
-                      width="7"
-                      height="7"
-                      rx="0.5"
-                      stroke="#24302E"
-                      strokeWidth="1.5"
-                      fill="none"
-                    />
-                    <rect
-                      x="3.5"
-                      y="3.5"
-                      width="4"
-                      height="4"
-                      rx="0.5"
-                      fill="#24302E"
-                    />
-                    <rect
-                      x="14.5"
-                      y="3.5"
-                      width="4"
-                      height="4"
-                      rx="0.5"
-                      fill="#24302E"
-                    />
-                    <rect
-                      x="3.5"
-                      y="14.5"
-                      width="4"
-                      height="4"
-                      rx="0.5"
-                      fill="#24302E"
-                    />
-                    <path
-                      d="M13 14h3M16 14v3M13 17h3"
-                      stroke="#24302E"
-                      strokeWidth="1.4"
-                      strokeLinecap="round"
-                    />
+                    <rect x="2" y="2" width="7" height="7" rx="0.5" stroke="#24302E" strokeWidth="1.5" fill="none" />
+                    <rect x="13" y="2" width="7" height="7" rx="0.5" stroke="#24302E" strokeWidth="1.5" fill="none" />
+                    <rect x="2" y="13" width="7" height="7" rx="0.5" stroke="#24302E" strokeWidth="1.5" fill="none" />
+                    <rect x="3.5" y="3.5" width="4" height="4" rx="0.5" fill="#24302E" />
+                    <rect x="14.5" y="3.5" width="4" height="4" rx="0.5" fill="#24302E" />
+                    <rect x="3.5" y="14.5" width="4" height="4" rx="0.5" fill="#24302E" />
+                    <path d="M13 14h3M16 14v3M13 17h3" stroke="#24302E" strokeWidth="1.4" strokeLinecap="round" />
                   </svg>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <h3
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: "#24302E",
-                      marginBottom: 6,
-                    }}
-                  >
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: "#24302E", marginBottom: 6 }}>
                     Scan QR Code
                   </h3>
-                  <p
-                    style={{
-                      fontSize: 14,
-                      color: "#5C5A50",
-                      lineHeight: 1.6,
-                      marginBottom: 16,
+                  <p style={{ fontSize: 14, color: "#5C5A50", lineHeight: 1.6, marginBottom: 16 }}>
+                    Use your device camera to scan the QR code on the worker's certificate.
+                  </p>
+                  <BtnPrimary
+                    onClick={() => {
+                      if (onQRScan) onQRScan()
+                      setShowInput(true)
                     }}
                   >
-                    Use your device camera to scan the QR code on the worker's
-                    certificate.
-                  </p>
-                  <BtnPrimary onClick={onQRScan}>
                     Scan QR Code
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path
-                        d="M3 7h8M8 4l3 3-3 3"
-                        stroke="white"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
+                      <path d="M3 7h8M8 4l3 3-3 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </BtnPrimary>
                 </div>
               </div>
 
-              {/* Enter ID — SECONDARY */}
+              {/* Enter ID */}
               <div
                 style={{
                   background: "#FFFFFF",
                   border: "1px solid #D6D3C6",
                   borderRadius: 8,
-
                   padding: "24px",
                   display: "flex",
                   alignItems: "flex-start",
@@ -241,7 +218,6 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
                     height: 48,
                     background: "#F1F0EA",
                     border: "1px solid #D6D3C6",
-
                     borderRadius: 8,
                     display: "flex",
                     alignItems: "center",
@@ -250,57 +226,253 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
                   }}
                 >
                   <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                    <rect
-                      x="3"
-                      y="6"
-                      width="16"
-                      height="10"
-                      rx="1.5"
-                      stroke="#24302E"
-                      strokeWidth="1.5"
-                      fill="none"
-                    />
-                    <path
-                      d="M7 11h8M11 8v6"
-                      stroke="#24302E"
-                      strokeWidth="1.4"
-                      strokeLinecap="round"
-                    />
+                    <rect x="3" y="6" width="16" height="10" rx="1.5" stroke="#24302E" strokeWidth="1.5" fill="none" />
+                    <path d="M7 11h8M11 8v6" stroke="#24302E" strokeWidth="1.4" strokeLinecap="round" />
                   </svg>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <h3
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: "#24302E",
-                      marginBottom: 6,
-                    }}
-                  >
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: "#24302E", marginBottom: 6 }}>
                     Enter Credential ID
                   </h3>
-                  <p
-                    style={{
-                      fontSize: 14,
-                      color: "#5C5A50",
-                      lineHeight: 1.6,
-                      marginBottom: 16,
-                    }}
-                  >
+                  <p style={{ fontSize: 14, color: "#5C5A50", lineHeight: 1.6, marginBottom: 16 }}>
                     Type the NSP Credential ID printed on the certificate.
                   </p>
-                  <BtnSecondary onClick={onManualEntry}>
-                    Enter Credential ID
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path
-                        d="M3 7h8M8 4l3 3-3 3"
-                        stroke="#24302E"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+
+                  {!showInput ? (
+                    <BtnSecondary
+                      onClick={() => {
+                        setShowInput(true)
+                        if (onManualEntry) onManualEntry()
+                      }}
+                    >
+                      Enter Credential ID
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path d="M3 7h8M8 4l3 3-3 3" stroke="#24302E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </BtnSecondary>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      <input
+                        type="text"
+                        value={credentialId}
+                        onChange={(e) => setCredentialId(e.target.value)}
+                        placeholder="urn:uuid:a8482d43-182c-4a21-b5b6-437eb03ad506"
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          fontSize: 13,
+                          fontFamily: "monospace",
+                          border: "1px solid #D6D3C6",
+                          borderRadius: 6,
+                          background: "#F9F9F6",
+                          color: "#24302E",
+                        }}
                       />
-                    </svg>
-                  </BtnSecondary>
+                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <BtnPrimary onClick={handleVerify}>
+                          {loading ? "Verifying..." : "Verify Now"}
+                        </BtnPrimary>
+                        <BtnSecondary
+                          onClick={() => {
+                            setShowInput(false)
+                            setResult(null)
+                            setError(null)
+                          }}
+                        >
+                          Cancel
+                        </BtnSecondary>
+                      </div>
+                    </div>
+                  )}
+
+                  {error && (
+                    <div
+                      style={{
+                        marginTop: 14,
+                        padding: "10px 14px",
+                        background: "#FEE2E2",
+                        border: "1px solid #FCA5A5",
+                        borderRadius: 6,
+                        color: "#991B1B",
+                        fontSize: 13,
+                      }}
+                    >
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Result Card */}
+                  {result?.verified && (
+                    <div
+                      style={{
+                        marginTop: 16,
+                        padding: "18px",
+                        background: "#F9F9F6",
+                        border: "1px solid #D6D3C6",
+                        borderRadius: 8,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 12,
+                      }}
+                    >
+                      {/* Status Header */}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          borderBottom: "1px solid #E5E2D9",
+                          paddingBottom: 10,
+                        }}
+                      >
+                        <span
+                          style={{
+                            background: result.verified ? "#DCFCE7" : "#FEE2E2",
+                            color: result.verified ? "#166534" : "#991B1B",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: "4px 10px",
+                            borderRadius: 999,
+                            letterSpacing: "0.04em",
+                          }}
+                        >
+                          {result.verificationStatus || "VALID"}
+                        </span>
+                        <span style={{ fontSize: 12, color: "#8C897C" }}>
+                          Issued: {issueDate}
+                        </span>
+                      </div>
+
+                      {/* Worker & Skill Details */}
+                      <div
+                        style={{
+                          background: "#FFFFFF",
+                          border: "1px solid #E5E2D9",
+                          borderRadius: 6,
+                          padding: "12px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: "#8C897C",
+                            textTransform: "uppercase",
+                            marginBottom: 2,
+                          }}
+                        >
+                          Worker & Skill Details
+                        </div>
+
+                        <div style={{ fontSize: 15, fontWeight: 700, color: "#24302E" }}>
+                          {skillTrade}
+                        </div>
+
+                        <div style={{ fontSize: 13, color: "#5C5A50" }}>
+                          <strong>Worker:</strong> {workerName}
+                        </div>
+
+                        <div style={{ fontSize: 13, color: "#5C5A50" }}>
+                          <strong>Assessment:</strong> {assessmentResult}
+                        </div>
+
+                        <div style={{ fontSize: 13, color: "#5C5A50" }}>
+                          <strong>Testing Centre:</strong> {testingCentre}
+                        </div>
+
+                        <div style={{ fontSize: 12, color: "#5C5A50" }}>
+                          <strong>Status:</strong> {credentialStatus}
+                        </div>
+
+                        <div style={{ fontSize: 12, color: "#5C5A50" }}>
+                          <strong>Issuer:</strong> {issuerName}
+                        </div>
+                      </div>
+
+                      {/* On-Chain Proof */}
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                          fontSize: 12,
+                          color: "#5C5A50",
+                        }}
+                      >
+                        <div>
+                          <strong>Credential ID:</strong>{" "}
+                          <code style={{ wordBreak: "break-all", color: "#24302E" }}>
+                            {result.credentialId || "—"}
+                          </code>
+                        </div>
+
+                        {result.candidateId && (
+                          <div>
+                            <strong>Candidate ID:</strong>{" "}
+                            <code style={{ wordBreak: "break-all", color: "#24302E" }}>
+                              {result.candidateId}
+                            </code>
+                          </div>
+                        )}
+
+                        {candidateDid && (
+                          <div>
+                            <strong>Candidate DID:</strong>{" "}
+                            <code style={{ wordBreak: "break-all", color: "#24302E" }}>
+                              {candidateDid}
+                            </code>
+                          </div>
+                        )}
+
+                        {result.onChainHash && (
+                          <div>
+                            <strong>On-Chain Root Hash:</strong>{" "}
+                            <code style={{ wordBreak: "break-all", color: "#24302E" }}>
+                              {result.onChainHash}
+                            </code>
+                          </div>
+                        )}
+
+                        {result.txHash && (
+                          <div>
+                            <strong>Transaction Hash:</strong>{" "}
+                            <code style={{ wordBreak: "break-all", color: "#24302E" }}>
+                              {result.txHash}
+                            </code>
+                          </div>
+                        )}
+
+                        <div>
+                          <strong>Ledger:</strong> {ledger}
+                        </div>
+                      </div>
+
+                      {polygonUrl && (
+                        <div style={{ paddingTop: 4 }}>
+                          <a
+                            href={polygonUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: "inline-block",
+                              background: "#24302E",
+                              color: "#F1F0EA",
+                              padding: "8px 14px",
+                              borderRadius: 6,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              textDecoration: "none",
+                            }}
+                          >
+                            View Transaction on Polygonscan ↗
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -334,38 +506,20 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
                     Before you start
                   </span>
                 </div>
-                <div
-                  style={{
-                    padding: "20px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 12,
-                  }}
-                >
+                <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 12 }}>
                   {[
                     "No account or login is required.",
-
                     "You need the credential ID from the worker's certificate.",
-
                     "Credentials are verified against the national blockchain ledger.",
-
                     "This service is for employers and verifiers only.",
                   ].map((t) => (
-                    <div
-                      key={t}
-                      style={{
-                        display: "flex",
-                        gap: 10,
-                        alignItems: "flex-start",
-                      }}
-                    >
+                    <div key={t} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                       <div
                         style={{
                           width: 18,
                           height: 18,
                           borderRadius: "50%",
                           background: "#B08D46",
-
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -374,36 +528,16 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
                         }}
                       >
                         <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-                          <path
-                            d="M2 4.5l1.8 1.8L7 3"
-                            stroke="#24302E"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
+                          <path d="M2 4.5l1.8 1.8L7 3" stroke="#24302E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </div>
-                      <span
-                        style={{
-                          fontSize: 13,
-                          color: "#5C5A50",
-                          lineHeight: 1.55,
-                        }}
-                      >
-                        {t}
-                      </span>
+                      <span style={{ fontSize: 13, color: "#5C5A50", lineHeight: 1.55 }}>{t}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div
-                style={{
-                  background: "#24302E",
-                  borderRadius: 8,
-                  padding: "20px",
-                }}
-              >
+              <div style={{ background: "#24302E", borderRadius: 8, padding: "20px" }}>
                 <p
                   style={{
                     fontSize: 12,
@@ -416,20 +550,14 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
                 >
                   Takes less than 30 seconds
                 </p>
-                <p
-                  style={{
-                    fontSize: 13,
-                    color: "rgba(241,240,234,0.5)",
-                    lineHeight: 1.6,
-                  }}
-                >
+                <p style={{ fontSize: 13, color: "rgba(241,240,234,0.5)", lineHeight: 1.6 }}>
                   No login. No account. Results are instant.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* How it works — full width */}
+          {/* How it works */}
           <div>
             <p
               style={{
@@ -443,26 +571,18 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
             >
               How it works
             </p>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gap: 16,
-              }}
-            >
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
               {[
                 {
                   step: "01",
                   title: "Choose a method",
                   desc: "Scan the QR code on the worker's certificate or type the Credential ID directly.",
                 },
-
                 {
                   step: "02",
                   title: "We check the ledger",
                   desc: "The credential hash is recomputed and compared against the on-chain record in the blockchain ledger.",
                 },
-
                 {
                   step: "03",
                   title: "Get an instant result",
@@ -476,7 +596,6 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
                     border: "1px solid #D6D3C6",
                     borderRadius: 8,
                     padding: "28px 24px",
-
                     display: "flex",
                     flexDirection: "column",
                   }}
@@ -493,21 +612,10 @@ export default function LandingScreen({ onManualEntry, onQRScan }: Props) {
                   >
                     {item.step}
                   </span>
-                  <p
-                    style={{
-                      fontSize: 15,
-                      fontWeight: 700,
-                      color: "#24302E",
-                      marginBottom: 10,
-                    }}
-                  >
+                  <p style={{ fontSize: 15, fontWeight: 700, color: "#24302E", marginBottom: 10 }}>
                     {item.title}
                   </p>
-                  <p
-                    style={{ fontSize: 13, color: "#5C5A50", lineHeight: 1.7 }}
-                  >
-                    {item.desc}
-                  </p>
+                  <p style={{ fontSize: 13, color: "#5C5A50", lineHeight: 1.7 }}>{item.desc}</p>
                 </div>
               ))}
             </div>

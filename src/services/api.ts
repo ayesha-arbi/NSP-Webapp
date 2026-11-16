@@ -490,16 +490,23 @@ export interface VerifyCredentialResponse {
 export interface VerificationResult {
   verified: boolean
   credentialId?: string
+  candidateId?: string
+  candidateDid?: string
   issuedAt?: string
   onChainHash?: string
+  explorerUrl?: string | null
+  verificationStatus?: string
   workerName?: string
   candidateName?: string
   skill?: string
   trade?: string
   grade?: string
+  status?: string
   centre?: string
   hubName?: string
+  issuer?: string
   txHash?: string
+  ledger?: string
   errorMessage?: string
 }
 
@@ -1466,26 +1473,31 @@ export async function verifyNspCredential(
 ): Promise<VerificationResult> {
   try {
     const res = await fetch(
-      `${API_BASE_URL.replace(/\/$/, "")}/api/ledger/verify/${encodeURIComponent(credentialId)}`,
+      `${API_BASE_URL.replace(/\/$/, "")}/api/verify/${encodeURIComponent(credentialId)}`,
     )
     const json = await res.json().catch(() => ({}))
 
     if (res.status === 200 && json.verified) {
       const d = json.data || {}
+        const credential = d.credentialSubject || {}
+        const subject = credential.credentialSubject || {}
       return {
         verified: true,
-        credentialId: d.credentialId || d.credential_id || credentialId,
-        issuedAt: d.issuedAt || d.issued_at || d.issueDate,
-        onChainHash: d.onChainHash || d.txHash || d.tx_hash,
-        workerName: d.workerName || d.candidateName || d.name || d.fullName,
-        skill: d.skill || d.trade || d.tradeCategory,
-        grade: d.grade || d.awardLevel,
-        centre:
-          d.centre ||
-          d.hubName ||
-          d.hub ||
-          (d.hubLocationId ? `Testing Hub #${d.hubLocationId}` : undefined),
-        txHash: d.txHash || d.onChainHash || d.tx_hash,
+        credentialId: d.credentialId || credentialId,
+          candidateId: d.candidateId,
+          candidateDid: subject.id,
+        issuedAt: d.issuedAt,
+        onChainHash: d.onChainHash,
+        txHash: d.txHash,
+        explorerUrl: d.explorerUrl,
+          verificationStatus: json.status,
+        workerName: d.workerName,
+        skill: d.skillTrade,
+        grade: d.assessmentResult,
+        centre: d.testingCentre,
+        status: d.credentialStatus,
+          issuer: subject.issuer || credential.issuer,
+        ledger: d.ledger,
       }
     } else {
       return {
