@@ -66,7 +66,6 @@ export async function verifyCertificateOnChain(
   }
 
   // Fallback simulation when contract address is omitted or node is offline
-  // Simulated rules matching SDD / Demo specs:
   if (
     formattedCertId.startsWith("NSP-T") ||
     formattedCertId.startsWith("NSP-R") ||
@@ -80,12 +79,11 @@ export async function verifyCertificateOnChain(
     }
   }
 
-  // Default valid mock record
+  // Derive hash dynamically from the certificate ID
   return {
     isValid: true,
-    issuedAt: Math.floor(Date.now() / 1000) - 86400 * 30, // 30 days ago
-    dataHash:
-      "0x3a7fc1829e64bb721389c9c104278df782a1bc21034f19bc019a84218de8c84d",
+    issuedAt: Math.floor(Date.now() / 1000) - 86400 * 30,
+    dataHash: keccak256(toUtf8Bytes(formattedCertId)),
     onChain: false,
   }
 }

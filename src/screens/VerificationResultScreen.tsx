@@ -376,12 +376,36 @@ export default function VerificationResultScreen({
                 {isVerified && (
                   <>
                     <TR label="Worker name" bold>
-                      {result.workerName}
+                      {result.workerName || (
+                        <span style={{ color: "#8C897C", fontWeight: 400 }}>
+                          Not specified on-chain
+                        </span>
+                      )}
                     </TR>
-                    <TR label="Skill / Trade">{result.skill}</TR>
-                    <TR label="Assessment result">{result.grade}</TR>
-                    <TR label="Issue date">{result.issueDate}</TR>
-                    <TR label="Testing centre">{result.centre}</TR>
+                    <TR label="Skill / Trade">
+                      {result.skill || (
+                        <span style={{ color: "#8C897C" }}>
+                          Not specified on-chain
+                        </span>
+                      )}
+                    </TR>
+                    <TR label="Assessment result">
+                      {result.grade || (
+                        <span style={{ color: "#8C897C" }}>
+                          Not specified on-chain
+                        </span>
+                      )}
+                    </TR>
+                    <TR label="Issue date">
+                      {result.issueDate || (
+                        <span style={{ color: "#8C897C" }}>Not recorded</span>
+                      )}
+                    </TR>
+                    <TR label="Testing centre">
+                      {result.centre || (
+                        <span style={{ color: "#8C897C" }}>Not recorded</span>
+                      )}
+                    </TR>
                     <TR label="Credential status">
                       <StatusPill status="active" />
                     </TR>
@@ -393,32 +417,40 @@ export default function VerificationResultScreen({
                           gap: 4,
                         }}
                       >
-                        <code
-                          style={{
-                            fontFamily: "'IBM Plex Mono', monospace",
-                            fontSize: 12,
-                            color: "#4C7A6E",
-                            wordBreak: "break-all",
-                          }}
-                        >
-                          {result.txHash}
-                        </code>
-                        {result.txHash?.startsWith("0x") && (
-                          <a
-                            href={`https://amoy.polygonscan.com/tx/${result.txHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              fontSize: 11,
-                              color: "#4C7A6E",
-                              textDecoration: "underline",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 4,
-                            }}
-                          >
-                            View on PolygonScan Amoy Explorer →
-                          </a>
+                        {result.txHash ? (
+                          <>
+                            <code
+                              style={{
+                                fontFamily: "'IBM Plex Mono', monospace",
+                                fontSize: 12,
+                                color: "#4C7A6E",
+                                wordBreak: "break-all",
+                              }}
+                            >
+                              {result.txHash}
+                            </code>
+                            {result.txHash.startsWith("0x") && (
+                              <a
+                                href={`https://amoy.polygonscan.com/tx/${result.txHash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: 11,
+                                  color: "#4C7A6E",
+                                  textDecoration: "underline",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
+                                View on PolygonScan Amoy Explorer →
+                              </a>
+                            )}
+                          </>
+                        ) : (
+                          <span style={{ color: "#8C897C", fontSize: 13 }}>
+                            Confirmed on Polygon Ledger
+                          </span>
                         )}
                       </div>
                     </TR>

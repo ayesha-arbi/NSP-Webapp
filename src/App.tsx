@@ -265,37 +265,24 @@ export default function App() {
         const issueDate = apiResult.issuedAt
           ? new Date(apiResult.issuedAt).toLocaleDateString("en-GB", {
               day: "2-digit",
-
               month: "short",
-
               year: "numeric",
             })
-          : "18 Oct 2026"
+          : undefined
 
         setVerificationResult({
           status: "verified",
-
           credentialId: apiResult.credentialId || trimmed,
-
-          workerName: "Muhammad Aslam Khan",
-
-          skill: "Electrical Installation & Maintenance",
-
-          grade: "Level 2 (Skilled)",
-
+          workerName: apiResult.workerName || apiResult.candidateName,
+          skill: apiResult.skill || apiResult.trade,
+          grade: apiResult.grade,
           issueDate,
-
-          centre: "Regional Testing Centre, Lahore (Hub-01)",
-
-          txHash:
-            apiResult.onChainHash ||
-            "0x89abcdef1234567890abcdef1234567890abcdef1234567890abcdef12345678",
-
+          centre: apiResult.centre || apiResult.hubName,
+          txHash: apiResult.txHash || apiResult.onChainHash,
           timestamp,
         })
 
         setVerifierScreen("result")
-
         return
       }
     } catch (apiErr) {
@@ -303,54 +290,38 @@ export default function App() {
     }
 
     // 2. Fallback simulation (for demo / offline testing when backend is offline)
-
     const onChain = await verifyCertificateOnChain(trimmed)
 
     if (onChain.isValid) {
       const issueDate = onChain.issuedAt
         ? new Date(onChain.issuedAt * 1000).toLocaleDateString("en-GB", {
             day: "2-digit",
-
             month: "short",
-
             year: "numeric",
           })
-        : "18 Oct 2026"
+        : undefined
 
       setVerificationResult({
         status: "verified",
-
-        credentialId:
-          trimmed || "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7",
-
-        workerName: "Muhammad Aslam Khan",
-
-        skill: "Electrical Work, Level 2",
-
-        grade: "Level 2 (Skilled)",
-
+        credentialId: trimmed,
+        workerName: undefined,
+        skill: undefined,
+        grade: undefined,
         issueDate,
-
-        centre: "Regional Centre, Lahore",
-
+        centre: undefined,
         txHash: onChain.dataHash,
-
         timestamp,
       })
     } else if (trimmed.toUpperCase().startsWith("NSP-T")) {
       setVerificationResult({
         status: "tampered",
-
         credentialId: trimmed,
-
         timestamp,
       })
     } else {
       setVerificationResult({
         status: "revoked",
-
         credentialId: trimmed,
-
         timestamp,
       })
     }

@@ -492,6 +492,14 @@ export interface VerificationResult {
   credentialId?: string
   issuedAt?: string
   onChainHash?: string
+  workerName?: string
+  candidateName?: string
+  skill?: string
+  trade?: string
+  grade?: string
+  centre?: string
+  hubName?: string
+  txHash?: string
   errorMessage?: string
 }
 
@@ -1463,11 +1471,21 @@ export async function verifyNspCredential(
     const json = await res.json().catch(() => ({}))
 
     if (res.status === 200 && json.verified) {
+      const d = json.data || {}
       return {
         verified: true,
-        credentialId: json.data?.credentialId || credentialId,
-        issuedAt: json.data?.issuedAt,
-        onChainHash: json.data?.onChainHash,
+        credentialId: d.credentialId || d.credential_id || credentialId,
+        issuedAt: d.issuedAt || d.issued_at || d.issueDate,
+        onChainHash: d.onChainHash || d.txHash || d.tx_hash,
+        workerName: d.workerName || d.candidateName || d.name || d.fullName,
+        skill: d.skill || d.trade || d.tradeCategory,
+        grade: d.grade || d.awardLevel,
+        centre:
+          d.centre ||
+          d.hubName ||
+          d.hub ||
+          (d.hubLocationId ? `Testing Hub #${d.hubLocationId}` : undefined),
+        txHash: d.txHash || d.onChainHash || d.tx_hash,
       }
     } else {
       return {

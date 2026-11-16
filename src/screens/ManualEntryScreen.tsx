@@ -41,9 +41,6 @@ export default function ManualEntryScreen({
 
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const isUrn = value.trim().toLowerCase().startsWith("urn:")
-  const suffix = isUrn ? value.trim() : value.replace(/^NSP-?/i, "")
-
   const handleVerify = () => {
     const trimmed = value.trim()
 
@@ -235,7 +232,7 @@ export default function ManualEntryScreen({
                   {state === "error-empty" &&
                     "Enter a Credential ID to continue."}
                   {state === "error-invalid" &&
-                    "Enter a valid Credential ID, for example NSP-004821."}
+                    "Enter a valid Credential ID or canonical URN."}
                   {state === "error-notfound" &&
                     "No credential was found with this ID. Check the ID and try again."}
                 </p>
@@ -273,14 +270,14 @@ export default function ManualEntryScreen({
                   Credential ID
                 </label>
                 <p style={{ fontSize: 13, color: "#8C897C", marginBottom: 12 }}>
-                  For example, NSP-004821
+                  Enter the Credential ID or canonical URN printed on the certificate
                 </p>
 
-                {/* Split input */}
+                {/* Input container */}
                 <div
                   style={{
                     display: "flex",
-                    maxWidth: 380,
+                    maxWidth: 420,
                     marginBottom: 20,
 
                     border: `1px solid ${
@@ -309,43 +306,27 @@ export default function ManualEntryScreen({
                       fontFamily: "'IBM Plex Mono', monospace",
                       fontSize: 13,
                       fontWeight: 600,
-                      color: isUrn ? "#4C7A6E" : "#5C5A50",
+                      color: "#4C7A6E",
                       display: "flex",
                       alignItems: "center",
                       flexShrink: 0,
                     }}
                   >
-                    {isUrn ? "URN" : "NSP–"}
+                    ID
                   </div>
                   <input
                     ref={inputRef}
                     id="cid"
                     type="text"
-                    value={isUrn ? value : suffix}
+                    value={value}
                     onChange={(e) => {
-                      const val = e.target.value
-                      if (
-                        val.toLowerCase().startsWith("urn:") ||
-                        (val.includes("-") && val.length > 18)
-                      ) {
-                        setValue(val.trim())
-                      } else {
-                        const clean = val
-                          .replace(/^NSP-?/i, "")
-                          .toUpperCase()
-                          .replace(/[^0-9A-Z]/g, "")
-                        setValue(clean ? "NSP-" + clean : "")
-                      }
+                      setValue(e.target.value)
                       setState("idle")
                     }}
                     onKeyDown={(e) =>
                       e.key === "Enter" && !isLoading && handleVerify()
                     }
-                    placeholder={
-                      isUrn
-                        ? "urn:uuid:7c9e6679-7425-40de-944b-e07fc1f90ae7"
-                        : "004821"
-                    }
+                    placeholder="e.g. NSP-004821 or urn:uuid:..."
                     disabled={isLoading}
                     autoComplete="off"
                     spellCheck={false}
@@ -354,8 +335,8 @@ export default function ManualEntryScreen({
                       padding: "10px 12px",
                       border: "none",
                       outline: "none",
-                      fontSize: isUrn ? 13 : 16,
-                      fontWeight: 600,
+                      fontSize: 14,
+                      fontWeight: 500,
                       fontFamily: "'IBM Plex Mono', monospace",
                       color: "#24302E",
                       background: isLoading ? "#F1F0EA" : "#FFFFFF",
@@ -678,10 +659,7 @@ export default function ManualEntryScreen({
                 >
                   {[
                     "Printed below the QR code on the physical certificate",
-
-
-
-                    "Starts with NSP- followed by digits",
+                    "Format can be a standard Credential ID or canonical URN",
                   ].map((t) => (
                     <div
                       key={t}
