@@ -1315,6 +1315,18 @@ export default function ApprovalsScreen() {
                   style={{
                     padding: "12px 16px",
                     textAlign: "left",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: "#5C5A50",
+                    borderBottom: "2px solid #E8E5D8",
+                  }}
+                >
+                  Credential ID
+                </th>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "left",
                     fontSize: 12,
                     fontWeight: 600,
                     color: "#5C5A50",
@@ -1430,6 +1442,48 @@ export default function ApprovalsScreen() {
                       {s.submittedAt}
                     </td>
                     <td style={{ padding: "16px" }}>
+                      {s.credentialId ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <code style={{
+                            fontSize: 11,
+                            fontFamily: "monospace",
+                            color: "#24302E",
+                            background: "#F1F0EA",
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                            maxWidth: 160,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            display: "block"
+                          }}>
+                            {s.credentialId}
+                          </code>
+                          <button
+                            title="Copy Credential ID"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(s.credentialId!);
+                            }}
+                            style={{
+                              background: "none",
+                              border: "1px solid #D6D3C6",
+                              borderRadius: 4,
+                              cursor: "pointer",
+                              padding: "2px 8px",
+                              fontSize: 11,
+                              color: "#4C7A6E",
+                              flexShrink: 0
+                            }}
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 12, color: "#8C897C" }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ padding: "16px" }}>
                       <StatusPill status={s.status} />
                     </td>
                     <td style={{ padding: "16px", textAlign: "right" }}>
@@ -1460,7 +1514,7 @@ export default function ApprovalsScreen() {
               {displayed.length === 0 && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     style={{
                       padding: "64px 24px",
                       textAlign: "center",
@@ -1691,7 +1745,7 @@ export default function ApprovalsScreen() {
             </div>
           </div>
 
-          {selected.status === "approved" && selected.mintingStatus && (
+          {selected.status === "approved" && (selected.credentialId || selected.mintingStatus) && (
             <div
               style={{
                 background: "#F1F0EA",
@@ -1711,9 +1765,11 @@ export default function ApprovalsScreen() {
               >
                 Minting Progress
               </h3>
-              <div style={{ marginBottom: 16 }}>
-                <MintingPill status={selected.mintingStatus} />
-              </div>
+              {selected.mintingStatus && (
+                <div style={{ marginBottom: 16 }}>
+                  <MintingPill status={selected.mintingStatus} />
+                </div>
+              )}
 
               <div
                 style={{
@@ -1724,17 +1780,42 @@ export default function ApprovalsScreen() {
                 }}
               >
                 {selected.credentialId && (
-                  <div>
-                    <div style={{ color: "#5C5A50", marginBottom: 2 }}>
-                      Credential ID
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <div style={{ color: "#5C5A50", fontSize: 12, marginBottom: 4 }}>
+                      Credential ID (Worker Passport ID)
                     </div>
-                    <div
-                      style={{
-                        fontFamily: "IBM Plex Mono, monospace",
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <code style={{
+                        fontFamily: "monospace",
                         color: "#24302E",
-                      }}
-                    >
-                      {selected.credentialId}
+                        fontSize: 12,
+                        background: "#F1F0EA",
+                        padding: "4px 8px",
+                        borderRadius: 4,
+                        wordBreak: "break-all"
+                      }}>
+                        {selected.credentialId || selected.mintingStatus}
+                      </code>
+                      {selected.credentialId && (
+                        <button
+                          onClick={() => navigator.clipboard.writeText(selected.credentialId!)}
+                          style={{
+                            background: "#4C7A6E",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 4,
+                            padding: "4px 12px",
+                            fontSize: 12,
+                            cursor: "pointer",
+                            flexShrink: 0
+                          }}
+                        >
+                          📋 Copy
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#8C897C", marginTop: 4 }}>
+                      Give this ID to the worker to load their passport in the NSP Mobile Wallet
                     </div>
                   </div>
                 )}
